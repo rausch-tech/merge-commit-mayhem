@@ -163,3 +163,186 @@ def test_websocket_on_non_exact_path_does_not_crash_server():
         )
         first = ws.receive_json()
         assert first["type"] == "room_joined"
+
+
+# --- B8 additions: game-loop integration tests -------------------------
+
+
+def test_task_hold_too_far_returns_error():
+    client = TestClient(app)
+    with client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+        _join(ws_a, "TASK", "Alice")
+        ws_a.receive_json()  # lobby
+        _join(ws_b, "TASK", "Bob")
+        ws_a.receive_json()
+        ws_b.receive_json()
+
+        ws_a.send_json({"type": "start_game", "payload": {}})
+        _drain_until(ws_a, "private_role")
+        _drain_until(ws_a, "game_state")
+        _drain_until(ws_b, "private_role")
+        _drain_until(ws_b, "game_state")
+
+        # Alice is somewhere in the Open Space area (start positions). Try to start
+        # a task in the Kitchen (refill_coffee) from there — must be too far.
+        ws_a.send_json(
+            {"type": "task_hold_start", "payload": {"taskId": "refill_coffee"}}
+        )
+        err = ws_a.receive_json()
+        # Could be an error or a subsequent game_state — drain until error.
+        while err["type"] == "game_state":
+            err = ws_a.receive_json()
+        assert err["type"] == "error"
+        assert err["payload"]["code"] == "TASK_TOO_FAR"
+
+
+def test_non_chaos_cannot_trigger_sabotage():
+    client = TestClient(app)
+    with client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+        _join(ws_a, "SABO", "Alice")
+        ws_a.receive_json()
+        _join(ws_b, "SABO", "Bob")
+        ws_a.receive_json()
+        ws_b.receive_json()
+
+        ws_a.send_json({"type": "start_game", "payload": {}})
+        role_a = _drain_until(ws_a, "private_role")
+        _drain_until(ws_a, "game_state")
+        role_b = _drain_until(ws_b, "private_role")
+        _drain_until(ws_b, "game_state")
+
+        non_chaos_ws = ws_a if role_a["payload"]["team"] != "chaos_agents" else ws_b
+        non_chaos_ws.send_json(
+            {"type": "trigger_sabotage", "payload": {"sabotageId": "ci_cd_red"}}
+        )
+        err = non_chaos_ws.receive_json()
+        while err["type"] == "game_state":
+            err = non_chaos_ws.receive_json()
+        assert err["type"] == "error"
+        assert err["payload"]["code"] == "NOT_CHAOS_AGENT"
+
+
+def test_chaos_sees_available_sabotages_in_private_role():
+    client = TestClient(app)
+    with client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+        _join(ws_a, "AVAIL", "Alice")
+        ws_a.receive_json()
+        _join(ws_b, "AVAIL", "Bob")
+        ws_a.receive_json()
+        ws_b.receive_json()
+
+        ws_a.send_json({"type": "start_game", "payload": {}})
+        role_a = _drain_until(ws_a, "private_role")
+        role_b = _drain_until(ws_b, "private_role")
+
+        for role in [role_a, role_b]:
+            if role["payload"]["team"] == "chaos_agents":
+                assert role["payload"]["availableSabotages"] == [
+                    "ci_cd_red",
+                    "coffee_outage",
+                    "mandatory_meeting",
+                ]
+            else:
+                assert role["payload"]["availableSabotages"] == []
+
+
+def test_game_state_carries_stats_and_tasks_and_sabotages():
+    client = TestClient(app)
+    with client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+        _join(ws_a, "STAT", "Alice")
+        ws_a.receive_json()
+        _join(ws_b, "STAT", "Bob")
+        ws_a.receive_json()
+        ws_b.receive_json()
+
+        ws_a.send_json({"type": "start_game", "payload": {}})
+        _drain_until(ws_a, "private_role")
+        state = _drain_until(ws_a, "game_state")
+        p = state["payload"]
+        assert p["releaseProgress"] == 0
+        assert p["pipelineStability"] == 100
+        assert p["coffeeLevel"] == 100
+        assert p["incidentCount"] == 0
+        task_ids = {t["id"] for t in p["tasks"]}
+        assert "fix_unit_tests" in task_ids
+        sab_ids = {s["id"] for s in p["sabotages"]}
+        assert sab_ids == {"ci_cd_red", "coffee_outage", "mandatory_meeting"}
+
+
+def test_game_ended_broadcast_on_release_win():
+    """Drive release_progress to 100 directly via the server-side room and verify
+    a game_ended message goes out to both clients."""
+    client = TestClient(app)
+    with client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+        _join(ws_a, "ENDR", "Alice")
+        ws_a.receive_json()
+        _join(ws_b, "ENDR", "Bob")
+        ws_a.receive_json()
+        ws_b.receive_json()
+
+        ws_a.send_json({"type": "start_game", "payload": {}})
+        _drain_until(ws_a, "private_role")
+        _drain_until(ws_a, "game_state")
+        _drain_until(ws_b, "private_role")
+        _drain_until(ws_b, "game_state")
+
+        # Server-side: force release_progress to 100 so the next tick ends the round.
+        room = registry.get("ENDR")
+        assert room is not None
+        room.release_progress = 100
+
+        ended_a = _drain_until(ws_a, "game_ended", max_msgs=50)
+        ended_b = _drain_until(ws_b, "game_ended", max_msgs=50)
+        assert ended_a["payload"]["winner"] == "release_team"
+        assert ended_a["payload"]["reason"] == "Release deployed."
+        # Roles revealed in the endscreen payload.
+        for p in ended_a["payload"]["players"]:
+            assert p["role"] in {"developer", "vibe_coder"}
+            assert p["team"] in {"release_team", "chaos_agents"}
+        # Second client sees the same winner.
+        assert ended_b["payload"]["winner"] == "release_team"
+
+
+def test_return_to_lobby_requires_host_and_ended_phase():
+    client = TestClient(app)
+    with client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+        _join(ws_a, "RESET", "Alice")
+        ws_a.receive_json()
+        _join(ws_b, "RESET", "Bob")
+        ws_a.receive_json()
+        ws_b.receive_json()
+
+        # Before start → wrong phase
+        ws_a.send_json({"type": "return_to_lobby", "payload": {}})
+        err = ws_a.receive_json()
+        while err["type"] == "game_state":
+            err = ws_a.receive_json()
+        assert err["type"] == "error"
+        assert err["payload"]["code"] == "WRONG_PHASE"
+
+        # Start round
+        ws_a.send_json({"type": "start_game", "payload": {}})
+        _drain_until(ws_a, "private_role")
+        _drain_until(ws_a, "game_state")
+        _drain_until(ws_b, "private_role")
+        _drain_until(ws_b, "game_state")
+
+        # End the round
+        registry.get("RESET").release_progress = 100
+        _drain_until(ws_a, "game_ended", max_msgs=50)
+        _drain_until(ws_b, "game_ended", max_msgs=50)
+
+        # Non-host tries to reset
+        ws_b.send_json({"type": "return_to_lobby", "payload": {}})
+        err = ws_b.receive_json()
+        while err["type"] in {"game_state"}:
+            err = ws_b.receive_json()
+        assert err["type"] == "error"
+        assert err["payload"]["code"] == "NOT_HOST"
+
+        # Host resets → both get lobby_state
+        ws_a.send_json({"type": "return_to_lobby", "payload": {}})
+        lob_a = _drain_until(ws_a, "lobby_state")
+        lob_b = _drain_until(ws_b, "lobby_state")
+        assert len(lob_a["payload"]["players"]) == 2
+        assert len(lob_b["payload"]["players"]) == 2

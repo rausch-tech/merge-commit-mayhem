@@ -95,6 +95,7 @@ class GameRoom:
         # End-of-round state.
         self.winner: str | None = None
         self.win_reason: str | None = None
+        self.has_broadcast_end: bool = False
 
     # --- player management -------------------------------------------------
 
@@ -430,6 +431,27 @@ class GameRoom:
             ],
         }
 
+    def ended_snapshot(self) -> dict:
+        """
+        Payload for the game_ended message. Reveals roles and per-player
+        stats. Only meaningful in phase ENDED.
+        """
+        return {
+            "winner": self.winner or "",
+            "reason": self.win_reason or "",
+            "players": [
+                {
+                    "id": p.id,
+                    "name": p.name,
+                    "role": p.role or "",
+                    "team": p.team or "",
+                    "completedTasks": self.completed_tasks_by_player.get(p.id, 0),
+                    "triggeredSabotages": self.triggered_sabotages_by_player.get(p.id, 0),
+                }
+                for p in self.players.values()
+            ],
+        }
+
     def lobby_snapshot(self) -> dict:
         return {
             "roomCode": self.code,
@@ -468,6 +490,7 @@ class GameRoom:
         self.meeting_active_for = 0.0
         self.winner = None
         self.win_reason = None
+        self.has_broadcast_end = False
         self.completed_tasks_by_player = {}
         self.triggered_sabotages_by_player = {}
         self.tasks = {}

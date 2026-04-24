@@ -138,7 +138,13 @@ class GameStateMsg(BaseModel):
     model_config = _camel_config()
     phase: str
     remaining_seconds: int
+    release_progress: int = 0
+    pipeline_stability: int = 100
+    coffee_level: int = 100
+    incident_count: int = 0
     players: list[dict[str, Any]]
+    tasks: list[dict[str, Any]] = Field(default_factory=list)
+    sabotages: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class PrivateRoleMsg(BaseModel):

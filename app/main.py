@@ -11,15 +11,21 @@ from pydantic import ValidationError
 from app.game.game_room import GameRoom, GameRoomError
 from app.game.models import InputState, Phase
 from app.game.room_code import generate_unique
+from app.game.sabotages import SABOTAGE_DEFINITIONS
 from app.protocol import (
     ErrorMsg,
+    GameEndedMsg,
     GameStateMsg,
     JoinRoom,
     LobbyStateMsg,
     PlayerInput,
     PrivateRoleMsg,
+    ReturnToLobby,
     RoomJoinedMsg,
     StartGame,
+    TaskHoldStart,
+    TaskHoldStop,
+    TriggerSabotage,
     envelope,
     parse_incoming,
 )
@@ -62,24 +68,32 @@ registry = GameRegistry()
 manager = ConnectionManager()
 
 
+def _game_state_msg(room: GameRoom) -> GameStateMsg:
+    """
+    Build a GameStateMsg from the room's public_state dict. Using model_validate
+    relies on public_state using camelCase keys that match GameStateMsg field aliases.
+    """
+    public = room.public_state()
+    return GameStateMsg.model_validate(public)
+
+
 async def _tick_loop() -> None:
     try:
         while True:
             await asyncio.sleep(TICK_DT)
             for room in list(registry.active_rooms()):
-                if room.phase is not Phase.PLAYING:
-                    continue
                 try:
-                    room.tick(TICK_DT)
-                    msg = envelope(
-                        "game_state",
-                        GameStateMsg(
-                            phase=room.phase.value,
-                            remaining_seconds=int(room.remaining_seconds),
-                            players=room.public_state()["players"],
-                        ),
-                    )
-                    await manager.broadcast(room.code, msg)
+                    if room.phase is Phase.PLAYING:
+                        room.tick(TICK_DT)
+                        await manager.broadcast(
+                            room.code, envelope("game_state", _game_state_msg(room))
+                        )
+                    if room.phase is Phase.ENDED and not room.has_broadcast_end:
+                        await manager.broadcast(
+                            room.code,
+                            envelope("game_ended", GameEndedMsg(**room.ended_snapshot())),
+                        )
+                        room.has_broadcast_end = True
                 except Exception:
                     log.exception("tick failed for room %s", room.code)
     except asyncio.CancelledError:
@@ -123,6 +137,14 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 await _handle_start(ws)
             elif isinstance(msg, PlayerInput):
                 await _handle_input(ws, msg)
+            elif isinstance(msg, TaskHoldStart):
+                await _handle_task_hold_start(ws, msg)
+            elif isinstance(msg, TaskHoldStop):
+                await _handle_task_hold_stop(ws, msg)
+            elif isinstance(msg, TriggerSabotage):
+                await _handle_trigger_sabotage(ws, msg)
+            elif isinstance(msg, ReturnToLobby):
+                await _handle_return_to_lobby(ws)
     except WebSocketDisconnect:
         pass
     finally:
@@ -163,28 +185,25 @@ async def _handle_start(ws: WebSocket) -> None:
         await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
         return
     # Send private role to each player.
+    all_sabotage_ids = [s.id for s in SABOTAGE_DEFINITIONS]
     for player_id in list(room.players.keys()):
         info = room.private_role_for(player_id)
+        available = all_sabotage_ids if info.team == "chaos_agents" else []
         await manager.send_to_player(
             room.code,
             player_id,
             envelope(
                 "private_role",
-                PrivateRoleMsg(role=info.role, team=info.team, description=info.description),
+                PrivateRoleMsg(
+                    role=info.role,
+                    team=info.team,
+                    description=info.description,
+                    available_sabotages=available,
+                ),
             ),
         )
     # Immediate public state so clients switch to the game view.
-    await manager.broadcast(
-        room.code,
-        envelope(
-            "game_state",
-            GameStateMsg(
-                phase=room.phase.value,
-                remaining_seconds=int(room.remaining_seconds),
-                players=room.public_state()["players"],
-            ),
-        ),
-    )
+    await manager.broadcast(room.code, envelope("game_state", _game_state_msg(room)))
 
 
 async def _handle_input(ws: WebSocket, msg: PlayerInput) -> None:
@@ -202,6 +221,70 @@ async def _handle_input(ws: WebSocket, msg: PlayerInput) -> None:
             left=msg.payload.left,
             right=msg.payload.right,
         ),
+    )
+
+
+async def _handle_task_hold_start(ws: WebSocket, msg: TaskHoldStart) -> None:
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    try:
+        room.apply_task_hold_start(session.player_id, msg.payload.task_id)
+    except GameRoomError as exc:
+        await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+
+
+async def _handle_task_hold_stop(ws: WebSocket, msg: TaskHoldStop) -> None:
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    room.apply_task_hold_stop(session.player_id, msg.payload.task_id)
+
+
+async def _handle_trigger_sabotage(ws: WebSocket, msg: TriggerSabotage) -> None:
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    try:
+        room.apply_sabotage(session.player_id, msg.payload.sabotage_id)
+    except GameRoomError as exc:
+        await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+
+
+async def _handle_return_to_lobby(ws: WebSocket) -> None:
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    player = room.players.get(session.player_id)
+    if player is None or not player.is_host:
+        await ws.send_json(
+            envelope("error", ErrorMsg(code="NOT_HOST", message="Only host can reset."))
+        )
+        return
+    if room.phase is not Phase.ENDED:
+        await ws.send_json(
+            envelope(
+                "error",
+                ErrorMsg(code="WRONG_PHASE", message="Only allowed in ENDED phase."),
+            )
+        )
+        return
+    room.reset_for_new_round()
+    await manager.broadcast(
+        room.code,
+        envelope("lobby_state", LobbyStateMsg(**room.lobby_snapshot())),
     )
 
 
@@ -224,14 +307,7 @@ async def _handle_disconnect(ws: WebSocket) -> None:
     else:
         await manager.broadcast(
             room.code,
-            envelope(
-                "game_state",
-                GameStateMsg(
-                    phase=room.phase.value,
-                    remaining_seconds=int(room.remaining_seconds),
-                    players=room.public_state()["players"],
-                ),
-            ),
+            envelope("game_state", _game_state_msg(room)),
         )
 
 
