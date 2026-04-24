@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>Merge Conflict Mayhem</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main id="app">
+    <section id="lobby-screen">
+      <h1>Merge Conflict Mayhem</h1>
+      <p class="subtitle">Lunch Break Edition</p>
+
+      <div id="join-form">
+        <label>
+          Name
+          <input id="input-name" type="text" maxlength="16" autocomplete="off" />
+        </label>
+        <label>
+          Raumcode
+          <input id="input-room-code" type="text" maxlength="4" autocomplete="off" />
+        </label>
+        <button id="btn-join" type="button">Join</button>
+      </div>
+
+      <div id="lobby-waiting" class="hidden">
+        <h2>Raum <span id="lobby-room-code"></span></h2>
+        <ul id="lobby-player-list"></ul>
+        <button id="btn-start" type="button" class="hidden">Runde starten</button>
+        <p id="lobby-hint">Warte auf den Host…</p>
+      </div>
+
+      <p id="error-banner" class="hidden"></p>
+    </section>
+
+    <section id="game-screen" class="hidden">
+      <div id="hud">
+        <div id="hud-timer" class="hud-pill">--:--</div>
+        <div id="hud-role" class="hud-pill">Rolle: —</div>
+        <div id="hud-players" class="hud-pill"></div>
+      </div>
+      <canvas id="game-canvas" width="900" height="400"></canvas>
+    </section>
+  </main>
+
+  <script type="module" src="/main.js"></script>
+</body>
+</html>
