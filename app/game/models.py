@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 class Phase(str, Enum):
     LOBBY = "lobby"
     PLAYING = "playing"
+    ENDED = "ended"
 
 
 class InputState(BaseModel):

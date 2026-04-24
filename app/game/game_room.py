@@ -46,7 +46,24 @@ class GameRoom:
         self.code = code
         self.phase: Phase = Phase.LOBBY
         self.players: dict[str, Player] = {}
-        self.remaining_seconds: float = 600.0
+        self.remaining_seconds: float = ROUND_SECONDS
+
+        # Global gameplay stats (0 in LOBBY, reset on start()).
+        self.release_progress: int = 0
+        self.pipeline_stability: int = 100
+        self.coffee_level: int = 100
+        self.incident_count: int = 0
+
+        # Per-player counters for the endscreen. Initialized on start().
+        self.completed_tasks_by_player: dict[str, int] = {}
+        self.triggered_sabotages_by_player: dict[str, int] = {}
+
+        # Mandatory-meeting slow-down timer (seconds remaining; 0 = inactive).
+        self.meeting_active_for: float = 0.0
+
+        # End-of-round state.
+        self.winner: str | None = None
+        self.win_reason: str | None = None
 
     # --- player management -------------------------------------------------
 
@@ -120,6 +137,17 @@ class GameRoom:
             player.x = pos_x
             player.y = pos_y
 
+        # Reset global stats for a fresh round.
+        self.release_progress = 0
+        self.pipeline_stability = 100
+        self.coffee_level = 100
+        self.incident_count = 0
+        self.meeting_active_for = 0.0
+        self.winner = None
+        self.win_reason = None
+        self.completed_tasks_by_player = {pid: 0 for pid in self.players}
+        self.triggered_sabotages_by_player = {pid: 0 for pid in self.players}
+
         self.remaining_seconds = ROUND_SECONDS
         self.phase = Phase.PLAYING
 
@@ -159,6 +187,10 @@ class GameRoom:
         return {
             "phase": self.phase.value,
             "remainingSeconds": int(self.remaining_seconds),
+            "releaseProgress": int(self.release_progress),
+            "pipelineStability": int(self.pipeline_stability),
+            "coffeeLevel": int(self.coffee_level),
+            "incidentCount": int(self.incident_count),
             "players": [
                 {
                     "id": p.id,
@@ -193,3 +225,28 @@ class GameRoom:
             team=p.team,
             description=description_for(p.role),
         )
+
+    def reset_for_new_round(self) -> None:
+        """
+        Raum zurueck in LOBBY-Phase. Spieler bleiben drin, Rollen werden geloescht,
+        Positionen und Inputs zurueckgesetzt. Host-Status bleibt erhalten.
+        """
+        if self.phase is Phase.LOBBY:
+            return
+        self.phase = Phase.LOBBY
+        self.remaining_seconds = ROUND_SECONDS
+        self.release_progress = 0
+        self.pipeline_stability = 100
+        self.coffee_level = 100
+        self.incident_count = 0
+        self.meeting_active_for = 0.0
+        self.winner = None
+        self.win_reason = None
+        self.completed_tasks_by_player = {}
+        self.triggered_sabotages_by_player = {}
+        for player in self.players.values():
+            player.role = None
+            player.team = None
+            player.x = 0.0
+            player.y = 0.0
+            player.input_state = InputState()
