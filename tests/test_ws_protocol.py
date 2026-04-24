@@ -143,3 +143,23 @@ def test_disconnect_removes_player_and_promotes_host():
         assert lobby["type"] == "lobby_state"
         names = [p["name"] for p in lobby["payload"]["players"]]
         assert names == ["Alice"]
+
+
+def test_websocket_on_non_exact_path_does_not_crash_server():
+    """
+    Regression test: a WebSocket to any path other than /ws must not
+    crash the server (previously, it fell through to the static mount
+    and raised AssertionError).
+    """
+    client = TestClient(app)
+    # Trailing slash was the original repro.
+    with pytest.raises(Exception):
+        with client.websocket_connect("/ws/"):
+            pass
+    # Server must still be usable for a legit connection after that.
+    with client.websocket_connect("/ws") as ws:
+        ws.send_json(
+            {"type": "join_room", "payload": {"roomCode": "ZZZZ", "playerName": "Zoe"}}
+        )
+        first = ws.receive_json()
+        assert first["type"] == "room_joined"

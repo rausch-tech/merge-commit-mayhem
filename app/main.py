@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
@@ -234,6 +235,14 @@ async def _handle_disconnect(ws: WebSocket) -> None:
         )
 
 
-# Static frontend — MOUNT MUST BE LAST so /ws route wins.
+# Static frontend.
+# Mount assets under /static (NOT /) so the mount never catches WebSocket
+# scopes — otherwise a stray ws:// to anything other than /ws would crash
+# StaticFiles with AssertionError. The root path is served explicitly below.
 _static_dir = Path(__file__).parent.parent / "static"
-app.mount("/", StaticFiles(directory=_static_dir, html=True), name="static")
+app.mount("/static", StaticFiles(directory=_static_dir), name="static")
+
+
+@app.get("/")
+async def root_index() -> FileResponse:
+    return FileResponse(_static_dir / "index.html")
