@@ -17,3 +17,6 @@ __pycache__/
 
 # Project inputs
 merge_conflict_mayhem_project.zip
+
+# Git worktrees
+.worktrees/
