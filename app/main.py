@@ -68,16 +68,19 @@ async def _tick_loop() -> None:
             for room in list(registry.active_rooms()):
                 if room.phase is not Phase.PLAYING:
                     continue
-                room.tick(TICK_DT)
-                msg = envelope(
-                    "game_state",
-                    GameStateMsg(
-                        phase=room.phase.value,
-                        remaining_seconds=int(room.remaining_seconds),
-                        players=room.public_state()["players"],
-                    ),
-                )
-                await manager.broadcast(room.code, msg)
+                try:
+                    room.tick(TICK_DT)
+                    msg = envelope(
+                        "game_state",
+                        GameStateMsg(
+                            phase=room.phase.value,
+                            remaining_seconds=int(room.remaining_seconds),
+                            players=room.public_state()["players"],
+                        ),
+                    )
+                    await manager.broadcast(room.code, msg)
+                except Exception:
+                    log.exception("tick failed for room %s", room.code)
     except asyncio.CancelledError:
         log.info("tick loop cancelled")
         raise

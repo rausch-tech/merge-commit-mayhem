@@ -1,4 +1,3 @@
-import itertools
 import random
 import uuid
 from dataclasses import dataclass

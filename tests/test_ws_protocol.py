@@ -78,11 +78,15 @@ def test_host_start_gives_private_role_and_game_state():
 
         ws_a.send_json({"type": "start_game", "payload": {}})
 
-        # Each client should receive a private_role and then a game_state.
-        role_a = _drain_until(ws_a, "private_role")
-        state_a = _drain_until(ws_a, "game_state")
-        role_b = _drain_until(ws_b, "private_role")
-        state_b = _drain_until(ws_b, "game_state")
+        # Contract: private_role MUST arrive before game_state on each client.
+        role_a = ws_a.receive_json()
+        assert role_a["type"] == "private_role"
+        state_a = ws_a.receive_json()
+        assert state_a["type"] == "game_state"
+        role_b = ws_b.receive_json()
+        assert role_b["type"] == "private_role"
+        state_b = ws_b.receive_json()
+        assert state_b["type"] == "game_state"
 
         assert role_a["payload"]["role"] in {"vibe_coder", "developer"}
         assert role_b["payload"]["role"] in {"vibe_coder", "developer"}
