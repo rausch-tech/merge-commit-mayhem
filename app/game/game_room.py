@@ -1,10 +1,17 @@
 import random
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.game.models import InputState, Phase, Player
 from app.game.roles import RoleInfo, assign as assign_roles, description_for
 from app.game.rooms import MAP_HEIGHT, MAP_WIDTH
+from app.game.tasks import (
+    TASK_DEFINITIONS,
+    TASK_INTERACTION_RADIUS,
+    TASK_RESPAWN_COOLDOWN,
+    TaskDefinition,
+    task_by_id,
+)
 
 MAX_PLAYERS = 6
 MIN_PLAYERS_TO_START = 2
@@ -41,6 +48,14 @@ class GameRoomError(Exception):
         return f"{self.code}: {self.message}"
 
 
+@dataclass
+class TaskRuntime:
+    definition: TaskDefinition
+    status: str = "available"   # "available" | "in_progress" | "cooldown"
+    cooldown_remaining: float = 0.0
+    per_player_progress: dict[str, float] = field(default_factory=dict)
+
+
 class GameRoom:
     def __init__(self, code: str) -> None:
         self.code = code
@@ -57,6 +72,7 @@ class GameRoom:
         # Per-player counters for the endscreen. Initialized on start().
         self.completed_tasks_by_player: dict[str, int] = {}
         self.triggered_sabotages_by_player: dict[str, int] = {}
+        self.tasks: dict[str, "TaskRuntime"] = {}
 
         # Mandatory-meeting slow-down timer (seconds remaining; 0 = inactive).
         self.meeting_active_for: float = 0.0
@@ -148,6 +164,11 @@ class GameRoom:
         self.completed_tasks_by_player = {pid: 0 for pid in self.players}
         self.triggered_sabotages_by_player = {pid: 0 for pid in self.players}
 
+        self.tasks = {
+            t.id: TaskRuntime(definition=t, status="available")
+            for t in TASK_DEFINITIONS
+        }
+
         self.remaining_seconds = ROUND_SECONDS
         self.phase = Phase.PLAYING
 
@@ -178,7 +199,84 @@ class GameRoom:
                     player.y = 0.0
                 elif player.y > MAP_HEIGHT:
                     player.y = float(MAP_HEIGHT)
+        self._tick_tasks(dt)
         self.remaining_seconds = max(0.0, self.remaining_seconds - dt)
+
+    # --- tasks -------------------------------------------------------------
+
+    def _task_in_range(self, player_id: str, task: "TaskRuntime") -> bool:
+        player = self.players.get(player_id)
+        if player is None:
+            return False
+        dx = player.x - task.definition.x
+        dy = player.y - task.definition.y
+        return (dx * dx + dy * dy) <= (TASK_INTERACTION_RADIUS * TASK_INTERACTION_RADIUS)
+
+    def apply_task_hold_start(self, player_id: str, task_id: str) -> None:
+        if self.phase is not Phase.PLAYING:
+            raise GameRoomError(code="WRONG_PHASE", message="Tasks only during playing.")
+        task = self.tasks.get(task_id)
+        if task is None:
+            raise GameRoomError(code="UNKNOWN_TASK", message=f"Unknown task {task_id!r}.")
+        if task.status == "cooldown":
+            raise GameRoomError(code="TASK_ON_COOLDOWN", message="Task in cooldown.")
+        if not self._task_in_range(player_id, task):
+            raise GameRoomError(code="TASK_TOO_FAR", message="Too far from task.")
+        task.status = "in_progress"
+        task.per_player_progress.setdefault(player_id, 0.0)
+
+    def apply_task_hold_stop(self, player_id: str, task_id: str) -> None:
+        task = self.tasks.get(task_id)
+        if task is None:
+            return
+        task.per_player_progress.pop(player_id, None)
+        if not task.per_player_progress and task.status == "in_progress":
+            task.status = "available"
+
+    def _apply_task_reward(self, definition: TaskDefinition) -> None:
+        if definition.release_progress_reward:
+            self.release_progress = min(
+                100, self.release_progress + definition.release_progress_reward
+            )
+        if definition.pipeline_stability_reward:
+            self.pipeline_stability = min(
+                100, self.pipeline_stability + definition.pipeline_stability_reward
+            )
+        if definition.coffee_level_set is not None:
+            self.coffee_level = definition.coffee_level_set
+
+    def _tick_tasks(self, dt: float) -> None:
+        for task in self.tasks.values():
+            if task.status == "cooldown":
+                task.cooldown_remaining -= dt
+                if task.cooldown_remaining <= 0:
+                    task.cooldown_remaining = 0.0
+                    task.status = "available"
+            elif task.status == "in_progress":
+                finishers: list[str] = []
+                still_progressing: dict[str, float] = {}
+                for pid, progress in task.per_player_progress.items():
+                    if not self._task_in_range(pid, task):
+                        continue  # player left the radius; drop their progress
+                    new_progress = progress + dt
+                    if new_progress >= task.definition.required_seconds:
+                        finishers.append(pid)
+                    else:
+                        still_progressing[pid] = new_progress
+                if finishers:
+                    # Deterministic tiebreak: lexicographically smallest player id.
+                    winner_pid = sorted(finishers)[0]
+                    self._apply_task_reward(task.definition)
+                    self.completed_tasks_by_player[winner_pid] = (
+                        self.completed_tasks_by_player.get(winner_pid, 0) + 1
+                    )
+                    task.per_player_progress = {}
+                    task.status = "cooldown"
+                    task.cooldown_remaining = TASK_RESPAWN_COOLDOWN
+                else:
+                    task.per_player_progress = still_progressing
+                    if not still_progressing:
+                        task.status = "available"
 
     # --- serialization accessors ------------------------------------------
 
@@ -244,6 +342,7 @@ class GameRoom:
         self.win_reason = None
         self.completed_tasks_by_player = {}
         self.triggered_sabotages_by_player = {}
+        self.tasks = {}
         for player in self.players.values():
             player.role = None
             player.team = None
