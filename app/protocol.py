@@ -51,8 +51,59 @@ class PlayerInput(BaseModel):
     payload: PlayerInputPayload
 
 
+class TaskHoldStartPayload(BaseModel):
+    model_config = _camel_config()
+    task_id: str
+
+
+class TaskHoldStopPayload(BaseModel):
+    model_config = _camel_config()
+    task_id: str
+
+
+class TriggerSabotagePayload(BaseModel):
+    model_config = _camel_config()
+    sabotage_id: str
+
+
+class ReturnToLobbyPayload(BaseModel):
+    model_config = _camel_config()
+
+
+class TaskHoldStart(BaseModel):
+    model_config = _camel_config()
+    type: Literal["task_hold_start"]
+    payload: TaskHoldStartPayload
+
+
+class TaskHoldStop(BaseModel):
+    model_config = _camel_config()
+    type: Literal["task_hold_stop"]
+    payload: TaskHoldStopPayload
+
+
+class TriggerSabotage(BaseModel):
+    model_config = _camel_config()
+    type: Literal["trigger_sabotage"]
+    payload: TriggerSabotagePayload
+
+
+class ReturnToLobby(BaseModel):
+    model_config = _camel_config()
+    type: Literal["return_to_lobby"]
+    payload: ReturnToLobbyPayload = Field(default_factory=ReturnToLobbyPayload)
+
+
 IncomingMessage = Annotated[
-    Union[JoinRoom, StartGame, PlayerInput],
+    Union[
+        JoinRoom,
+        StartGame,
+        PlayerInput,
+        TaskHoldStart,
+        TaskHoldStop,
+        TriggerSabotage,
+        ReturnToLobby,
+    ],
     Discriminator("type"),
 ]
 
@@ -95,12 +146,20 @@ class PrivateRoleMsg(BaseModel):
     role: str
     team: str
     description: str
+    available_sabotages: list[str] = Field(default_factory=list)
 
 
 class ErrorMsg(BaseModel):
     model_config = _camel_config()
     code: str
     message: str
+
+
+class GameEndedMsg(BaseModel):
+    model_config = _camel_config()
+    winner: str
+    reason: str
+    players: list[dict[str, Any]]  # each: {id, name, role, team, completedTasks, triggeredSabotages}
 
 
 def envelope(type_: str, payload: BaseModel) -> dict[str, Any]:

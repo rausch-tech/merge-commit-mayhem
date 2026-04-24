@@ -98,6 +98,7 @@ def test_private_role_serializes_as_expected():
         "role": "vibe_coder",
         "team": "chaos_agents",
         "description": "Sabotier das Release.",
+        "availableSabotages": [],
     }
 
 
@@ -105,3 +106,81 @@ def test_error_msg_serializes_correctly():
     msg = ErrorMsg(code="NOT_HOST", message="Only host can start.")
     dumped = msg.model_dump(by_alias=True)
     assert dumped == {"code": "NOT_HOST", "message": "Only host can start."}
+
+
+# --- B7 additions: new incoming types + GameEndedMsg + PrivateRole extension
+
+
+from app.protocol import (
+    GameEndedMsg,
+    ReturnToLobby,
+    TaskHoldStart,
+    TaskHoldStop,
+    TriggerSabotage,
+)
+
+
+def test_parse_task_hold_start():
+    raw = {"type": "task_hold_start", "payload": {"taskId": "fix_unit_tests"}}
+    msg = parse_incoming(raw)
+    assert isinstance(msg, TaskHoldStart)
+    assert msg.payload.task_id == "fix_unit_tests"
+
+
+def test_parse_task_hold_stop():
+    raw = {"type": "task_hold_stop", "payload": {"taskId": "review_pr"}}
+    msg = parse_incoming(raw)
+    assert isinstance(msg, TaskHoldStop)
+    assert msg.payload.task_id == "review_pr"
+
+
+def test_parse_trigger_sabotage():
+    raw = {"type": "trigger_sabotage", "payload": {"sabotageId": "ci_cd_red"}}
+    msg = parse_incoming(raw)
+    assert isinstance(msg, TriggerSabotage)
+    assert msg.payload.sabotage_id == "ci_cd_red"
+
+
+def test_parse_return_to_lobby_with_empty_payload():
+    raw = {"type": "return_to_lobby", "payload": {}}
+    msg = parse_incoming(raw)
+    assert isinstance(msg, ReturnToLobby)
+
+
+def test_private_role_default_available_sabotages_empty():
+    msg = PrivateRoleMsg(role="developer", team="release_team", description="x")
+    dumped = msg.model_dump(by_alias=True)
+    assert dumped["availableSabotages"] == []
+
+
+def test_private_role_with_available_sabotages():
+    msg = PrivateRoleMsg(
+        role="vibe_coder",
+        team="chaos_agents",
+        description="Sabotier.",
+        available_sabotages=["ci_cd_red", "coffee_outage", "mandatory_meeting"],
+    )
+    dumped = msg.model_dump(by_alias=True)
+    assert dumped["availableSabotages"] == ["ci_cd_red", "coffee_outage", "mandatory_meeting"]
+
+
+def test_game_ended_msg_serializes_to_camel():
+    msg = GameEndedMsg(
+        winner="release_team",
+        reason="Release deployed.",
+        players=[
+            {
+                "id": "p1",
+                "name": "Sven",
+                "role": "developer",
+                "team": "release_team",
+                "completedTasks": 5,
+                "triggeredSabotages": 0,
+            }
+        ],
+    )
+    dumped = msg.model_dump(by_alias=True)
+    assert dumped["winner"] == "release_team"
+    assert dumped["reason"] == "Release deployed."
+    assert dumped["players"][0]["completedTasks"] == 5
+    assert dumped["players"][0]["triggeredSabotages"] == 0
