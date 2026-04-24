@@ -6,7 +6,9 @@ from app.game.models import InputState, Phase, Player
 from app.game.roles import RoleInfo, assign as assign_roles, description_for
 from app.game.rooms import MAP_HEIGHT, MAP_WIDTH
 from app.game.sabotages import (
+    COFFEE_SLOW_SPEED,
     MEETING_DURATION,
+    NORMAL_SPEED,
     SABOTAGE_DEFINITIONS,
     SabotageDefinition,
     sabotage_by_id,
@@ -21,7 +23,6 @@ from app.game.tasks import (
 
 MAX_PLAYERS = 6
 MIN_PLAYERS_TO_START = 2
-PLAYER_SPEED = 120.0  # px/s
 PLAYER_RADIUS = 12
 ROUND_SECONDS = 600.0
 
@@ -205,10 +206,10 @@ class GameRoom:
             dx = (int(player.input_state.right) - int(player.input_state.left))
             dy = (int(player.input_state.down) - int(player.input_state.up))
             if dx or dy:
+                speed = self._current_speed_for(player.id)
                 length = (dx * dx + dy * dy) ** 0.5
-                player.x += (dx / length) * PLAYER_SPEED * dt
-                player.y += (dy / length) * PLAYER_SPEED * dt
-                # Clamp in map bounds.
+                player.x += (dx / length) * speed * dt
+                player.y += (dy / length) * speed * dt
                 if player.x < 0:
                     player.x = 0.0
                 elif player.x > MAP_WIDTH:
@@ -220,6 +221,18 @@ class GameRoom:
         self._tick_tasks(dt)
         self._tick_sabotages(dt)
         self.remaining_seconds = max(0.0, self.remaining_seconds - dt)
+
+    # --- speed helpers -----------------------------------------------------
+
+    def _current_speed_for(self, player_id: str) -> float:
+        """
+        Returns the effective movement speed in px/s for a player this tick.
+        Effects (coffee outage + mandatory meeting) do not stack — floor is
+        COFFEE_SLOW_SPEED, normal is NORMAL_SPEED.
+        """
+        if self.coffee_level == 0 or self.meeting_active_for > 0:
+            return COFFEE_SLOW_SPEED
+        return NORMAL_SPEED
 
     # --- tasks -------------------------------------------------------------
 

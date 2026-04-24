@@ -311,3 +311,60 @@ def test_start_after_reset_assigns_new_roles():
     second_role_map = {p.id: p.role for p in room.players.values()}
     # New assignment happened (might by chance equal — allow either; but at least no Nones left).
     assert all(r is not None for r in second_role_map.values())
+
+
+# --- B5 additions: movement speed modifiers -----------------------------
+
+
+def test_default_speed_is_normal():
+    from app.game.sabotages import NORMAL_SPEED
+    room = _make_started_room(player_count=2)
+    pid = next(iter(room.players))
+    assert room._current_speed_for(pid) == NORMAL_SPEED
+
+
+def test_coffee_zero_applies_slow_speed():
+    from app.game.sabotages import COFFEE_SLOW_SPEED
+    room = _make_started_room(player_count=2)
+    pid = next(iter(room.players))
+    room.coffee_level = 0
+    assert room._current_speed_for(pid) == COFFEE_SLOW_SPEED
+
+
+def test_meeting_active_applies_slow_speed():
+    from app.game.sabotages import COFFEE_SLOW_SPEED
+    room = _make_started_room(player_count=2)
+    pid = next(iter(room.players))
+    room.meeting_active_for = 3.0
+    assert room._current_speed_for(pid) == COFFEE_SLOW_SPEED
+
+
+def test_both_effects_do_not_stack():
+    from app.game.sabotages import COFFEE_SLOW_SPEED
+    room = _make_started_room(player_count=2)
+    pid = next(iter(room.players))
+    room.coffee_level = 0
+    room.meeting_active_for = 3.0
+    # Still exactly the same slow-speed, not lower.
+    assert room._current_speed_for(pid) == COFFEE_SLOW_SPEED
+
+
+def test_coffee_refill_restores_normal_speed():
+    from app.game.sabotages import NORMAL_SPEED
+    room = _make_started_room(player_count=2)
+    pid = next(iter(room.players))
+    room.coffee_level = 0
+    room.coffee_level = 100  # refilled
+    assert room._current_speed_for(pid) == NORMAL_SPEED
+
+
+def test_tick_movement_respects_slow_speed():
+    from app.game.sabotages import COFFEE_SLOW_SPEED
+    room = _make_started_room(player_count=2)
+    p = next(iter(room.players.values()))
+    p.x, p.y = 400.0, 100.0
+    room.apply_input(p.id, InputState(right=True))
+    room.coffee_level = 0  # slow
+    room.tick(0.1)
+    # 60 px/s * 0.1 s = 6 px, not 12 px.
+    assert p.x == pytest.approx(406.0)
