@@ -5,6 +5,12 @@ from dataclasses import dataclass, field
 from app.game.models import InputState, Phase, Player
 from app.game.roles import RoleInfo, assign as assign_roles, description_for
 from app.game.rooms import MAP_HEIGHT, MAP_WIDTH
+from app.game.sabotages import (
+    MEETING_DURATION,
+    SABOTAGE_DEFINITIONS,
+    SabotageDefinition,
+    sabotage_by_id,
+)
 from app.game.tasks import (
     TASK_DEFINITIONS,
     TASK_INTERACTION_RADIUS,
@@ -56,6 +62,13 @@ class TaskRuntime:
     per_player_progress: dict[str, float] = field(default_factory=dict)
 
 
+@dataclass
+class SabotageRuntime:
+    definition: SabotageDefinition
+    cooldown_remaining: float = 0.0
+    active: bool = False     # True for coffee_outage while coffee==0, for meeting while meeting_active_for>0
+
+
 class GameRoom:
     def __init__(self, code: str) -> None:
         self.code = code
@@ -73,6 +86,7 @@ class GameRoom:
         self.completed_tasks_by_player: dict[str, int] = {}
         self.triggered_sabotages_by_player: dict[str, int] = {}
         self.tasks: dict[str, "TaskRuntime"] = {}
+        self.sabotages: dict[str, "SabotageRuntime"] = {}
 
         # Mandatory-meeting slow-down timer (seconds remaining; 0 = inactive).
         self.meeting_active_for: float = 0.0
@@ -169,6 +183,10 @@ class GameRoom:
             for t in TASK_DEFINITIONS
         }
 
+        self.sabotages = {
+            s.id: SabotageRuntime(definition=s) for s in SABOTAGE_DEFINITIONS
+        }
+
         self.remaining_seconds = ROUND_SECONDS
         self.phase = Phase.PLAYING
 
@@ -200,6 +218,7 @@ class GameRoom:
                 elif player.y > MAP_HEIGHT:
                     player.y = float(MAP_HEIGHT)
         self._tick_tasks(dt)
+        self._tick_sabotages(dt)
         self.remaining_seconds = max(0.0, self.remaining_seconds - dt)
 
     # --- tasks -------------------------------------------------------------
@@ -278,6 +297,53 @@ class GameRoom:
                     if not still_progressing:
                         task.status = "available"
 
+    # --- sabotages ---------------------------------------------------------
+
+    def apply_sabotage(self, player_id: str, sabotage_id: str) -> None:
+        if self.phase is not Phase.PLAYING:
+            raise GameRoomError(code="WRONG_PHASE", message="Sabotages only during playing.")
+        player = self.players.get(player_id)
+        if player is None:
+            raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
+        if player.team != "chaos_agents":
+            raise GameRoomError(
+                code="NOT_CHAOS_AGENT",
+                message="Only chaos agents can trigger sabotages.",
+            )
+        sab = self.sabotages.get(sabotage_id)
+        if sab is None:
+            raise GameRoomError(code="UNKNOWN_SABOTAGE", message=f"Unknown {sabotage_id!r}.")
+        if sab.cooldown_remaining > 0:
+            raise GameRoomError(code="SABOTAGE_ON_COOLDOWN", message="Sabotage on cooldown.")
+
+        # Apply the effect.
+        if sabotage_id == "ci_cd_red":
+            self.pipeline_stability = max(0, self.pipeline_stability - 20)
+        elif sabotage_id == "coffee_outage":
+            self.coffee_level = 0
+        elif sabotage_id == "mandatory_meeting":
+            self.meeting_active_for = MEETING_DURATION
+        # Future sabotages: add here.
+
+        sab.cooldown_remaining = sab.definition.cooldown_seconds
+        self.triggered_sabotages_by_player[player_id] = (
+            self.triggered_sabotages_by_player.get(player_id, 0) + 1
+        )
+
+    def _tick_sabotages(self, dt: float) -> None:
+        for sab in self.sabotages.values():
+            if sab.cooldown_remaining > 0:
+                sab.cooldown_remaining = max(0.0, sab.cooldown_remaining - dt)
+            # Recompute active flag for UI:
+            if sab.definition.id == "coffee_outage":
+                sab.active = self.coffee_level == 0
+            elif sab.definition.id == "mandatory_meeting":
+                sab.active = self.meeting_active_for > 0
+            else:
+                sab.active = False
+        if self.meeting_active_for > 0:
+            self.meeting_active_for = max(0.0, self.meeting_active_for - dt)
+
     # --- serialization accessors ------------------------------------------
 
     def public_state(self) -> dict:
@@ -299,6 +365,33 @@ class GameRoom:
                     "isHost": p.is_host,
                 }
                 for p in self.players.values()
+            ],
+            "tasks": [
+                {
+                    "id": t.definition.id,
+                    "title": t.definition.title,
+                    "room": t.definition.room,
+                    "x": t.definition.x,
+                    "y": t.definition.y,
+                    "requiredSeconds": t.definition.required_seconds,
+                    "status": t.status,
+                    "progress": (
+                        max(t.per_player_progress.values()) / t.definition.required_seconds
+                        if t.per_player_progress
+                        else 0.0
+                    ),
+                    "cooldownRemaining": round(t.cooldown_remaining, 2),
+                }
+                for t in self.tasks.values()
+            ],
+            "sabotages": [
+                {
+                    "id": s.definition.id,
+                    "title": s.definition.title,
+                    "cooldownRemaining": round(s.cooldown_remaining, 2),
+                    "active": s.active,
+                }
+                for s in self.sabotages.values()
             ],
         }
 
@@ -343,6 +436,7 @@ class GameRoom:
         self.completed_tasks_by_player = {}
         self.triggered_sabotages_by_player = {}
         self.tasks = {}
+        self.sabotages = {}
         for player in self.players.values():
             player.role = None
             player.team = None
