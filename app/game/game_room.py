@@ -221,6 +221,28 @@ class GameRoom:
         self._tick_tasks(dt)
         self._tick_sabotages(dt)
         self.remaining_seconds = max(0.0, self.remaining_seconds - dt)
+        self._check_win_conditions()
+
+    # --- win conditions ----------------------------------------------------
+
+    def _check_win_conditions(self) -> None:
+        """
+        Inspect state in priority order and transition to ENDED if a
+        condition is met. Idempotent — does nothing once already ENDED.
+        """
+        if self.phase is not Phase.PLAYING:
+            return
+        if self.pipeline_stability <= 0:
+            self._finish_round("chaos_agents", "Die Pipeline ist tot.")
+        elif self.release_progress >= 100:
+            self._finish_round("release_team", "Release deployed.")
+        elif self.remaining_seconds <= 0:
+            self._finish_round("chaos_agents", "Das Release-Fenster ist geschlossen.")
+
+    def _finish_round(self, winner: str, reason: str) -> None:
+        self.phase = Phase.ENDED
+        self.winner = winner
+        self.win_reason = reason
 
     # --- speed helpers -----------------------------------------------------
 
