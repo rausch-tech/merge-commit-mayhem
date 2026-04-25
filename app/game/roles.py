@@ -6,9 +6,7 @@ _MAX_PLAYERS = 6
 
 _DESCRIPTIONS = {
     "developer": "Du bist ein Developer. Bring das Release über die Linie.",
-    "vibe_coder": (
-        "Du bist der Vibe Coder. Sabotiere das Release, ohne entdeckt zu werden."
-    ),
+    "vibe_coder": ("Du bist der Vibe Coder. Sabotiere das Release, ohne entdeckt zu werden."),
 }
 _TEAMS = {
     "developer": "release_team",
@@ -34,9 +32,7 @@ def assign(
     """
     n = len(player_ids)
     if n < _MIN_PLAYERS or n > _MAX_PLAYERS:
-        raise ValueError(
-            f"assign() erwartet {_MIN_PLAYERS}..{_MAX_PLAYERS} Spieler, bekam {n}."
-        )
+        raise ValueError(f"assign() erwartet {_MIN_PLAYERS}..{_MAX_PLAYERS} Spieler, bekam {n}.")
 
     r = rng or random.SystemRandom()
     shuffled = list(player_ids)

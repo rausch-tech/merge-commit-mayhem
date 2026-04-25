@@ -2,10 +2,9 @@ import random
 
 import pytest
 
-from app.game.game_room import GameRoom, GameRoomError, MEETING_DURATION_SECONDS
+from app.game.game_room import MEETING_DURATION_SECONDS, GameRoom, GameRoomError
 from app.game.models import InputState, Phase
 from app.game.voting import SKIP_TARGET, all_chaos_eliminated, tally
-
 
 # --- pure tally helper ----------------------------------------------------
 
@@ -36,21 +35,27 @@ def test_tally_two_named_targets_tied_no_removal():
 
 def test_all_chaos_eliminated_yes():
     class P:
-        def __init__(self, team, alive): self.team, self.is_alive = team, alive
+        def __init__(self, team, alive):
+            self.team, self.is_alive = team, alive
+
     players = [P("chaos_agents", False), P("release_team", True)]
     assert all_chaos_eliminated(players) is True
 
 
 def test_all_chaos_eliminated_no_chaos_left_in_game_returns_false():
     class P:
-        def __init__(self, team, alive): self.team, self.is_alive = team, alive
+        def __init__(self, team, alive):
+            self.team, self.is_alive = team, alive
+
     players = [P("release_team", True)]
     assert all_chaos_eliminated(players) is False
 
 
 def test_all_chaos_eliminated_some_alive():
     class P:
-        def __init__(self, team, alive): self.team, self.is_alive = team, alive
+        def __init__(self, team, alive):
+            self.team, self.is_alive = team, alive
+
     players = [P("chaos_agents", False), P("chaos_agents", True)]
     assert all_chaos_eliminated(players) is False
 

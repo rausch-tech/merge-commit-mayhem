@@ -62,10 +62,14 @@ def resolve_wall_collision(
 
     Returns (resolved_x, resolved_y).
     """
-    for (wx1, wy1, wx2, wy2) in walls:
+    for wx1, wy1, wx2, wy2 in walls:
         # AABB-vs-circle test (cheap & sufficient for axis-aligned rects).
-        if (new_x + radius > wx1 and new_x - radius < wx2
-                and new_y + radius > wy1 and new_y - radius < wy2):
+        if (
+            new_x + radius > wx1
+            and new_x - radius < wx2
+            and new_y + radius > wy1
+            and new_y - radius < wy2
+        ):
             if moved_dx > 0 and moved_dy == 0:
                 new_x = wx1 - radius
             elif moved_dx < 0 and moved_dy == 0:

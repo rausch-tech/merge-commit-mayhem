@@ -4,7 +4,7 @@ from enum import Enum
 from pydantic import BaseModel, Field
 
 
-class Phase(str, Enum):
+class Phase(str, Enum):  # noqa: UP042
     LOBBY = "lobby"
     PLAYING = "playing"
     MEETING = "meeting"

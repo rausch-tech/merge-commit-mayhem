@@ -12,21 +12,21 @@ Hi 👋 — Merge Conflict Mayhem ist ein internes Multiplayer-Game für Tech-Te
 
 ### Klein (gut für Erst-Beitrag)
 
-| Was | Wo | Hinweis |
-|---|---|---|
-| **Neuer Eventtext** | (kommt mit Tier 5.4) `event_texts.json` — aktuell hardcoded in Code, sammeln wir aber schon im Roadmap | Witzig, kurz, Tech-Insider-tauglich |
-| **Bug-Report** | GitHub Issues | Schritte zur Reproduktion, was erwartet, was gesehen |
-| **Doku-Verbesserung** | `docs/*.md` | Tippfehler, unklare Stellen, fehlende Beispiele |
-| **Neue Task-Idee** | GitHub Issue mit Label `task-idea` | Titel, Raum, Reward-Vorschlag, lustige Beschreibung |
-| **Neue Sabotage-Idee** | GitHub Issue mit Label `sabotage-idea` | Effekt, Cooldown, Repair-Mechanik, lustige Beschreibung |
+| Was                    | Wo                                                                                                     | Hinweis                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| **Neuer Eventtext**    | (kommt mit Tier 5.4) `event_texts.json` — aktuell hardcoded in Code, sammeln wir aber schon im Roadmap | Witzig, kurz, Tech-Insider-tauglich                     |
+| **Bug-Report**         | GitHub Issues                                                                                          | Schritte zur Reproduktion, was erwartet, was gesehen    |
+| **Doku-Verbesserung**  | `docs/*.md`                                                                                            | Tippfehler, unklare Stellen, fehlende Beispiele         |
+| **Neue Task-Idee**     | GitHub Issue mit Label `task-idea`                                                                     | Titel, Raum, Reward-Vorschlag, lustige Beschreibung     |
+| **Neue Sabotage-Idee** | GitHub Issue mit Label `sabotage-idea`                                                                 | Effekt, Cooldown, Repair-Mechanik, lustige Beschreibung |
 
 ### Mittel
 
-| Was | Hinweis |
-|---|---|
-| **Neue Task implementieren** | Definition in `app/game/tasks.py`, Position in `maps/default.json` (`taskAnchors`), Icon-Mapping in `static/sprites.js` |
-| **Neue Sabotage implementieren** | Definition in `app/game/sabotages.py`, Effekt-Branch in `GameRoom.apply_sabotage`, Icon in `static/sprites.js` |
-| **Neue Map** | `maps/<name>.json` — Schema siehe `docs/maps.md`. Validieren mit `uv run python -c "from app.game.game_map import load_map; print(load_map('maps/<name>.json').name)"` |
+| Was                              | Hinweis                                                                                                                                                                |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Neue Task implementieren**     | Definition in `app/game/tasks.py`, Position in `maps/default.json` (`taskAnchors`), Icon-Mapping in `static/sprites.js`                                                |
+| **Neue Sabotage implementieren** | Definition in `app/game/sabotages.py`, Effekt-Branch in `GameRoom.apply_sabotage`, Icon in `static/sprites.js`                                                         |
+| **Neue Map**                     | `maps/<name>.json` — Schema siehe `docs/maps.md`. Validieren mit `uv run python -c "from app.game.game_map import load_map; print(load_map('maps/<name>.json').name)"` |
 
 ### Groß
 

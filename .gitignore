@@ -20,3 +20,7 @@ merge_conflict_mayhem_project.zip
 
 # Git worktrees
 .worktrees/
+
+# Frontend tooling (only used for prettier, no runtime deps)
+node_modules/
+package-lock.json

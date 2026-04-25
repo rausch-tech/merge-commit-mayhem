@@ -18,7 +18,7 @@ const state = {
   map: null,
 };
 
-const previousTaskStatus = {};  // taskId -> last seen status
+const previousTaskStatus = {}; // taskId -> last seen status
 
 const els = {
   joinForm: document.getElementById("join-form"),
@@ -58,17 +58,9 @@ function warRoomBoundsFromMap(map) {
   return { xMin: room.x, yMin: room.y, xMax: room.x + room.width, yMax: room.y + room.height };
 }
 
-const meetingOverlay = new MeetingOverlay(
-  document.getElementById("meeting-overlay"),
-  ws,
-);
-const votingResultToast = new VotingResultToast(
-  document.getElementById("voting-result-toast"),
-);
-const emergencyBtn = new EmergencyMeetingBtn(
-  document.getElementById("emergency-meeting-btn"),
-  ws,
-);
+const meetingOverlay = new MeetingOverlay(document.getElementById("meeting-overlay"), ws);
+const votingResultToast = new VotingResultToast(document.getElementById("voting-result-toast"));
+const emergencyBtn = new EmergencyMeetingBtn(document.getElementById("emergency-meeting-btn"), ws);
 
 function showError(msg) {
   els.errorBanner.textContent = msg;
@@ -114,7 +106,7 @@ ws.on("lobby_state", (payload) => {
   // If we were on the game screen (post-round reset), swap back to lobby.
   els.gameScreen.classList.add("hidden");
   els.lobbyScreen.classList.remove("hidden");
-  els.joinForm.classList.add("hidden");          // already joined
+  els.joinForm.classList.add("hidden"); // already joined
   els.lobbyWaiting.classList.remove("hidden");
   // Also make sure sabotage panel hides until next start.
   sabotagePanel.setAvailable([]);

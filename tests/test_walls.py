@@ -2,9 +2,9 @@ import random
 
 import pytest
 
-from app.game.game_room import GameRoom
-from app.game.models import InputState, Phase
 from app.game.game_map import DEFAULT_MAP, compute_walls
+from app.game.game_room import GameRoom
+from app.game.models import InputState
 from app.game.walls import (
     DOOR_WIDTH_DEFAULT,
     PLAYER_COLLISION_RADIUS,
@@ -47,7 +47,7 @@ def test_resolve_blocks_horizontal_against_vertical_wall():
 def test_resolve_blocks_vertical_against_horizontal_wall():
     # x=700 is between the doors at x=400 (range 340-460) and x=1200 (range 1140-1260),
     # so there IS a wall segment here.
-    new_y, = (resolve_wall_collision(700.0, 800.0, 0.0, 5.0, WALLS)[1],)
+    (new_y,) = (resolve_wall_collision(700.0, 800.0, 0.0, 5.0, WALLS)[1],)
     assert new_y == pytest.approx(800 - WALL_THICKNESS - PLAYER_COLLISION_RADIUS)
 
 

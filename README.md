@@ -1,5 +1,7 @@
 # Merge Conflict Mayhem
 
+[![CI](https://github.com/rausch-tech/merge-commit-mayhem/actions/workflows/ci.yml/badge.svg)](https://github.com/rausch-tech/merge-commit-mayhem/actions/workflows/ci.yml)
+
 Ein Among-Us-artiges Social-Deduction-Game für Tech-Teams. Statt Raumstation: ein Software-Büro mitten im Release. Statt Crewmates und Imposter: Release-Team und Chaos-Agenten. Mit der Mechanik-Klarheit von Among Us und der Insider-Komik eines Engineering-Teams in der Krise.
 
 **Status:** Spielbar als Browser-Prototyp, in aktiver Entwicklung. Godot-Client folgt nach der Foundation-Cleanup-Phase. Siehe [`docs/ROADMAP.md`](docs/ROADMAP.md) für den vollständigen Plan.

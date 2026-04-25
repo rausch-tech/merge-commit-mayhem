@@ -8,14 +8,14 @@ from typing import Final
 
 # Global gameplay constants (single source of truth -- also reused by game_room).
 TASK_INTERACTION_RADIUS: Final[float] = 40.0  # px around task center where E works
-TASK_RESPAWN_COOLDOWN: Final[float] = 8.0     # s until a completed task becomes available again
+TASK_RESPAWN_COOLDOWN: Final[float] = 8.0  # s until a completed task becomes available again
 
 
 @dataclass(frozen=True)
 class TaskDefinition:
     id: str
     title: str
-    room: str   # display label only, e.g. "open_space"
+    room: str  # display label only, e.g. "open_space"
     required_seconds: float
     release_progress_reward: int = 0
     pipeline_stability_reward: int = 0

@@ -2,10 +2,14 @@
 // the state actually changes. Reset on window blur to avoid stuck keys.
 
 const KEY_MAP = {
-  KeyW: "up", ArrowUp: "up",
-  KeyS: "down", ArrowDown: "down",
-  KeyA: "left", ArrowLeft: "left",
-  KeyD: "right", ArrowRight: "right",
+  KeyW: "up",
+  ArrowUp: "up",
+  KeyS: "down",
+  ArrowDown: "down",
+  KeyA: "left",
+  ArrowLeft: "left",
+  KeyD: "right",
+  ArrowRight: "right",
 };
 
 export function attachInput(wsClient) {
@@ -53,7 +57,7 @@ export function attachTaskInteraction(wsClient, renderer) {
   let currentTaskId = null;
 
   const tryStart = () => {
-    if (currentTaskId !== null) return;  // already holding
+    if (currentTaskId !== null) return; // already holding
     const taskId = renderer.localPlayerInRange;
     if (!taskId) return;
     currentTaskId = taskId;

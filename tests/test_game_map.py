@@ -16,7 +16,6 @@ from app.game.game_map import (
 )
 from app.game.walls import WALL_THICKNESS
 
-
 # --- load_map + validation --------------------------------------------------
 
 
@@ -66,7 +65,7 @@ def test_load_map_raises_on_missing_required_field():
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         json.dump(minimal, f)
         tmp_path = Path(f.name)
-    with pytest.raises(Exception):
+    with pytest.raises((Exception,)):  # noqa: B017 — multiple validation paths can throw
         load_map(tmp_path)
 
 
@@ -74,13 +73,24 @@ def test_load_map_raises_on_extra_field_in_room():
     data = {
         "name": "test",
         "size": {"width": 100, "height": 100},
-        "rooms": [{"id": "x", "title": "X", "x": 0, "y": 0, "width": 100, "height": 100, "color": "#fff", "extraField": 99}],
+        "rooms": [
+            {
+                "id": "x",
+                "title": "X",
+                "x": 0,
+                "y": 0,
+                "width": 100,
+                "height": 100,
+                "color": "#fff",
+                "extraField": 99,
+            }
+        ],
         "warRoomId": "x",
     }
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         json.dump(data, f)
         tmp_path = Path(f.name)
-    with pytest.raises(Exception):
+    with pytest.raises((Exception,)):  # noqa: B017 — multiple validation paths can throw
         load_map(tmp_path)
 
 
@@ -142,7 +152,7 @@ def test_task_position_map_has_all_four_tasks():
 
 def test_task_position_map_values_are_float_pairs():
     positions = task_position_map(DEFAULT_MAP)
-    for tid, (x, y) in positions.items():
+    for _tid, (x, y) in positions.items():
         assert isinstance(x, float)
         assert isinstance(y, float)
 

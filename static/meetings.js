@@ -77,9 +77,8 @@ export class MeetingOverlay {
 
     // Skip count + skip button state.
     const skipCount = (meeting.votesCount || {})[""] || 0;
-    this.skipBtn.textContent = skipCount > 0
-      ? `Skip — niemand entfernen (${skipCount})`
-      : "Skip — niemand entfernen";
+    this.skipBtn.textContent =
+      skipCount > 0 ? `Skip — niemand entfernen (${skipCount})` : "Skip — niemand entfernen";
     this.skipBtn.disabled = this._localHasVoted;
 
     // Status line — how many of the alive have voted.
@@ -90,7 +89,6 @@ export class MeetingOverlay {
       : `${votesCast}/${totalAlive} haben abgestimmt.`;
   }
 }
-
 
 export class VotingResultToast {
   constructor(rootEl) {
@@ -121,7 +119,6 @@ export class VotingResultToast {
   }
 }
 
-
 export class EmergencyMeetingBtn {
   /**
    * Visibility logic: the button is shown ONLY when:
@@ -133,7 +130,7 @@ export class EmergencyMeetingBtn {
   constructor(btnEl, wsClient) {
     this.btn = btnEl;
     this.ws = wsClient;
-    this._meetingAvailable = true;  // server is ultimate authority; this is a pre-check optimization
+    this._meetingAvailable = true; // server is ultimate authority; this is a pre-check optimization
     this.btn.addEventListener("click", () => {
       this.ws.send("call_emergency_meeting", {});
     });
@@ -161,10 +158,10 @@ export class EmergencyMeetingBtn {
       return;
     }
     const inWarRoom =
-      me.x >= warRoomBounds.xMin
-      && me.x <= warRoomBounds.xMax
-      && me.y >= warRoomBounds.yMin
-      && me.y <= warRoomBounds.yMax;
+      me.x >= warRoomBounds.xMin &&
+      me.x <= warRoomBounds.xMax &&
+      me.y >= warRoomBounds.yMin &&
+      me.y <= warRoomBounds.yMax;
     this.btn.classList.toggle("hidden", !inWarRoom);
   }
 }

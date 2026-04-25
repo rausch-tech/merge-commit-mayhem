@@ -11,7 +11,9 @@ dependencies = [
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
+    "pre-commit>=4.6.0",
     "pytest>=9.0.3",
+    "ruff>=0.15.12",
 ]
 
 [tool.pytest.ini_options]
@@ -19,3 +21,29 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-ra --strict-markers"
 pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".worktrees", "merge_conflict_mayhem_project"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+]
+ignore = [
+    "E501",  # line too long (formatter handles it)
+    "B008",  # function call in default argument (FastAPI Depends)
+    "SIM105",  # contextlib.suppress (sometimes try/except is clearer)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true

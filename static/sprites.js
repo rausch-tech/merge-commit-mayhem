@@ -3,18 +3,24 @@
 
 export const SPRITES = {
   // task icons (ui_icon_set.png is 4 cols x 3 rows)
-  task_fix_unit_tests:    { sheet: "/images/ui_icon_set.png", cols: 4, rows: 3, col: 0, row: 0 },
-  task_review_pr:         { sheet: "/images/ui_icon_set.png", cols: 4, rows: 3, col: 1, row: 0 },
-  task_refill_coffee:     { sheet: "/images/ui_icon_set.png", cols: 4, rows: 3, col: 2, row: 0 },
+  task_fix_unit_tests: { sheet: "/images/ui_icon_set.png", cols: 4, rows: 3, col: 0, row: 0 },
+  task_review_pr: { sheet: "/images/ui_icon_set.png", cols: 4, rows: 3, col: 1, row: 0 },
+  task_refill_coffee: { sheet: "/images/ui_icon_set.png", cols: 4, rows: 3, col: 2, row: 0 },
   task_repair_deployment: { sheet: "/images/ui_icon_set.png", cols: 4, rows: 3, col: 0, row: 1 },
 
   // sabotage icons (sabotage_icons.png is 5 cols x 2 rows)
-  sabotage_ci_cd_red:         { sheet: "/images/sabotage_icons.png", cols: 5, rows: 2, col: 0, row: 0 },
-  sabotage_coffee_outage:     { sheet: "/images/sabotage_icons.png", cols: 5, rows: 2, col: 1, row: 0 },
-  sabotage_mandatory_meeting: { sheet: "/images/sabotage_icons.png", cols: 5, rows: 2, col: 2, row: 0 },
+  sabotage_ci_cd_red: { sheet: "/images/sabotage_icons.png", cols: 5, rows: 2, col: 0, row: 0 },
+  sabotage_coffee_outage: { sheet: "/images/sabotage_icons.png", cols: 5, rows: 2, col: 1, row: 0 },
+  sabotage_mandatory_meeting: {
+    sheet: "/images/sabotage_icons.png",
+    cols: 5,
+    rows: 2,
+    col: 2,
+    row: 0,
+  },
 
   // role badges (role_badges.png is 5 cols x 2 rows)
-  role_developer:  { sheet: "/images/role_badges.png", cols: 5, rows: 2, col: 0, row: 0 },
+  role_developer: { sheet: "/images/role_badges.png", cols: 5, rows: 2, col: 0, row: 0 },
   role_vibe_coder: { sheet: "/images/role_badges.png", cols: 5, rows: 2, col: 4, row: 0 },
 
   // Character sprites — assigned by player color INDEX, not role.
@@ -81,8 +87,14 @@ export function drawSprite(ctx, key, x, y, w, h) {
   const tileH = img.naturalHeight / s.rows;
   ctx.drawImage(
     img,
-    s.col * tileW, s.row * tileH, tileW, tileH,  // source
-    x - w / 2, y - h / 2, w, h                    // destination (centered)
+    s.col * tileW,
+    s.row * tileH,
+    tileW,
+    tileH, // source
+    x - w / 2,
+    y - h / 2,
+    w,
+    h // destination (centered)
   );
   return true;
 }

@@ -3,15 +3,14 @@ import random
 import pytest
 
 from app.game.game_room import GameRoom, GameRoomError
-from app.game.models import Phase
-from app.game.sabotages import MEETING_DURATION, sabotage_by_id
+from app.game.sabotages import MEETING_DURATION
 
 
 def _room_with_roles() -> tuple[GameRoom, str, str]:
     """Return (room, chaos_player_id, dev_player_id). Uses seeded rng for determinism."""
     room = GameRoom(code="ABCD")
     p0 = room.add_player("p0")
-    p1 = room.add_player("p1")
+    room.add_player("p1")
     host_id = p0.id
     room.start(requesting_player_id=host_id, rng=random.Random(0))
     chaos_id = next(p.id for p in room.players.values() if p.team == "chaos_agents")

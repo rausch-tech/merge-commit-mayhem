@@ -1,0 +1,16 @@
+# Generated / heavy
+node_modules/
+.venv/
+.uv/
+.worktrees/
+.pytest_cache/
+uv.lock
+package-lock.json
+
+# Assets — don't reformat
+images/
+sounds/
+maps/
+
+# Original design pack — keep its formatting as-is
+merge_conflict_mayhem_project/

@@ -10,9 +10,9 @@ export class SabotagePanel {
   constructor(rootEl, wsClient) {
     this.root = rootEl;
     this.ws = wsClient;
-    this.buttons = new Map();         // sabotage_id -> { btn, cdEl, fillEl }
+    this.buttons = new Map(); // sabotage_id -> { btn, cdEl, fillEl }
     this.availableIds = [];
-    this.totalCooldowns = {};         // sabotage_id -> total seconds (for ring fraction)
+    this.totalCooldowns = {}; // sabotage_id -> total seconds (for ring fraction)
   }
 
   /**

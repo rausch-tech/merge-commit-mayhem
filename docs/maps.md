@@ -24,7 +24,15 @@ the lobby; for now only the default is loaded.
 Each room is an axis-aligned rectangle.
 
 ```jsonc
-{ "id": "open_space", "title": "Open Space", "x": 0, "y": 0, "width": 800, "height": 800, "color": "#3a4560" }
+{
+  "id": "open_space",
+  "title": "Open Space",
+  "x": 0,
+  "y": 0,
+  "width": 800,
+  "height": 800,
+  "color": "#3a4560",
+}
 ```
 
 ## Wall lines + doors
@@ -35,7 +43,10 @@ A wall line runs across the map on one axis with optional door cutouts.
 {
   "axis": "x",
   "position": 800,
-  "doors": [{ "center": 400, "width": 120 }, { "center": 1200, "width": 120 }]
+  "doors": [
+    { "center": 400, "width": 120 },
+    { "center": 1200, "width": 120 },
+  ],
 }
 ```
 

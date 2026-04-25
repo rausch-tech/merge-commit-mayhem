@@ -1,4 +1,8 @@
-from typing import Annotated, Any, Literal, Union  # noqa: UP035 (Union needed for 3.9 compat via Pydantic)
+from typing import (  # noqa: UP035 (Union needed for 3.9 compat via Pydantic)
+    Annotated,
+    Any,
+    Literal,
+)
 
 from pydantic import BaseModel, ConfigDict, Discriminator, Field
 from pydantic.alias_generators import to_camel
@@ -127,24 +131,23 @@ class SkipVote(BaseModel):
 
 
 IncomingMessage = Annotated[
-    Union[
-        JoinRoom,
-        StartGame,
-        PlayerInput,
-        TaskHoldStart,
-        TaskHoldStop,
-        TriggerSabotage,
-        ReturnToLobby,
-        CallEmergencyMeeting,
-        CastVote,
-        SkipVote,
-    ],
+    JoinRoom
+    | StartGame
+    | PlayerInput
+    | TaskHoldStart
+    | TaskHoldStop
+    | TriggerSabotage
+    | ReturnToLobby
+    | CallEmergencyMeeting
+    | CastVote
+    | SkipVote,
     Discriminator("type"),
 ]
 
 
 class _IncomingEnvelope(BaseModel):
     """Wrapper to trigger Pydantic's discriminated-union validation."""
+
     model_config = _camel_config()
     root: IncomingMessage
 
@@ -202,7 +205,9 @@ class GameEndedMsg(BaseModel):
     model_config = _camel_config()
     winner: str
     reason: str
-    players: list[dict[str, Any]]  # each: {id, name, role, team, completedTasks, triggeredSabotages}
+    players: list[
+        dict[str, Any]
+    ]  # each: {id, name, role, team, completedTasks, triggeredSabotages}
 
 
 class VotingResultMsg(BaseModel):

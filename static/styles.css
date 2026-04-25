@@ -7,7 +7,9 @@
   --danger: #f87171;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 body {
   margin: 0;
@@ -23,7 +25,9 @@ body {
   padding: 24px;
 }
 
-.hidden { display: none !important; }
+.hidden {
+  display: none !important;
+}
 
 h1 {
   margin: 0;
@@ -75,7 +79,9 @@ button {
   cursor: pointer;
 }
 
-button:hover { filter: brightness(1.1); }
+button:hover {
+  filter: brightness(1.1);
+}
 
 #lobby-waiting ul {
   list-style: none;
@@ -158,11 +164,21 @@ button:hover { filter: brightness(1.1); }
   font-weight: 600;
 }
 
-.hud-pill-release .hud-value { color: #4ade80; }    /* green */
-.hud-pill-pipeline .hud-value { color: #60a5fa; }   /* blue */
-.hud-pill-coffee .hud-value { color: #fb923c; }     /* orange */
-.hud-pill-timer .hud-value { color: #facc15; }      /* yellow */
-.hud-pill-role { font-weight: 600; }
+.hud-pill-release .hud-value {
+  color: #4ade80;
+} /* green */
+.hud-pill-pipeline .hud-value {
+  color: #60a5fa;
+} /* blue */
+.hud-pill-coffee .hud-value {
+  color: #fb923c;
+} /* orange */
+.hud-pill-timer .hud-value {
+  color: #facc15;
+} /* yellow */
+.hud-pill-role {
+  font-weight: 600;
+}
 
 #game-stage {
   display: flex;
@@ -204,9 +220,16 @@ button:hover { filter: brightness(1.1); }
   border-left: 3px solid #475569;
 }
 
-.task-row-available { border-left-color: #4ade80; }
-.task-row-in_progress { border-left-color: #60a5fa; }
-.task-row-cooldown { border-left-color: #475569; opacity: 0.6; }
+.task-row-available {
+  border-left-color: #4ade80;
+}
+.task-row-in_progress {
+  border-left-color: #60a5fa;
+}
+.task-row-cooldown {
+  border-left-color: #475569;
+  opacity: 0.6;
+}
 
 .task-title {
   font-weight: 600;
@@ -291,7 +314,7 @@ button:hover { filter: brightness(1.1); }
 
 .sabotage-label,
 .sabotage-cooldown {
-  position: relative;  /* sit above the fill */
+  position: relative; /* sit above the fill */
   z-index: 1;
 }
 
@@ -327,8 +350,12 @@ button:hover { filter: brightness(1.1); }
   font-size: 1.8rem;
 }
 
-#endscreen-banner[data-team="release_team"] { color: #4ade80; }
-#endscreen-banner[data-team="chaos_agents"] { color: #f87171; }
+#endscreen-banner[data-team="release_team"] {
+  color: #4ade80;
+}
+#endscreen-banner[data-team="chaos_agents"] {
+  color: #f87171;
+}
 
 #endscreen-reason {
   color: var(--muted);
@@ -363,12 +390,25 @@ button:hover { filter: brightness(1.1); }
   align-items: center;
 }
 
-.endscreen-row-release_team { border-left-color: #60a5fa; }
-.endscreen-row-chaos_agents { border-left-color: #f87171; }
+.endscreen-row-release_team {
+  border-left-color: #60a5fa;
+}
+.endscreen-row-chaos_agents {
+  border-left-color: #f87171;
+}
 
-.endscreen-name { font-weight: 600; }
-.endscreen-role { color: var(--muted); font-size: 0.85rem; }
-.endscreen-stats { color: var(--muted); font-size: 0.8rem; text-align: right; }
+.endscreen-name {
+  font-weight: 600;
+}
+.endscreen-role {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.endscreen-stats {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: right;
+}
 
 #endscreen-reset {
   margin-top: 24px;
@@ -609,6 +649,12 @@ button:hover { filter: brightness(1.1); }
 }
 
 @keyframes votingToastFadeIn {
-  from { opacity: 0; transform: translate(-50%, -10px); }
-  to   { opacity: 1; transform: translate(-50%, 0); }
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }

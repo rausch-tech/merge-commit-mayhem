@@ -21,11 +21,17 @@ function play(key) {
   // Clone so rapid repeats don't restart the same playback.
   const clone = original.cloneNode(true);
   clone.volume = VOLUME;
-  clone.play().catch(() => { /* user-gesture-not-yet-given is fine */ });
+  clone.play().catch(() => {
+    /* user-gesture-not-yet-given is fine */
+  });
 }
 
-export function playClick() { play("click"); }
-export function playTaskComplete() { play("taskComplete"); }
+export function playClick() {
+  play("click");
+}
+export function playTaskComplete() {
+  play("taskComplete");
+}
 
 /**
  * Wire ALL <button> elements that are present right now (or get rendered
@@ -43,6 +49,6 @@ export function wireGlobalClickSound() {
         playClick();
       }
     },
-    true  // capture phase so it fires before button-handlers stop propagation
+    true // capture phase so it fires before button-handlers stop propagation
   );
 }

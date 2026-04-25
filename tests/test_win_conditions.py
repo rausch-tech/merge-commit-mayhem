@@ -1,7 +1,5 @@
 import random
 
-import pytest
-
 from app.game.game_room import GameRoom
 from app.game.models import Phase
 

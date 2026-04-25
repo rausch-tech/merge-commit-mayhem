@@ -2,7 +2,7 @@ import random
 
 import pytest
 
-from app.game.game_room import GameRoom, GameRoomError, MAX_PLAYERS
+from app.game.game_room import MAX_PLAYERS, GameRoom, GameRoomError
 from app.game.models import InputState, Phase
 
 
@@ -214,6 +214,7 @@ def test_private_role_returns_tuple():
 
 def test_phase_enum_has_ended():
     from app.game.models import Phase as _Phase
+
     assert _Phase.ENDED.value == "ended"
 
 
@@ -252,8 +253,6 @@ def test_public_state_exposes_stats():
 
 def test_reset_for_new_round_returns_to_lobby():
     room = _make_started_room(player_count=3)
-    host_id = next(p.id for p in room.players.values() if p.is_host)
-
     # mess with some state to make sure reset clears it
     room.release_progress = 50
     room.pipeline_stability = 30
@@ -302,8 +301,6 @@ def test_reset_is_noop_in_lobby():
 def test_start_after_reset_assigns_new_roles():
     room = _make_started_room(player_count=3)
     host_id = next(p.id for p in room.players.values() if p.is_host)
-    first_role_map = {p.id: p.role for p in room.players.values()}
-
     room.reset_for_new_round()
     room.start(requesting_player_id=host_id, rng=random.Random(99))
 
@@ -318,6 +315,7 @@ def test_start_after_reset_assigns_new_roles():
 
 def test_default_speed_is_normal():
     from app.game.sabotages import NORMAL_SPEED
+
     room = _make_started_room(player_count=2)
     pid = next(iter(room.players))
     assert room._current_speed_for(pid) == NORMAL_SPEED
@@ -325,6 +323,7 @@ def test_default_speed_is_normal():
 
 def test_coffee_zero_applies_slow_speed():
     from app.game.sabotages import COFFEE_SLOW_SPEED
+
     room = _make_started_room(player_count=2)
     pid = next(iter(room.players))
     room.coffee_level = 0
@@ -333,6 +332,7 @@ def test_coffee_zero_applies_slow_speed():
 
 def test_meeting_active_applies_slow_speed():
     from app.game.sabotages import COFFEE_SLOW_SPEED
+
     room = _make_started_room(player_count=2)
     pid = next(iter(room.players))
     room.meeting_active_for = 3.0
@@ -341,6 +341,7 @@ def test_meeting_active_applies_slow_speed():
 
 def test_both_effects_do_not_stack():
     from app.game.sabotages import COFFEE_SLOW_SPEED
+
     room = _make_started_room(player_count=2)
     pid = next(iter(room.players))
     room.coffee_level = 0
@@ -351,6 +352,7 @@ def test_both_effects_do_not_stack():
 
 def test_coffee_refill_restores_normal_speed():
     from app.game.sabotages import NORMAL_SPEED
+
     room = _make_started_room(player_count=2)
     pid = next(iter(room.players))
     room.coffee_level = 0
@@ -359,7 +361,7 @@ def test_coffee_refill_restores_normal_speed():
 
 
 def test_tick_movement_respects_slow_speed():
-    from app.game.sabotages import COFFEE_SLOW_SPEED
+
     room = _make_started_room(player_count=2)
     p = next(iter(room.players.values()))
     p.x, p.y = 400.0, 100.0
@@ -391,7 +393,7 @@ def test_demo_mode_assigns_vibe_coder_to_solo_player():
 def test_demo_mode_with_two_players_uses_normal_role_assignment():
     room = GameRoom(code="DEMO")
     a = room.add_player("Alice")
-    b = room.add_player("Bob")
+    room.add_player("Bob")
     room.start(requesting_player_id=a.id, rng=random.Random(0), demo=True)
     roles = sorted(p.role for p in room.players.values())
     assert roles == ["developer", "vibe_coder"]

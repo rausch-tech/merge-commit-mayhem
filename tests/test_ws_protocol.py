@@ -1,5 +1,3 @@
-import json
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -119,9 +117,7 @@ def test_duplicate_name_rejected():
         _join(ws_a, "RSTU", "Sven")
         ws_a.receive_json()
 
-        ws_b.send_json(
-            {"type": "join_room", "payload": {"roomCode": "RSTU", "playerName": "Sven"}}
-        )
+        ws_b.send_json({"type": "join_room", "payload": {"roomCode": "RSTU", "playerName": "Sven"}})
         err = ws_b.receive_json()
         assert err["type"] == "error"
         assert err["payload"]["code"] == "NAME_TAKEN"
@@ -153,14 +149,11 @@ def test_websocket_on_non_exact_path_does_not_crash_server():
     """
     client = TestClient(app)
     # Trailing slash was the original repro.
-    with pytest.raises(Exception):
-        with client.websocket_connect("/ws/"):
-            pass
+    with pytest.raises(Exception), client.websocket_connect("/ws/"):  # noqa: B017 — TestClient raises generic Exception on rejected upgrade
+        pass
     # Server must still be usable for a legit connection after that.
     with client.websocket_connect("/ws") as ws:
-        ws.send_json(
-            {"type": "join_room", "payload": {"roomCode": "ZZZZ", "playerName": "Zoe"}}
-        )
+        ws.send_json({"type": "join_room", "payload": {"roomCode": "ZZZZ", "playerName": "Zoe"}})
         first = ws.receive_json()
         assert first["type"] == "room_joined"
 
@@ -185,9 +178,7 @@ def test_task_hold_too_far_returns_error():
 
         # Alice is somewhere in the Open Space area (start positions). Try to start
         # a task in the Kitchen (refill_coffee) from there — must be too far.
-        ws_a.send_json(
-            {"type": "task_hold_start", "payload": {"taskId": "refill_coffee"}}
-        )
+        ws_a.send_json({"type": "task_hold_start", "payload": {"taskId": "refill_coffee"}})
         err = ws_a.receive_json()
         # Could be an error or a subsequent game_state — drain until error.
         while err["type"] == "game_state":
@@ -208,13 +199,11 @@ def test_non_chaos_cannot_trigger_sabotage():
         ws_a.send_json({"type": "start_game", "payload": {}})
         role_a = _drain_until(ws_a, "private_role")
         _drain_until(ws_a, "game_state")
-        role_b = _drain_until(ws_b, "private_role")
+        _drain_until(ws_b, "private_role")
         _drain_until(ws_b, "game_state")
 
         non_chaos_ws = ws_a if role_a["payload"]["team"] != "chaos_agents" else ws_b
-        non_chaos_ws.send_json(
-            {"type": "trigger_sabotage", "payload": {"sabotageId": "ci_cd_red"}}
-        )
+        non_chaos_ws.send_json({"type": "trigger_sabotage", "payload": {"sabotageId": "ci_cd_red"}})
         err = non_chaos_ws.receive_json()
         while err["type"] == "game_state":
             err = non_chaos_ws.receive_json()
@@ -272,7 +261,11 @@ def test_game_state_carries_stats_and_tasks_and_sabotages():
 def test_game_ended_broadcast_on_release_win():
     """Drive release_progress to 100 directly via the server-side room and verify
     a game_ended message goes out to both clients."""
-    with TestClient(app) as client, client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+    with (
+        TestClient(app) as client,
+        client.websocket_connect("/ws") as ws_a,
+        client.websocket_connect("/ws") as ws_b,
+    ):
         _join(ws_a, "ENDR", "Alice")
         ws_a.receive_json()
         _join(ws_b, "ENDR", "Bob")
@@ -303,7 +296,11 @@ def test_game_ended_broadcast_on_release_win():
 
 
 def test_return_to_lobby_requires_host_and_ended_phase():
-    with TestClient(app) as client, client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+    with (
+        TestClient(app) as client,
+        client.websocket_connect("/ws") as ws_a,
+        client.websocket_connect("/ws") as ws_b,
+    ):
         _join(ws_a, "RESET", "Alice")
         ws_a.receive_json()
         _join(ws_b, "RESET", "Bob")
@@ -383,7 +380,11 @@ def test_non_demo_single_player_still_rejected():
 
 
 def test_call_emergency_meeting_outside_war_room_returns_error():
-    with TestClient(app) as client, client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+    with (
+        TestClient(app) as client,
+        client.websocket_connect("/ws") as ws_a,
+        client.websocket_connect("/ws") as ws_b,
+    ):
         _join(ws_a, "MEET", "Alice")
         ws_a.receive_json()  # lobby
         _join(ws_b, "MEET", "Bob")
@@ -406,7 +407,11 @@ def test_call_emergency_meeting_outside_war_room_returns_error():
 
 
 def test_call_meeting_from_war_room_transitions_to_meeting_phase():
-    with TestClient(app) as client, client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+    with (
+        TestClient(app) as client,
+        client.websocket_connect("/ws") as ws_a,
+        client.websocket_connect("/ws") as ws_b,
+    ):
         _join(ws_a, "MEET2", "Alice")
         ws_a.receive_json()
         _join(ws_b, "MEET2", "Bob")
@@ -439,7 +444,12 @@ def test_call_meeting_from_war_room_transitions_to_meeting_phase():
 
 
 def test_full_voting_round_eliminates_named_target():
-    with TestClient(app) as client, client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b, client.websocket_connect("/ws") as ws_c:
+    with (
+        TestClient(app) as client,
+        client.websocket_connect("/ws") as ws_a,
+        client.websocket_connect("/ws") as ws_b,
+        client.websocket_connect("/ws") as ws_c,
+    ):
         _join(ws_a, "VOTEFL", "Alice")
         ws_a.receive_json()
         _join(ws_b, "VOTEFL", "Bob")
@@ -457,7 +467,7 @@ def test_full_voting_round_eliminates_named_target():
 
         room = registry.get("VOTEFL")
         alice_id = next(p.id for p in room.players.values() if p.name == "Alice")
-        bob_id = next(p.id for p in room.players.values() if p.name == "Bob")
+        _bob_id = next(p.id for p in room.players.values() if p.name == "Bob")
         carol_id = next(p.id for p in room.players.values() if p.name == "Carol")
         room.players[alice_id].x = 1000.0
         room.players[alice_id].y = 1000.0
@@ -494,7 +504,11 @@ def test_full_voting_round_eliminates_named_target():
 
 
 def test_meeting_resolves_with_skip_when_only_skips_received():
-    with TestClient(app) as client, client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+    with (
+        TestClient(app) as client,
+        client.websocket_connect("/ws") as ws_a,
+        client.websocket_connect("/ws") as ws_b,
+    ):
         _join(ws_a, "VOTSK", "Alice")
         ws_a.receive_json()
         _join(ws_b, "VOTSK", "Bob")

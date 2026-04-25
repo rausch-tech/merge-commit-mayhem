@@ -22,6 +22,4 @@ def generate_unique(
         code = generate(rng)
         if code not in existing:
             return code
-    raise RuntimeError(
-        f"Could not generate unique room code after {_MAX_ATTEMPTS} attempts."
-    )
+    raise RuntimeError(f"Could not generate unique room code after {_MAX_ATTEMPTS} attempts.")

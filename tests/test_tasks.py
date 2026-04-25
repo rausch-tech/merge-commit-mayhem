@@ -2,9 +2,9 @@ import random
 
 import pytest
 
-from app.game.game_room import GameRoom, GameRoomError, TaskRuntime
-from app.game.models import InputState, Phase
-from app.game.tasks import TASK_INTERACTION_RADIUS, TASK_RESPAWN_COOLDOWN, task_by_id
+from app.game.game_room import GameRoom, GameRoomError
+from app.game.models import InputState
+from app.game.tasks import TASK_INTERACTION_RADIUS, TASK_RESPAWN_COOLDOWN
 
 
 def _room_with_players(n: int) -> tuple[GameRoom, list[str]]:

@@ -2,18 +2,25 @@ import pytest
 from pydantic import ValidationError
 
 from app.protocol import (
+    CallEmergencyMeeting,
+    CastVote,
     ErrorMsg,
+    GameEndedMsg,
     GameStateMsg,
-    IncomingMessage,
     JoinRoom,
     LobbyStateMsg,
     PlayerInput,
     PrivateRoleMsg,
+    ReturnToLobby,
     RoomJoinedMsg,
+    SkipVote,
     StartGame,
+    TaskHoldStart,
+    TaskHoldStop,
+    TriggerSabotage,
+    VotingResultMsg,
     parse_incoming,
 )
-
 
 # --- incoming parsing -------------------------------------------------------
 
@@ -114,15 +121,6 @@ def test_error_msg_serializes_correctly():
 # --- B7 additions: new incoming types + GameEndedMsg + PrivateRole extension
 
 
-from app.protocol import (
-    GameEndedMsg,
-    ReturnToLobby,
-    TaskHoldStart,
-    TaskHoldStop,
-    TriggerSabotage,
-)
-
-
 def test_parse_task_hold_start():
     raw = {"type": "task_hold_start", "payload": {"taskId": "fix_unit_tests"}}
     msg = parse_incoming(raw)
@@ -190,14 +188,6 @@ def test_game_ended_msg_serializes_to_camel():
 
 
 # --- VB additions: voting protocol models -----------------------------------
-
-
-from app.protocol import (
-    CallEmergencyMeeting,
-    CastVote,
-    SkipVote,
-    VotingResultMsg,
-)
 
 
 def test_parse_call_emergency_meeting():

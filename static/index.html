@@ -1,105 +1,105 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de">
-<head>
-  <meta charset="utf-8" />
-  <title>Merge Conflict Mayhem</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="/static/styles.css" />
-  <link rel="preload" as="image" href="/images/ui_icon_set.png" />
-  <link rel="preload" as="image" href="/images/sabotage_icons.png" />
-  <link rel="preload" as="image" href="/images/role_badges.png" />
-  <link rel="preload" as="image" href="/images/figuren.png" />
-</head>
-<body>
-  <main id="app">
-    <section id="lobby-screen">
-      <div id="lobby-header">
-        <img id="lobby-logo" src="/images/logo.png" alt="Merge Conflict Mayhem" />
-        <p class="subtitle">Lunch Break Edition</p>
-      </div>
-
-      <div id="join-form">
-        <label>
-          Name
-          <input id="input-name" type="text" maxlength="16" autocomplete="off" />
-        </label>
-        <label>
-          Raumcode
-          <input id="input-room-code" type="text" maxlength="4" autocomplete="off" />
-        </label>
-        <button id="btn-join" type="button">Join</button>
-      </div>
-
-      <div id="lobby-waiting" class="hidden">
-        <h2>Raum <span id="lobby-room-code"></span></h2>
-        <ul id="lobby-player-list"></ul>
-        <label id="demo-mode-row" class="hidden">
-          <input type="checkbox" id="demo-mode" />
-          Demo-Mode (1 Spieler, du bist Chaos)
-        </label>
-        <button id="btn-start" type="button" class="hidden">Runde starten</button>
-        <p id="lobby-hint">Warte auf den Host…</p>
-      </div>
-
-      <p id="error-banner" class="hidden"></p>
-    </section>
-
-    <section id="game-screen" class="hidden">
-      <div id="hud">
-        <div id="hud-release" class="hud-pill hud-pill-release" title="Release Progress">
-          <span class="hud-label">Release</span>
-          <span class="hud-value">0%</span>
+  <head>
+    <meta charset="utf-8" />
+    <title>Merge Conflict Mayhem</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="preload" as="image" href="/images/ui_icon_set.png" />
+    <link rel="preload" as="image" href="/images/sabotage_icons.png" />
+    <link rel="preload" as="image" href="/images/role_badges.png" />
+    <link rel="preload" as="image" href="/images/figuren.png" />
+  </head>
+  <body>
+    <main id="app">
+      <section id="lobby-screen">
+        <div id="lobby-header">
+          <img id="lobby-logo" src="/images/logo.png" alt="Merge Conflict Mayhem" />
+          <p class="subtitle">Lunch Break Edition</p>
         </div>
-        <div id="hud-pipeline" class="hud-pill hud-pill-pipeline" title="Pipeline Stability">
-          <span class="hud-label">Pipeline</span>
-          <span class="hud-value">100%</span>
+
+        <div id="join-form">
+          <label>
+            Name
+            <input id="input-name" type="text" maxlength="16" autocomplete="off" />
+          </label>
+          <label>
+            Raumcode
+            <input id="input-room-code" type="text" maxlength="4" autocomplete="off" />
+          </label>
+          <button id="btn-join" type="button">Join</button>
         </div>
-        <div id="hud-coffee" class="hud-pill hud-pill-coffee" title="Coffee Level">
-          <span class="hud-label">Coffee</span>
-          <span class="hud-value">100%</span>
+
+        <div id="lobby-waiting" class="hidden">
+          <h2>Raum <span id="lobby-room-code"></span></h2>
+          <ul id="lobby-player-list"></ul>
+          <label id="demo-mode-row" class="hidden">
+            <input type="checkbox" id="demo-mode" />
+            Demo-Mode (1 Spieler, du bist Chaos)
+          </label>
+          <button id="btn-start" type="button" class="hidden">Runde starten</button>
+          <p id="lobby-hint">Warte auf den Host…</p>
         </div>
-        <div id="hud-timer" class="hud-pill hud-pill-timer" title="Timer">
-          <span class="hud-label">Timer</span>
-          <span class="hud-value">--:--</span>
+
+        <p id="error-banner" class="hidden"></p>
+      </section>
+
+      <section id="game-screen" class="hidden">
+        <div id="hud">
+          <div id="hud-release" class="hud-pill hud-pill-release" title="Release Progress">
+            <span class="hud-label">Release</span>
+            <span class="hud-value">0%</span>
+          </div>
+          <div id="hud-pipeline" class="hud-pill hud-pill-pipeline" title="Pipeline Stability">
+            <span class="hud-label">Pipeline</span>
+            <span class="hud-value">100%</span>
+          </div>
+          <div id="hud-coffee" class="hud-pill hud-pill-coffee" title="Coffee Level">
+            <span class="hud-label">Coffee</span>
+            <span class="hud-value">100%</span>
+          </div>
+          <div id="hud-timer" class="hud-pill hud-pill-timer" title="Timer">
+            <span class="hud-label">Timer</span>
+            <span class="hud-value">--:--</span>
+          </div>
+          <div id="hud-role" class="hud-pill hud-pill-role" title="Deine Rolle">Rolle: —</div>
         </div>
-        <div id="hud-role" class="hud-pill hud-pill-role" title="Deine Rolle">Rolle: —</div>
+        <div id="game-stage">
+          <aside id="task-sidebar"></aside>
+          <canvas id="game-canvas" width="900" height="400"></canvas>
+        </div>
+        <div id="sabotage-panel" class="hidden"></div>
+      </section>
+      <div id="endscreen" class="hidden">
+        <div id="endscreen-card">
+          <h1 id="endscreen-banner">—</h1>
+          <p id="endscreen-reason"></p>
+          <h3>Rollen aufgedeckt</h3>
+          <ul id="endscreen-players"></ul>
+          <button id="endscreen-reset" type="button" class="hidden">Zurück zur Lobby</button>
+        </div>
       </div>
-      <div id="game-stage">
-        <aside id="task-sidebar"></aside>
-        <canvas id="game-canvas" width="900" height="400"></canvas>
-      </div>
-      <div id="sabotage-panel" class="hidden"></div>
-    </section>
-    <div id="endscreen" class="hidden">
-      <div id="endscreen-card">
-        <h1 id="endscreen-banner">—</h1>
-        <p id="endscreen-reason"></p>
-        <h3>Rollen aufgedeckt</h3>
-        <ul id="endscreen-players"></ul>
-        <button id="endscreen-reset" type="button" class="hidden">Zurück zur Lobby</button>
-      </div>
-    </div>
 
-    <button id="emergency-meeting-btn" class="hidden" type="button">Emergency Meeting</button>
+      <button id="emergency-meeting-btn" class="hidden" type="button">Emergency Meeting</button>
 
-    <div id="meeting-overlay" class="hidden">
-      <div id="meeting-card">
-        <h1 id="meeting-title">Emergency Meeting</h1>
-        <p id="meeting-countdown" class="meeting-countdown">--</p>
-        <h3>Wer war's?</h3>
-        <ul id="meeting-vote-list"></ul>
-        <button id="meeting-skip-btn" type="button">Skip — niemand entfernen</button>
-        <p id="meeting-status" class="meeting-status"></p>
+      <div id="meeting-overlay" class="hidden">
+        <div id="meeting-card">
+          <h1 id="meeting-title">Emergency Meeting</h1>
+          <p id="meeting-countdown" class="meeting-countdown">--</p>
+          <h3>Wer war's?</h3>
+          <ul id="meeting-vote-list"></ul>
+          <button id="meeting-skip-btn" type="button">Skip — niemand entfernen</button>
+          <p id="meeting-status" class="meeting-status"></p>
+        </div>
       </div>
-    </div>
 
-    <div id="voting-result-toast" class="hidden">
-      <div id="voting-result-card">
-        <h2 id="voting-result-text">—</h2>
+      <div id="voting-result-toast" class="hidden">
+        <div id="voting-result-card">
+          <h2 id="voting-result-text">—</h2>
+        </div>
       </div>
-    </div>
-  </main>
+    </main>
 
-  <script type="module" src="/static/main.js"></script>
-</body>
+    <script type="module" src="/static/main.js"></script>
+  </body>
 </html>

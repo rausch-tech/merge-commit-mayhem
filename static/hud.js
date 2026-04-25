@@ -33,7 +33,7 @@ export class Hud {
   }
 
   setRole(role, team) {
-    const label = role === "vibe_coder" ? "Vibe Coder (Chaos)" : (role || "—");
+    const label = role === "vibe_coder" ? "Vibe Coder (Chaos)" : role || "—";
     // Build a small role badge before the text.
     this.roleEl.classList.add("with-badge");
     this.roleEl.innerHTML = "";

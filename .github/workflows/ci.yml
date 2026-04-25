@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Install dependencies
+        run: uv sync --all-groups
+      - name: Run pytest
+        run: uv run pytest -q
+
+  lint-python:
+    name: ruff (lint + format)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Install ruff
+        run: uv sync --only-group dev
+      - name: ruff check
+        run: uv run ruff check .
+      - name: ruff format check
+        run: uv run ruff format --check .
+
+  lint-frontend:
+    name: prettier
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: prettier check
+        run: npx --yes prettier@3.3.3 --check 'static/**/*.{js,css,html}' '*.md' 'docs/**/*.md' 'CONTRIBUTING.md' 'README.md'
+
+  deploy:
+    name: deploy to EC2
+    needs: [test, lint-python, lint-frontend]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    concurrency:
+      group: deploy-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check secrets are configured
+        id: secret-check
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          if [[ -z "$EC2_SSH_KEY" || -z "$EC2_HOST" ]]; then
+            echo "secrets-missing=true" >> "$GITHUB_OUTPUT"
+            echo "::warning ::Skipping deploy — set EC2_SSH_KEY and EC2_HOST repo secrets to enable."
+          else
+            echo "secrets-missing=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up SSH key
+        if: steps.secret-check.outputs.secrets-missing == 'false'
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/mcm-deploy.pem
+          chmod 400 ~/.ssh/mcm-deploy.pem
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Run deploy script
+        if: steps.secret-check.outputs.secrets-missing == 'false'
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER || 'ubuntu' }}
+          SSH_KEY: ~/.ssh/mcm-deploy.pem
+        run: |
+          chmod +x scripts/deploy.sh
+          ./scripts/deploy.sh

@@ -10,7 +10,7 @@ Internes Multiplayer-Spiel für Tech-Teams: Release-Team vs. geheime Chaos-Agent
 
 > **Python entscheidet. Der Client zeigt nur an.**
 
-- Backend (FastAPI, Pydantic v2, WebSockets) ist autoritativ für *allen* State.
+- Backend (FastAPI, Pydantic v2, WebSockets) ist autoritativ für _allen_ State.
 - Clients senden Input, rendern empfangene Snapshots. Keine Spiellogik im Browser.
 - WebSocket-Protokoll JSON, camelCase auf der Wire, Godot-kompatibel halten.
 - Öffentlicher `game_state` enthält **nie** geheime Rollen.

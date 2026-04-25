@@ -2,7 +2,7 @@ import random
 
 import pytest
 
-from app.game.roles import RoleInfo, assign
+from app.game.roles import assign
 
 
 @pytest.mark.parametrize("n", [2, 3, 4, 5, 6])

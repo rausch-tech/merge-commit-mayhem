@@ -11,7 +11,6 @@ from pydantic import ValidationError
 from app.game.game_map import DEFAULT_MAP
 from app.game.game_room import GameRoom, GameRoomError
 from app.game.models import InputState, Phase
-from app.game.room_code import generate_unique
 from app.game.sabotages import SABOTAGE_DEFINITIONS
 from app.protocol import (
     CallEmergencyMeeting,
@@ -137,9 +136,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
             try:
                 msg = parse_incoming(raw)
             except ValidationError as e:
-                await ws.send_json(
-                    envelope("error", ErrorMsg(code="BAD_MESSAGE", message=str(e)))
-                )
+                await ws.send_json(envelope("error", ErrorMsg(code="BAD_MESSAGE", message=str(e))))
                 continue
 
             if isinstance(msg, JoinRoom):

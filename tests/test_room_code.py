@@ -1,4 +1,5 @@
 import pytest
+
 from app.game.room_code import ALPHABET, generate, generate_unique
 
 
@@ -27,8 +28,7 @@ def test_generate_unique_avoids_collisions():
 def test_generate_unique_eventually_raises_when_saturated():
     # Saturate with all possible codes → generate_unique must give up.
     all_codes = {
-        a + b + c + d
-        for a in ALPHABET for b in ALPHABET for c in ALPHABET for d in ALPHABET
+        a + b + c + d for a in ALPHABET for b in ALPHABET for c in ALPHABET for d in ALPHABET
     }
     with pytest.raises(RuntimeError):
         generate_unique(all_codes)

@@ -2,26 +2,32 @@ import random
 import uuid
 from dataclasses import dataclass, field
 
+from app.game.game_map import (
+    DEFAULT_MAP,
+    GameMap,
+    compute_walls,
+    task_position_map,
+    war_room_bounds_for,
+)
 from app.game.models import InputState, Phase, Player
-from app.game.roles import RoleInfo, assign as assign_roles, description_for
-from app.game.voting import SKIP_TARGET, all_chaos_eliminated, tally as _tally_votes
-from app.game.game_map import GameMap, DEFAULT_MAP, compute_walls, war_room_bounds_for, task_position_map
+from app.game.roles import RoleInfo, description_for
+from app.game.roles import assign as assign_roles
 from app.game.sabotages import (
     COFFEE_SLOW_SPEED,
     MEETING_DURATION,
     NORMAL_SPEED,
     SABOTAGE_DEFINITIONS,
     SabotageDefinition,
-    sabotage_by_id,
 )
-from app.game.walls import resolve_wall_collision
 from app.game.tasks import (
     TASK_DEFINITIONS,
     TASK_INTERACTION_RADIUS,
     TASK_RESPAWN_COOLDOWN,
     TaskDefinition,
-    task_by_id,
 )
+from app.game.voting import SKIP_TARGET, all_chaos_eliminated
+from app.game.voting import tally as _tally_votes
+from app.game.walls import resolve_wall_collision
 
 MAX_PLAYERS = 6
 MIN_PLAYERS_TO_START = 2
@@ -63,7 +69,7 @@ class TaskRuntime:
     definition: TaskDefinition
     x: float
     y: float
-    status: str = "available"   # "available" | "in_progress" | "cooldown"
+    status: str = "available"  # "available" | "in_progress" | "cooldown"
     cooldown_remaining: float = 0.0
     per_player_progress: dict[str, float] = field(default_factory=dict)
 
@@ -72,7 +78,9 @@ class TaskRuntime:
 class SabotageRuntime:
     definition: SabotageDefinition
     cooldown_remaining: float = 0.0
-    active: bool = False     # True for coffee_outage while coffee==0, for meeting while meeting_active_for>0
+    active: bool = (
+        False  # True for coffee_outage while coffee==0, for meeting while meeting_active_for>0
+    )
 
 
 class GameRoom:
@@ -96,8 +104,8 @@ class GameRoom:
         # Per-player counters for the endscreen. Initialized on start().
         self.completed_tasks_by_player: dict[str, int] = {}
         self.triggered_sabotages_by_player: dict[str, int] = {}
-        self.tasks: dict[str, "TaskRuntime"] = {}
-        self.sabotages: dict[str, "SabotageRuntime"] = {}
+        self.tasks: dict[str, TaskRuntime] = {}
+        self.sabotages: dict[str, SabotageRuntime] = {}
 
         # Mandatory-meeting slow-down timer (seconds remaining; 0 = inactive).
         self.meeting_active_for: float = 0.0
@@ -111,7 +119,7 @@ class GameRoom:
         self.meeting_remaining_seconds: float = 0.0
         self.meeting_caller_id: str | None = None
         self.meeting_title: str = ""
-        self.votes: dict[str, str] = {}                       # voter_id -> target_id (or SKIP_TARGET)
+        self.votes: dict[str, str] = {}  # voter_id -> target_id (or SKIP_TARGET)
         self.players_with_meeting_left: dict[str, bool] = {}  # player_id -> True if can still call
         self.last_voting_result: dict | None = None
 
@@ -197,7 +205,7 @@ class GameRoom:
                 self.players[pid].team = info.team
 
         spawn_positions = [(s.x, s.y) for s in self.map.spawn_points]
-        for (pos_x, pos_y), player in zip(spawn_positions, self.players.values()):
+        for (pos_x, pos_y), player in zip(spawn_positions, self.players.values(), strict=False):
             player.x = pos_x
             player.y = pos_y
 
@@ -222,9 +230,7 @@ class GameRoom:
             for t in TASK_DEFINITIONS
         }
 
-        self.sabotages = {
-            s.id: SabotageRuntime(definition=s) for s in SABOTAGE_DEFINITIONS
-        }
+        self.sabotages = {s.id: SabotageRuntime(definition=s) for s in SABOTAGE_DEFINITIONS}
 
         # Each player gets exactly one emergency meeting per round.
         self.players_with_meeting_left = {pid: True for pid in self.players}
@@ -252,8 +258,8 @@ class GameRoom:
         if self.phase is not Phase.PLAYING:
             return
         for player in self.players.values():
-            dx = (int(player.input_state.right) - int(player.input_state.left))
-            dy = (int(player.input_state.down) - int(player.input_state.up))
+            dx = int(player.input_state.right) - int(player.input_state.left)
+            dy = int(player.input_state.down) - int(player.input_state.up)
             if dx or dy:
                 speed = self._current_speed_for(player.id)
                 length = (dx * dx + dy * dy) ** 0.5
@@ -264,13 +270,21 @@ class GameRoom:
                 new_x = player.x + step_x
                 if step_x != 0:
                     new_x, _ = resolve_wall_collision(
-                        new_x, player.y, step_x, 0.0, self._walls,
+                        new_x,
+                        player.y,
+                        step_x,
+                        0.0,
+                        self._walls,
                     )
                 # Then y.
                 new_y = player.y + step_y
                 if step_y != 0:
                     _, new_y = resolve_wall_collision(
-                        new_x, new_y, 0.0, step_y, self._walls,
+                        new_x,
+                        new_y,
+                        0.0,
+                        step_y,
+                        self._walls,
                     )
                 player.x = new_x
                 player.y = new_y
@@ -339,7 +353,9 @@ class GameRoom:
             raise GameRoomError(code="WRONG_PHASE", message="Tasks only during playing.")
         player = self.players.get(player_id)
         if player is None or not player.is_alive:
-            raise GameRoomError(code="PLAYER_ELIMINATED", message="Eliminated players cannot do tasks.")
+            raise GameRoomError(
+                code="PLAYER_ELIMINATED", message="Eliminated players cannot do tasks."
+            )
         task = self.tasks.get(task_id)
         if task is None:
             raise GameRoomError(code="UNKNOWN_TASK", message=f"Unknown task {task_id!r}.")
@@ -412,7 +428,9 @@ class GameRoom:
         if player is None:
             raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
         if not player.is_alive:
-            raise GameRoomError(code="PLAYER_ELIMINATED", message="Eliminated players cannot sabotage.")
+            raise GameRoomError(
+                code="PLAYER_ELIMINATED", message="Eliminated players cannot sabotage."
+            )
         if player.team != "chaos_agents":
             raise GameRoomError(
                 code="NOT_CHAOS_AGENT",
@@ -469,11 +487,19 @@ class GameRoom:
         if player is None:
             raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
         if not player.is_alive:
-            raise GameRoomError(code="PLAYER_ELIMINATED", message="Eliminated players cannot call meetings.")
+            raise GameRoomError(
+                code="PLAYER_ELIMINATED", message="Eliminated players cannot call meetings."
+            )
         if not self._is_in_war_room(player):
-            raise GameRoomError(code="NOT_IN_WAR_ROOM", message="Emergency meetings can only be called from the War Room.")
+            raise GameRoomError(
+                code="NOT_IN_WAR_ROOM",
+                message="Emergency meetings can only be called from the War Room.",
+            )
         if not self.players_with_meeting_left.get(requesting_player_id, False):
-            raise GameRoomError(code="NO_MEETING_LEFT", message="You already used your emergency meeting this round.")
+            raise GameRoomError(
+                code="NO_MEETING_LEFT",
+                message="You already used your emergency meeting this round.",
+            )
 
         # Transition to MEETING.
         self.players_with_meeting_left[requesting_player_id] = False
@@ -497,7 +523,9 @@ class GameRoom:
             raise GameRoomError(code="CANNOT_VOTE", message="Only living players can vote.")
         target = self.players.get(target_id)
         if target is None or not target.is_alive:
-            raise GameRoomError(code="INVALID_TARGET", message="Vote target must be a living player.")
+            raise GameRoomError(
+                code="INVALID_TARGET", message="Vote target must be a living player."
+            )
         self.votes[voter_id] = target_id
 
     def skip_vote(self, voter_id: str) -> None:
@@ -527,12 +555,10 @@ class GameRoom:
         max_count = max(counts.values()) if counts else 0
         winners = [t for t, c in counts.items() if c == max_count]
         skip_won = (eliminated_id is None) and (
-            (counts.get(SKIP_TARGET, 0) == max_count and max_count > 0)
+            counts.get(SKIP_TARGET, 0) == max_count and max_count > 0
         )
         named_tie = (
-            eliminated_id is None
-            and len(winners) > 1
-            and all(w != SKIP_TARGET for w in winners)
+            eliminated_id is None and len(winners) > 1 and all(w != SKIP_TARGET for w in winners)
         )
 
         was_chaos = False

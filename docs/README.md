@@ -4,21 +4,21 @@ Hier liegen alle Projekt-Docs. Wenn du neu hier bist, fang mit der Roadmap an.
 
 ## Lebende Dokumente
 
-| Doc | Was |
-|---|---|
+| Doc                        | Was                                                                                                                            |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | [`ROADMAP.md`](ROADMAP.md) | **Der eine Plan.** Vision, Stand, sechs Tier mit konkreten Slices, „was ist nächstes?". Alle anderen Docs erklären Sub-Themen. |
-| [`maps.md`](maps.md) | Map-JSON-Schema. Was darf in einer `maps/*.json` stehen, wie wird daraus das Spiel? |
+| [`maps.md`](maps.md)       | Map-JSON-Schema. Was darf in einer `maps/*.json` stehen, wie wird daraus das Spiel?                                            |
+| [`DEPLOY.md`](DEPLOY.md)   | Deploy-Workflow: Auto-Deploy via GitHub Actions, manueller Deploy, Server-Innenleben, Caddy, Rollback.                         |
 
 ## Kommt im Tier 0 dazu
 
-Diese Docs werden im ersten Sauberkeits-Sprint geschrieben (siehe Roadmap Tier 0):
+Diese Docs werden im weiteren Sauberkeits-Sprint geschrieben (siehe Roadmap Tier 0):
 
-| Doc | Was |
-|---|---|
-| `PROTOCOL.md` | Vollständiger WebSocket-Vertrag — alle Messages mit Schema, Phase-Übergänge, Error-Codes |
-| `ARCHITECTURE.md` | High-Level-Overview, Tick-Loop, Datenfluss |
-| `DEPLOY.md` | Deploy-Workflow auf EC2 (Tarball, Caddy, Stop/Start) |
-| `DEV.md` | Lokale Entwicklung, Branch-Konventionen, Testing |
+| Doc               | Was                                                                                      |
+| ----------------- | ---------------------------------------------------------------------------------------- |
+| `PROTOCOL.md`     | Vollständiger WebSocket-Vertrag — alle Messages mit Schema, Phase-Übergänge, Error-Codes |
+| `ARCHITECTURE.md` | High-Level-Overview, Tick-Loop, Datenfluss                                               |
+| `DEV.md`          | Lokale Entwicklung, Branch-Konventionen, Testing                                         |
 
 ## Im Repo, aber nicht hier
 

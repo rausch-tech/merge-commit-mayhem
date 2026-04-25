@@ -36,7 +36,9 @@ def tally(votes: dict[str, str]) -> str | None:
     return winner
 
 
-def all_chaos_eliminated(players: list, team_field: str = "team", alive_field: str = "is_alive") -> bool:
+def all_chaos_eliminated(
+    players: list, team_field: str = "team", alive_field: str = "is_alive"
+) -> bool:
     """
     True if every player on team 'chaos_agents' has is_alive=False.
     Returns False if no chaos players exist (vacuous-truth would mislead).

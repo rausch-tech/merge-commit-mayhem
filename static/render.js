@@ -11,15 +11,15 @@ loadSheet("/images/figuren.png");
 
 // Map hex color to character index (must mirror app/game/game_room.py _COLOR_PALETTE order).
 const COLOR_TO_CHAR_INDEX = {
-  "#4ade80": 0,  // green
-  "#60a5fa": 1,  // blue
-  "#fb923c": 2,  // orange
-  "#c084fc": 3,  // purple
-  "#facc15": 4,  // yellow
-  "#f87171": 5,  // red
+  "#4ade80": 0, // green
+  "#60a5fa": 1, // blue
+  "#fb923c": 2, // orange
+  "#c084fc": 3, // purple
+  "#facc15": 4, // yellow
+  "#f87171": 5, // red
 };
 
-const CHARACTER_RENDER_SIZE = 56;  // px on screen
+const CHARACTER_RENDER_SIZE = 56; // px on screen
 const PLAYER_RADIUS = 12;
 
 const WALL_THICKNESS = 8;
@@ -67,7 +67,9 @@ function computeWallsClient(map) {
   return out;
 }
 
-function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+function clamp(v, lo, hi) {
+  return v < lo ? lo : v > hi ? hi : v;
+}
 
 export class Renderer {
   constructor(canvas) {
@@ -76,15 +78,21 @@ export class Renderer {
     this.players = [];
     this.ownPlayerId = null;
     this.tasks = [];
-    this.localPlayerInRange = null;  // task-id of the task within interaction radius for the local player, else null
+    this.localPlayerInRange = null; // task-id of the task within interaction radius for the local player, else null
     this._running = false;
-    this.map = null;     // populated via setMap()
-    this._walls = [];    // computed when setMap is called
+    this.map = null; // populated via setMap()
+    this._walls = []; // computed when setMap is called
   }
 
-  setOwnPlayerId(id) { this.ownPlayerId = id; }
-  setPlayers(players) { this.players = players; }
-  setTasks(tasks) { this.tasks = tasks; }
+  setOwnPlayerId(id) {
+    this.ownPlayerId = id;
+  }
+  setPlayers(players) {
+    this.players = players;
+  }
+  setTasks(tasks) {
+    this.tasks = tasks;
+  }
 
   setMap(map) {
     this.map = map;
@@ -101,7 +109,9 @@ export class Renderer {
     requestAnimationFrame(loop);
   }
 
-  stop() { this._running = false; }
+  stop() {
+    this._running = false;
+  }
 
   _localPlayer() {
     if (!this.ownPlayerId) return null;
@@ -111,7 +121,7 @@ export class Renderer {
   _draw() {
     const { ctx, canvas } = this;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (!this.map) return;  // not yet received
+    if (!this.map) return; // not yet received
 
     const mapW = this.map.size.width;
     const mapH = this.map.size.height;
@@ -199,9 +209,11 @@ export class Renderer {
       if (task.status === "in_progress" && task.progress > 0) {
         ctx.beginPath();
         ctx.arc(
-          task.x, task.y, TASK_RADIUS + 8,
+          task.x,
+          task.y,
+          TASK_RADIUS + 8,
           -Math.PI / 2,
-          -Math.PI / 2 + (task.progress * Math.PI * 2)
+          -Math.PI / 2 + task.progress * Math.PI * 2
         );
         ctx.strokeStyle = "#facc15";
         ctx.lineWidth = 3;
@@ -236,11 +248,7 @@ export class Renderer {
 
       // Colored ring at feet (player identity color stays visible).
       ctx.beginPath();
-      ctx.ellipse(
-        player.x, player.y + half * 0.85,
-        half * 0.7, half * 0.22,
-        0, 0, Math.PI * 2
-      );
+      ctx.ellipse(player.x, player.y + half * 0.85, half * 0.7, half * 0.22, 0, 0, Math.PI * 2);
       ctx.fillStyle = player.color;
       ctx.globalAlpha = isDead ? 0.35 * 0.55 : 0.55;
       ctx.fill();
@@ -256,7 +264,7 @@ export class Renderer {
         player.x,
         player.y,
         CHARACTER_RENDER_SIZE,
-        CHARACTER_RENDER_SIZE,
+        CHARACTER_RENDER_SIZE
       );
       if (!drew) {
         ctx.beginPath();
