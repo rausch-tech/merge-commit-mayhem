@@ -1,3 +1,5 @@
+import { applySprite } from "./sprites.js";
+
 const ROLE_LABELS = {
   developer: "Developer",
   vibe_coder: "Vibe Coder",
@@ -34,6 +36,9 @@ export class EndscreenOverlay {
     for (const p of payload.players || []) {
       const row = document.createElement("li");
       row.className = `endscreen-row endscreen-row-${p.team}`;
+      const badge = document.createElement("div");
+      badge.className = "role-badge role-badge-lg";
+      if (p.role) applySprite(badge, `role_${p.role}`);
       const left = document.createElement("div");
       left.className = "endscreen-name";
       left.textContent = p.name;
@@ -43,6 +48,7 @@ export class EndscreenOverlay {
       const stats = document.createElement("div");
       stats.className = "endscreen-stats";
       stats.textContent = `${p.completedTasks} Tasks · ${p.triggeredSabotages} Sabotagen`;
+      row.appendChild(badge);
       row.appendChild(left);
       row.appendChild(role);
       row.appendChild(stats);

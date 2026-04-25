@@ -1,6 +1,11 @@
 // Pure rendering. Holds no game state — just takes snapshots.
 // ROOM_LAYOUT mirrors app/game/rooms.py (must match until moved to config).
 
+import { drawSprite, loadSheet } from "./sprites.js";
+
+// Preload task spritesheet so it's cached before the first frame needs it.
+loadSheet("/images/ui_icon_set.png");
+
 const ROOM_LAYOUT = [
   { id: "open_space",      title: "Open Space",      x: 0,    y: 0,    width: 800, height: 800, color: "#3a4560" },
   { id: "meeting_room",    title: "Meeting Room",    x: 800,  y: 0,    width: 800, height: 800, color: "#5a3a70" },
@@ -83,23 +88,50 @@ export class Renderer {
     let inRange = null;
     const TASK_RADIUS = 14;
     const INTERACT_RADIUS = 40;
+    const TILE = 40;
     for (const task of this.tasks) {
       let fill = "#4ade80";
       if (task.status === "in_progress") fill = "#60a5fa";
       else if (task.status === "cooldown") fill = "#475569";
 
+      // Background plate (status-colored halo ring).
       ctx.beginPath();
-      ctx.arc(task.x, task.y, TASK_RADIUS, 0, Math.PI * 2);
+      ctx.arc(task.x, task.y, TASK_RADIUS + 6, 0, Math.PI * 2);
       ctx.fillStyle = fill;
+      ctx.globalAlpha = 0.35;
       ctx.fill();
+      ctx.globalAlpha = 1;
       ctx.strokeStyle = "#0b0f1f";
       ctx.lineWidth = 2;
       ctx.stroke();
 
+      // Sprite (or fallback colored circle + 2-letter label).
+      const drew = drawSprite(ctx, `task_${task.id}`, task.x, task.y, TILE, TILE);
+      if (!drew) {
+        ctx.beginPath();
+        ctx.arc(task.x, task.y, TASK_RADIUS, 0, Math.PI * 2);
+        ctx.fillStyle = fill;
+        ctx.fill();
+        ctx.fillStyle = "#0b0f1f";
+        ctx.font = "bold 10px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(task.title.slice(0, 2).toUpperCase(), task.x, task.y);
+      }
+
+      // Cooldown overlay — semi-transparent black.
+      if (task.status === "cooldown") {
+        ctx.beginPath();
+        ctx.arc(task.x, task.y, TILE / 2 + 2, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        ctx.fill();
+      }
+
+      // Progress ring if in_progress.
       if (task.status === "in_progress" && task.progress > 0) {
         ctx.beginPath();
         ctx.arc(
-          task.x, task.y, TASK_RADIUS + 4,
+          task.x, task.y, TASK_RADIUS + 8,
           -Math.PI / 2,
           -Math.PI / 2 + (task.progress * Math.PI * 2)
         );
@@ -108,18 +140,13 @@ export class Renderer {
         ctx.stroke();
       }
 
-      ctx.fillStyle = "#0b0f1f";
-      ctx.font = "bold 10px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(task.title.slice(0, 2).toUpperCase(), task.x, task.y);
-
+      // Hover/in-range halo.
       if (local && task.status !== "cooldown") {
         const dx = local.x - task.x;
         const dy = local.y - task.y;
         if (dx * dx + dy * dy <= INTERACT_RADIUS * INTERACT_RADIUS) {
           ctx.beginPath();
-          ctx.arc(task.x, task.y, TASK_RADIUS + 8, 0, Math.PI * 2);
+          ctx.arc(task.x, task.y, TILE / 2 + 6, 0, Math.PI * 2);
           ctx.strokeStyle = "rgba(250, 204, 21, 0.7)";
           ctx.lineWidth = 2;
           ctx.setLineDash([4, 3]);

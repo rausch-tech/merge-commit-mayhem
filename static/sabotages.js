@@ -1,3 +1,5 @@
+import { applySprite } from "./sprites.js";
+
 const TITLE_LABELS = {
   ci_cd_red: "CI/CD Rot",
   coffee_outage: "Kaffee leer",
@@ -37,8 +39,12 @@ export class SabotagePanel {
     for (const id of this.availableIds) {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "sabotage-btn";
+      btn.className = "sabotage-btn sabotage-btn-icon";
       btn.dataset.sabotageId = id;
+      // Sprite icon as a <span> with background-image inside the button.
+      const iconEl = document.createElement("span");
+      iconEl.className = "sabotage-icon";
+      applySprite(iconEl, `sabotage_${id}`);
       const fillEl = document.createElement("span");
       fillEl.className = "sabotage-cooldown-fill";
       const labelEl = document.createElement("span");
@@ -48,6 +54,7 @@ export class SabotagePanel {
       cdEl.className = "sabotage-cooldown";
       cdEl.textContent = "";
       btn.appendChild(fillEl);
+      btn.appendChild(iconEl);
       btn.appendChild(labelEl);
       btn.appendChild(cdEl);
       btn.addEventListener("click", () => {

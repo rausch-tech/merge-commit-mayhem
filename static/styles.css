@@ -409,3 +409,49 @@ button:hover { filter: brightness(1.1); }
   width: auto;
   margin: 0;
 }
+
+/* Sabotage icon inside the button */
+.sabotage-btn-icon {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.sabotage-icon {
+  position: relative;
+  z-index: 1;
+  width: 36px;
+  height: 36px;
+  display: inline-block;
+  border-radius: 4px;
+}
+
+/* Role badge in HUD + endscreen */
+.role-badge {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  vertical-align: middle;
+  margin-right: 6px;
+  border-radius: 4px;
+  background-repeat: no-repeat;
+}
+
+.role-badge-lg {
+  width: 40px;
+  height: 40px;
+  margin-right: 10px;
+}
+
+/* Endscreen rows show role badge before the role-team text */
+.endscreen-row {
+  grid-template-columns: auto 1.2fr 1.4fr 1.4fr;
+}
+
+/* Override #hud-role-pill to fit a tiny badge inline */
+#hud-role.with-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

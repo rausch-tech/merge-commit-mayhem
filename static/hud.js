@@ -1,3 +1,5 @@
+import { applySprite } from "./sprites.js";
+
 /**
  * HUD bindings for the four live stats (release, pipeline, coffee, timer)
  * plus the player's private role pill. All elements are looked up once;
@@ -31,8 +33,17 @@ export class Hud {
   }
 
   setRole(role, team) {
-    const label = role === "vibe_coder" ? "Vibe Coder (Chaos)" : role;
-    this.roleEl.textContent = `Rolle: ${label}`;
+    const label = role === "vibe_coder" ? "Vibe Coder (Chaos)" : (role || "—");
+    // Build a small role badge before the text.
+    this.roleEl.classList.add("with-badge");
+    this.roleEl.innerHTML = "";
+    const badge = document.createElement("span");
+    badge.className = "role-badge";
+    if (role) applySprite(badge, `role_${role}`);
+    const text = document.createElement("span");
+    text.textContent = `Rolle: ${label}`;
+    this.roleEl.appendChild(badge);
+    this.roleEl.appendChild(text);
     if (team === "chaos_agents") {
       this.roleEl.style.background = "#4a1e1e";
     } else {
