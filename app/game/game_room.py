@@ -13,6 +13,7 @@ from app.game.sabotages import (
     SabotageDefinition,
     sabotage_by_id,
 )
+from app.game.walls import WALLS, resolve_wall_collision
 from app.game.tasks import (
     TASK_DEFINITIONS,
     TASK_INTERACTION_RADIUS,
@@ -222,8 +223,25 @@ class GameRoom:
             if dx or dy:
                 speed = self._current_speed_for(player.id)
                 length = (dx * dx + dy * dy) ** 0.5
-                player.x += (dx / length) * speed * dt
-                player.y += (dy / length) * speed * dt
+                step_x = (dx / length) * speed * dt
+                step_y = (dy / length) * speed * dt
+
+                # Move along x first, then resolve walls.
+                new_x = player.x + step_x
+                if step_x != 0:
+                    new_x, _ = resolve_wall_collision(
+                        new_x, player.y, step_x, 0.0, WALLS,
+                    )
+                # Then y.
+                new_y = player.y + step_y
+                if step_y != 0:
+                    _, new_y = resolve_wall_collision(
+                        new_x, new_y, 0.0, step_y, WALLS,
+                    )
+                player.x = new_x
+                player.y = new_y
+
+                # Map-edge clamp (perimeter).
                 if player.x < 0:
                     player.x = 0.0
                 elif player.x > MAP_WIDTH:

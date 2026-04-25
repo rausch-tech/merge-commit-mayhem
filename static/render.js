@@ -34,6 +34,41 @@ const PLAYER_RADIUS = 12;
 const MAP_WIDTH = 2400;
 const MAP_HEIGHT = 1600;
 
+const WALL_THICKNESS = 8;
+const DOOR_WIDTH = 120;
+
+// Mirror of app/game/walls.py WALLS — same coordinates so visuals match server collision.
+const WALLS = (() => {
+  const list = [];
+  // Vertical walls at x=800 and x=1600 with doors at y=400, 1200.
+  for (const lineX of [800, 1600]) {
+    let lastY = 0;
+    for (const doorY of [400, 1200]) {
+      const top = doorY - DOOR_WIDTH / 2;
+      if (top > lastY) {
+        list.push([lineX - WALL_THICKNESS, lastY, lineX + WALL_THICKNESS, top]);
+      }
+      lastY = doorY + DOOR_WIDTH / 2;
+    }
+    if (lastY < MAP_HEIGHT) {
+      list.push([lineX - WALL_THICKNESS, lastY, lineX + WALL_THICKNESS, MAP_HEIGHT]);
+    }
+  }
+  // Horizontal wall at y=800 with doors at x=400, 1200, 2000.
+  let lastX = 0;
+  for (const doorX of [400, 1200, 2000]) {
+    const left = doorX - DOOR_WIDTH / 2;
+    if (left > lastX) {
+      list.push([lastX, 800 - WALL_THICKNESS, left, 800 + WALL_THICKNESS]);
+    }
+    lastX = doorX + DOOR_WIDTH / 2;
+  }
+  if (lastX < MAP_WIDTH) {
+    list.push([lastX, 800 - WALL_THICKNESS, MAP_WIDTH, 800 + WALL_THICKNESS]);
+  }
+  return list;
+})();
+
 function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
 
 export class Renderer {
@@ -97,6 +132,15 @@ export class Renderer {
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       ctx.fillText(room.title.toUpperCase(), room.x + 12, room.y + 12);
+    }
+
+    // Walls.
+    ctx.fillStyle = "#0b0f1f";
+    ctx.strokeStyle = "#475569";
+    ctx.lineWidth = 1;
+    for (const [wx1, wy1, wx2, wy2] of WALLS) {
+      ctx.fillRect(wx1, wy1, wx2 - wx1, wy2 - wy1);
+      ctx.strokeRect(wx1, wy1, wx2 - wx1, wy2 - wy1);
     }
 
     // Tasks.
