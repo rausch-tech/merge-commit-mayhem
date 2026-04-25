@@ -1,5 +1,5 @@
 import { WsClient } from "./ws.js";
-import { attachInput } from "./input.js";
+import { attachInput, attachTaskInteraction } from "./input.js";
 import { Renderer } from "./render.js";
 import { Hud } from "./hud.js";
 import { TaskList } from "./tasks.js";
@@ -116,4 +116,5 @@ els.btnStart.addEventListener("click", () => {
 });
 
 attachInput(ws);
+attachTaskInteraction(ws, renderer);
 ws.connect();

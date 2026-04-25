@@ -43,3 +43,42 @@ export function attachInput(wsClient) {
     if (changed) send();
   });
 }
+
+/**
+ * Wire the E-key (and Space as a friendly alternative) to task hold messages.
+ * Pulls the currently in-range task id from the renderer; the server
+ * authoritatively decides whether the start is accepted (proximity, cooldown).
+ */
+export function attachTaskInteraction(wsClient, renderer) {
+  let currentTaskId = null;
+
+  const tryStart = () => {
+    if (currentTaskId !== null) return;  // already holding
+    const taskId = renderer.localPlayerInRange;
+    if (!taskId) return;
+    currentTaskId = taskId;
+    wsClient.send("task_hold_start", { taskId });
+  };
+
+  const stop = () => {
+    if (currentTaskId === null) return;
+    const taskId = currentTaskId;
+    currentTaskId = null;
+    wsClient.send("task_hold_stop", { taskId });
+  };
+
+  window.addEventListener("keydown", (e) => {
+    if (e.code !== "KeyE" && e.code !== "Space") return;
+    if (e.repeat) return;
+    e.preventDefault();
+    tryStart();
+  });
+
+  window.addEventListener("keyup", (e) => {
+    if (e.code !== "KeyE" && e.code !== "Space") return;
+    e.preventDefault();
+    stop();
+  });
+
+  window.addEventListener("blur", stop);
+}
