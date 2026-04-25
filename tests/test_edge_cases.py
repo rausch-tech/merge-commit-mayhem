@@ -32,8 +32,8 @@ def _make_started_room(player_count: int = 3, seed: int = 0) -> GameRoom:
 
 def _place_in_war_room(room: GameRoom, player_id: str) -> None:
     """Teleport a player into the War Room so they can call a meeting."""
-    room.players[player_id].x = 1000.0
-    room.players[player_id].y = 1000.0
+    room.players[player_id].x = 2000.0
+    room.players[player_id].y = 2000.0
 
 
 def _force_meeting(room: GameRoom, caller_id: str) -> None:

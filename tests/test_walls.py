@@ -37,33 +37,35 @@ def test_resolve_returns_unchanged_when_no_overlap():
 
 
 def test_resolve_blocks_horizontal_against_vertical_wall():
-    # Vertical wall at x=800 thickness 8 each side; player radius 20.
-    # Player tried to move right and ended up at x=800 (inside the wall + radius).
-    new_x, _ = resolve_wall_collision(800.0, 100.0, 5.0, 0.0, WALLS)
-    # Must be pushed left to 800 - 8 - 20 = 772.
-    assert new_x == pytest.approx(800 - WALL_THICKNESS - PLAYER_COLLISION_RADIUS)
+    # Vertical wall at x=1600 thickness 8 each side; player radius 20.
+    # Player tried to move right and ended up at x=1600 (inside the wall + radius).
+    # y=100 is in a walled segment (door 1 at y=800 starts at 680, so y=100 has wall).
+    new_x, _ = resolve_wall_collision(1600.0, 100.0, 5.0, 0.0, WALLS)
+    # Must be pushed left to 1600 - 8 - 20 = 1572.
+    assert new_x == pytest.approx(1600 - WALL_THICKNESS - PLAYER_COLLISION_RADIUS)
 
 
 def test_resolve_blocks_vertical_against_horizontal_wall():
-    # x=700 is between the doors at x=400 (range 340-460) and x=1200 (range 1140-1260),
-    # so there IS a wall segment here.
-    (new_y,) = (resolve_wall_collision(700.0, 800.0, 0.0, 5.0, WALLS)[1],)
-    assert new_y == pytest.approx(800 - WALL_THICKNESS - PLAYER_COLLISION_RADIUS)
+    # x=500 is in the first wall segment of the y=1600 horizontal wall (0-680 range,
+    # before door 1 which starts at x=680), so there IS a wall segment here.
+    (new_y,) = (resolve_wall_collision(500.0, 1600.0, 0.0, 5.0, WALLS)[1],)
+    assert new_y == pytest.approx(1600 - WALL_THICKNESS - PLAYER_COLLISION_RADIUS)
 
 
 # --- door passage --------------------------------------------------------
 
 
 def test_door_in_vertical_wall_lets_player_pass():
-    # Door at y=400 on the x=800 wall, half-width = DOOR_WIDTH/2 = 60.
-    # Player centered at y=400 tries to move from x=799 to x=801.
-    new_x, _ = resolve_wall_collision(801.0, 400.0, 2.0, 0.0, WALLS)
-    assert new_x == 801.0
+    # Door at y=800 on the x=1600 wall, half-width = DOOR_WIDTH/2 = 120.
+    # Player centered at y=800 tries to move from x=1599 to x=1601.
+    new_x, _ = resolve_wall_collision(1601.0, 800.0, 2.0, 0.0, WALLS)
+    assert new_x == 1601.0
 
 
 def test_door_in_horizontal_wall_lets_player_pass():
-    new_x, new_y = resolve_wall_collision(400.0, 801.0, 0.0, 2.0, WALLS)
-    assert new_y == 801.0
+    # Door at x=800 on the y=1600 wall, half-width = 120.
+    new_x, new_y = resolve_wall_collision(800.0, 1601.0, 0.0, 2.0, WALLS)
+    assert new_y == 1601.0
 
 
 # --- sliding behavior in the room tick ---------------------------------
@@ -71,15 +73,15 @@ def test_door_in_horizontal_wall_lets_player_pass():
 
 def test_player_slides_along_wall_when_moving_diagonally():
     """
-    Player at (770, 100) moves right+down. The wall at x=800 blocks the right
+    Player at (1570, 100) moves right+down. The wall at x=1600 blocks the right
     movement, but the y movement should still advance.
     """
-    room, pid = _started_room_with_player(770.0, 100.0)
+    room, pid = _started_room_with_player(1570.0, 100.0)
     room.apply_input(pid, InputState(right=True, down=True))
     room.tick(0.5)  # 75 px requested in each axis
     p = room.players[pid]
-    # x is blocked at the wall: 800 - 8 - 20 = 772.
-    assert p.x == pytest.approx(772.0, abs=0.5)
+    # x is blocked at the wall: 1600 - 8 - 20 = 1572.
+    assert p.x == pytest.approx(1572.0, abs=0.5)
     # y advanced by 75/sqrt(2) ≈ 53 px (since input was diagonal but y was free).
     # Actually with axis-by-axis: x first (blocked), y next (free) — y gets the
     # full diagonal y-component which is 53 px.
@@ -87,24 +89,24 @@ def test_player_slides_along_wall_when_moving_diagonally():
 
 
 def test_player_walks_through_door():
-    """Player at y=400 (center of door) walks freely past the wall."""
-    room, pid = _started_room_with_player(770.0, 400.0)
+    """Player at y=800 (center of door) walks freely past the wall."""
+    room, pid = _started_room_with_player(1570.0, 800.0)
     room.apply_input(pid, InputState(right=True))
     room.tick(0.5)  # 75 px attempted
     p = room.players[pid]
-    # Door allows passage. Player should be at 770 + 75 = 845.
-    assert p.x == pytest.approx(845.0, abs=1.0)
+    # Door allows passage. Player should be at 1570 + 75 = 1645.
+    assert p.x == pytest.approx(1645.0, abs=1.0)
 
 
 def test_player_blocked_by_wall_cannot_cross():
     """Player at y=200 (well clear of any door) cannot cross the wall."""
-    room, pid = _started_room_with_player(770.0, 200.0)
+    room, pid = _started_room_with_player(1570.0, 200.0)
     room.apply_input(pid, InputState(right=True))
-    # Tick repeatedly; should never cross x=800 - 8 - 20 = 772.
+    # Tick repeatedly; should never cross x=1600 - 8 - 20 = 1572.
     for _ in range(20):
         room.tick(0.1)
     p = room.players[pid]
-    assert p.x <= 800 - WALL_THICKNESS - PLAYER_COLLISION_RADIUS + 0.5  # tolerance
+    assert p.x <= 1600 - WALL_THICKNESS - PLAYER_COLLISION_RADIUS + 0.5  # tolerance
 
 
 def test_walls_dont_break_existing_movement_in_open_space():

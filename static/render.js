@@ -99,6 +99,16 @@ export class Renderer {
     this._walls = computeWallsClient(map);
   }
 
+  resize() {
+    // Match canvas backbuffer to displayed size for crisp rendering.
+    const rect = this.canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    this.canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    this.canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+    // Reset transform; the camera transform is reapplied each _draw().
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
   start() {
     this._running = true;
     const loop = () => {
@@ -120,22 +130,27 @@ export class Renderer {
 
   _draw() {
     const { ctx, canvas } = this;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (!this.map) return; // not yet received
+    const dpr = window.devicePixelRatio || 1;
+    const viewW = canvas.width / dpr;
+    const viewH = canvas.height / dpr;
+
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // reset to CSS-px
+    ctx.clearRect(0, 0, viewW, viewH);
+
+    if (!this.map) {
+      ctx.restore();
+      return;
+    }
 
     const mapW = this.map.size.width;
     const mapH = this.map.size.height;
 
     // Camera centered on local player, clamped to map bounds.
     const local = this._localPlayer();
-    const cameraX = local
-      ? clamp(local.x - canvas.width / 2, 0, Math.max(0, mapW - canvas.width))
-      : 0;
-    const cameraY = local
-      ? clamp(local.y - canvas.height / 2, 0, Math.max(0, mapH - canvas.height))
-      : 0;
+    const cameraX = local ? clamp(local.x - viewW / 2, 0, Math.max(0, mapW - viewW)) : 0;
+    const cameraY = local ? clamp(local.y - viewH / 2, 0, Math.max(0, mapH - viewH)) : 0;
 
-    ctx.save();
     ctx.translate(-cameraX, -cameraY);
 
     // Rooms.

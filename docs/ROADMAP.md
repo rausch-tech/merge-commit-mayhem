@@ -73,6 +73,7 @@ Sechs Tier, in der Reihenfolge wie sie gebaut werden sollten. Jedes Tier hat ein
 
 | #   | Was                                                                                                                                                      | Aufwand  |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| 1.0 | **Canvas-Vollbild + Map 2× größer** — Canvas füllt das Browser-Fenster, Map skaliert von 2400×1600 auf 4800×3200, Timer 720s → 900s                      | ✅ done  |
 | 1.1 | **Eventfeed** — Live-Feed rechts neben Canvas: „Pipeline ist rot", „PR gemerged", „Carol wurde entfernt — war Chaos-Agent". Trigger durch Server-Events. | 1 Tag    |
 | 1.2 | **Incidents-Mechanik** — drittes Stat im HUD. Tasks „Logs analysieren" + „Legacy-Service beruhigen" reduzieren. Eine zukünftige Sabotage erzeugt sie.    | 1 Tag    |
 | 1.3 | **Mehr Tasks** — vier zusätzliche aus dem Master-Doc: Logs analysieren, Legacy-Service beruhigen, Scope reduzieren, Release Notes schreiben              | 0.5 Tag  |

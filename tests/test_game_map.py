@@ -25,8 +25,8 @@ def test_default_map_loads_without_error():
 
 
 def test_default_map_has_expected_size():
-    assert DEFAULT_MAP.size.width == 2400
-    assert DEFAULT_MAP.size.height == 1600
+    assert DEFAULT_MAP.size.width == 4800
+    assert DEFAULT_MAP.size.height == 3200
 
 
 def test_default_map_has_six_rooms():
@@ -110,18 +110,22 @@ def test_compute_walls_are_tuples_of_four_ints():
         assert all(isinstance(v, int) for v in w)
 
 
-def test_compute_walls_vertical_wall_at_800():
+def test_compute_walls_vertical_wall_at_1600():
     walls = compute_walls(DEFAULT_MAP)
-    # All vertical-wall segments for line x=800 should have x1 < 800 < x2.
-    vert_800 = [w for w in walls if w[0] == 800 - WALL_THICKNESS and w[2] == 800 + WALL_THICKNESS]
-    assert len(vert_800) == 3  # 3 segments (2 doors cut it into 3)
+    # All vertical-wall segments for line x=1600 should have x1 < 1600 < x2.
+    vert_1600 = [
+        w for w in walls if w[0] == 1600 - WALL_THICKNESS and w[2] == 1600 + WALL_THICKNESS
+    ]
+    assert len(vert_1600) == 3  # 3 segments (2 doors cut it into 3)
 
 
-def test_compute_walls_horizontal_wall_at_800():
+def test_compute_walls_horizontal_wall_at_1600():
     walls = compute_walls(DEFAULT_MAP)
-    # Horizontal wall segments for line y=800.
-    horiz_800 = [w for w in walls if w[1] == 800 - WALL_THICKNESS and w[3] == 800 + WALL_THICKNESS]
-    assert len(horiz_800) == 4  # 3 doors cut it into 4
+    # Horizontal wall segments for line y=1600.
+    horiz_1600 = [
+        w for w in walls if w[1] == 1600 - WALL_THICKNESS and w[3] == 1600 + WALL_THICKNESS
+    ]
+    assert len(horiz_1600) == 4  # 3 doors cut it into 4
 
 
 # --- war_room_bounds_for -----------------------------------------------------
@@ -129,10 +133,10 @@ def test_compute_walls_horizontal_wall_at_800():
 
 def test_war_room_bounds_correct():
     x_min, y_min, x_max, y_max = war_room_bounds_for(DEFAULT_MAP)
-    assert x_min == 800
-    assert y_min == 800
-    assert x_max == 1600
-    assert y_max == 1600
+    assert x_min == 1600
+    assert y_min == 1600
+    assert x_max == 3200
+    assert y_max == 3200
 
 
 def test_war_room_bounds_raises_if_id_not_found():
@@ -159,8 +163,8 @@ def test_task_position_map_values_are_float_pairs():
 
 def test_task_positions_match_json():
     positions = task_position_map(DEFAULT_MAP)
-    assert positions["fix_unit_tests"] == (200.0, 200.0)
-    assert positions["refill_coffee"] == (2000.0, 400.0)
+    assert positions["fix_unit_tests"] == (400.0, 400.0)
+    assert positions["refill_coffee"] == (4000.0, 800.0)
 
 
 # --- round-trip: model_dump / model_validate --------------------------------

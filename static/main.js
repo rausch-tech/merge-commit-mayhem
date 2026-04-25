@@ -74,6 +74,12 @@ const hud = new Hud();
 const renderer = new Renderer(els.canvas);
 renderer.start();
 
+// Initial size + react to window resize.
+const resizeRenderer = () => renderer.resize();
+window.addEventListener("resize", resizeRenderer);
+// Run once after first paint when the canvas has a real layout size.
+window.requestAnimationFrame(resizeRenderer);
+
 const sabotagePanelEl = document.getElementById("sabotage-panel");
 const sabotagePanel = new SabotagePanel(sabotagePanelEl, ws);
 
@@ -121,6 +127,7 @@ ws.on("room_joined", (payload) => {
   saveSession(payload.roomCode, payload.playerId);
   renderer.setOwnPlayerId(payload.playerId);
   renderer.setMap(payload.map || null);
+  renderer.resize();
   els.joinForm.classList.add("hidden");
   els.lobbyWaiting.classList.remove("hidden");
   els.lobbyRoomCode.textContent = payload.roomCode;

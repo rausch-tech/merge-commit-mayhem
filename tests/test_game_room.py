@@ -114,16 +114,16 @@ def test_start_transitions_to_playing_and_assigns_roles():
     assert all(p.team in {"release_team", "chaos_agents"} for p in room.players.values())
 
 
-def test_start_sets_timer_to_720():
+def test_start_sets_timer_to_900():
     room = _make_started_room(player_count=2)
-    assert room.remaining_seconds == 720.0
+    assert room.remaining_seconds == 900.0
 
 
 def test_start_places_players_on_map():
     room = _make_started_room(player_count=4)
     for p in room.players.values():
-        assert 0 <= p.x <= 2400
-        assert 0 <= p.y <= 1600
+        assert 0 <= p.x <= 4800
+        assert 0 <= p.y <= 3200
 
 
 # --- apply_input + tick ----------------------------------------------------
@@ -148,10 +148,10 @@ def test_tick_moves_player_right():
 def test_tick_clamps_at_map_borders():
     room = _make_started_room(player_count=2)
     p = next(iter(room.players.values()))
-    p.x = 2395.0
+    p.x = 4795.0
     room.apply_input(p.id, InputState(right=True))
-    room.tick(1.0)  # Versucht 150 px rechts → wird auf 2400 geclampt.
-    assert p.x == 2400.0
+    room.tick(1.0)  # Versucht 150 px rechts → wird auf 4800 geclampt.
+    assert p.x == 4800.0
 
     p.y = 5.0
     room.apply_input(p.id, InputState(right=False, up=True))
@@ -174,7 +174,7 @@ def test_tick_diagonal_is_not_faster_than_axis():
 def test_tick_decrements_timer():
     room = _make_started_room(player_count=2)
     room.tick(0.5)
-    assert room.remaining_seconds == pytest.approx(719.5)
+    assert room.remaining_seconds == pytest.approx(899.5)
 
 
 def test_tick_is_noop_in_lobby():

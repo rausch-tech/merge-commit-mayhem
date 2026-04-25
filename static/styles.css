@@ -113,17 +113,19 @@ button:hover {
 }
 
 #game-screen {
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  background: #0b0f1f;
 }
 
 #hud {
+  flex: 0 0 auto;
   display: flex;
   gap: 12px;
   padding: 8px 12px;
   background: var(--panel);
-  border-radius: 10px;
 }
 
 .hud-pill {
@@ -134,11 +136,10 @@ button:hover {
 }
 
 #game-canvas {
-  background: #0b0f1f;
-  border-radius: 10px;
+  flex: 1 1 auto;
   width: 100%;
-  height: auto;
-  max-width: 900px;
+  height: 100%;
+  background: #0b0f1f;
   image-rendering: pixelated;
 }
 
@@ -181,18 +182,17 @@ button:hover {
 }
 
 #game-stage {
+  flex: 1 1 auto;
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
+  align-items: stretch;
+  overflow: hidden;
 }
 
 #task-sidebar {
   flex: 0 0 220px;
   background: var(--panel);
-  border-radius: 10px;
   padding: 12px;
   font-size: 0.85rem;
-  max-height: 400px;
   overflow-y: auto;
 }
 
@@ -239,11 +239,6 @@ button:hover {
   font-size: 0.75rem;
   color: var(--muted);
   margin-top: 2px;
-}
-
-#game-canvas {
-  /* keep existing rules — canvas no longer must take full width inside the stage */
-  flex: 0 0 900px;
 }
 
 #sabotage-panel {

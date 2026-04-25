@@ -85,7 +85,7 @@ def test_call_meeting_requires_war_room():
 def test_call_meeting_in_war_room_transitions_to_meeting_phase():
     room, ids = _started_room(3)
     pid = ids[0]
-    room.players[pid].x, room.players[pid].y = 1000.0, 1000.0
+    room.players[pid].x, room.players[pid].y = 2000.0, 2000.0
     room.call_emergency_meeting(pid, rng=random.Random(0))
     assert room.phase is Phase.MEETING
     assert room.meeting_caller_id == pid
@@ -96,11 +96,11 @@ def test_call_meeting_in_war_room_transitions_to_meeting_phase():
 def test_meeting_consumed_on_use():
     room, ids = _started_room(3)
     pid = ids[0]
-    room.players[pid].x, room.players[pid].y = 1000.0, 1000.0
+    room.players[pid].x, room.players[pid].y = 2000.0, 2000.0
     room.call_emergency_meeting(pid, rng=random.Random(0))
     room._resolve_meeting()
     # Try to call again -- denied.
-    room.players[pid].x, room.players[pid].y = 1000.0, 1000.0
+    room.players[pid].x, room.players[pid].y = 2000.0, 2000.0
     with pytest.raises(GameRoomError) as exc:
         room.call_emergency_meeting(pid)
     assert exc.value.code == "NO_MEETING_LEFT"
@@ -110,7 +110,7 @@ def test_dead_player_cannot_call_meeting():
     room, ids = _started_room(3)
     pid = ids[0]
     room.players[pid].is_alive = False
-    room.players[pid].x, room.players[pid].y = 1000.0, 1000.0
+    room.players[pid].x, room.players[pid].y = 2000.0, 2000.0
     with pytest.raises(GameRoomError) as exc:
         room.call_emergency_meeting(pid)
     assert exc.value.code == "PLAYER_ELIMINATED"
@@ -129,7 +129,7 @@ def test_cast_vote_outside_meeting_phase_errors():
 def test_cast_vote_for_dead_player_errors():
     room, ids = _started_room(3)
     a, b, c = ids
-    room.players[a].x, room.players[a].y = 1000.0, 1000.0
+    room.players[a].x, room.players[a].y = 2000.0, 2000.0
     room.call_emergency_meeting(a, rng=random.Random(0))
     room.players[c].is_alive = False
     with pytest.raises(GameRoomError) as exc:
@@ -140,7 +140,7 @@ def test_cast_vote_for_dead_player_errors():
 def test_dead_voter_cannot_vote():
     room, ids = _started_room(3)
     a, b, c = ids
-    room.players[a].x, room.players[a].y = 1000.0, 1000.0
+    room.players[a].x, room.players[a].y = 2000.0, 2000.0
     room.call_emergency_meeting(a, rng=random.Random(0))
     room.players[b].is_alive = False
     with pytest.raises(GameRoomError) as exc:
@@ -151,7 +151,7 @@ def test_dead_voter_cannot_vote():
 def test_majority_vote_eliminates_target():
     room, ids = _started_room(4)
     a, b, c, d = ids
-    room.players[a].x, room.players[a].y = 1000.0, 1000.0
+    room.players[a].x, room.players[a].y = 2000.0, 2000.0
     room.call_emergency_meeting(a, rng=random.Random(0))
     room.cast_vote(a, c)
     room.cast_vote(b, c)
@@ -165,7 +165,7 @@ def test_majority_vote_eliminates_target():
 def test_tied_vote_no_removal():
     room, ids = _started_room(4)
     a, b, c, d = ids
-    room.players[a].x, room.players[a].y = 1000.0, 1000.0
+    room.players[a].x, room.players[a].y = 2000.0, 2000.0
     room.call_emergency_meeting(a, rng=random.Random(0))
     room.cast_vote(a, b)
     room.cast_vote(c, d)
@@ -177,7 +177,7 @@ def test_tied_vote_no_removal():
 def test_tick_decrements_meeting_timer_and_auto_resolves():
     room, ids = _started_room(3)
     a, b, c = ids
-    room.players[a].x, room.players[a].y = 1000.0, 1000.0
+    room.players[a].x, room.players[a].y = 2000.0, 2000.0
     room.call_emergency_meeting(a, rng=random.Random(0))
     # Cast no votes; let the timer expire.
     for _ in range(int(MEETING_DURATION_SECONDS / 0.1) + 5):
@@ -190,7 +190,7 @@ def test_tick_decrements_meeting_timer_and_auto_resolves():
 def test_meeting_resolves_early_when_all_alive_voted():
     room, ids = _started_room(3)
     a, b, c = ids
-    room.players[a].x, room.players[a].y = 1000.0, 1000.0
+    room.players[a].x, room.players[a].y = 2000.0, 2000.0
     room.call_emergency_meeting(a, rng=random.Random(0))
     # All three vote at once -> next tick should resolve.
     room.cast_vote(a, b)
@@ -280,7 +280,7 @@ def test_public_state_meeting_is_none_outside_meeting_phase():
 def test_public_state_meeting_present_during_meeting():
     room, ids = _started_room(3)
     pid = ids[0]
-    room.players[pid].x, room.players[pid].y = 1000.0, 1000.0
+    room.players[pid].x, room.players[pid].y = 2000.0, 2000.0
     room.call_emergency_meeting(pid, rng=random.Random(0))
     room.cast_vote(pid, ids[1])
     state = room.public_state()

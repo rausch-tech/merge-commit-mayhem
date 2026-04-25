@@ -427,8 +427,8 @@ def test_call_meeting_from_war_room_transitions_to_meeting_phase():
         room = registry.get("MEET2")
         assert room is not None
         alice_id = next(p.id for p in room.players.values() if p.name == "Alice")
-        room.players[alice_id].x = 1000.0
-        room.players[alice_id].y = 1000.0
+        room.players[alice_id].x = 2000.0
+        room.players[alice_id].y = 2000.0
 
         ws_a.send_json({"type": "call_emergency_meeting", "payload": {}})
 
@@ -468,8 +468,8 @@ def test_full_voting_round_eliminates_named_target():
         alice_id = next(p.id for p in room.players.values() if p.name == "Alice")
         _bob_id = next(p.id for p in room.players.values() if p.name == "Bob")
         carol_id = next(p.id for p in room.players.values() if p.name == "Carol")
-        room.players[alice_id].x = 1000.0
-        room.players[alice_id].y = 1000.0
+        room.players[alice_id].x = 2000.0
+        room.players[alice_id].y = 2000.0
 
         ws_a.send_json({"type": "call_emergency_meeting", "payload": {}})
 
@@ -574,8 +574,8 @@ def test_meeting_resolves_with_skip_when_only_skips_received():
 
         room = registry.get("VOTSK")
         alice_id = next(p.id for p in room.players.values() if p.name == "Alice")
-        room.players[alice_id].x = 1000.0
-        room.players[alice_id].y = 1000.0
+        room.players[alice_id].x = 2000.0
+        room.players[alice_id].y = 2000.0
         ws_a.send_json({"type": "call_emergency_meeting", "payload": {}})
 
         for _ in range(60):
