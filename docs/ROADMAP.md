@@ -58,7 +58,8 @@ Sechs Tier, in der Reihenfolge wie sie gebaut werden sollten. Jedes Tier hat ein
 | 0.9 | **Dead-Code raus** — `incidentCount` ohne Mechanik raus, ungenutzte Spritesheets dokumentieren oder ausräumen | 0.5 Tag |
 | 0.10 | **Reconnect** — Server bewahrt Spieler-Identität 30 s nach Disconnect; Client kann mit selber Identität rejoin | 1 Tag |
 | 0.11 | **Edge-Cases** — Host-Disconnect mid-Meeting, letzter Spieler in ENDED, gleichzeitige Joins, Memory-Smoke | 0.5–1 Tag |
-| 0.12 | **Live-Test mit Team** — 3–5 Runden, Bugs surfacen + fixen | 1 Termin + Bug-Block |
+| 0.12 | **Auto-Deploy auf main** — GitHub-Actions-Workflow baut Tarball, scp + ssh-restart auf EC2 nach jedem Push auf `main` (mit Test-Gate davor: pytest + lint müssen grün sein). Secrets via GitHub-Secrets (SSH-Key, EC2-Host). | 1 Tag |
+| 0.13 | **Live-Test mit Team** — 3–5 Runden, Bugs surfacen + fixen | 1 Termin + Bug-Block |
 
 **Done-Kriterium:** Alle Tests grün in CI. Doku-Block existiert. Deploy-Script funktioniert. Reconnect funktioniert. Mit echten Leuten gespielt, keine Critical-Bugs offen.
 
