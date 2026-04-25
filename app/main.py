@@ -90,6 +90,9 @@ async def _tick_loop() -> None:
                 try:
                     if room.phase is Phase.PLAYING or room.phase is Phase.MEETING:
                         room.tick(TICK_DT)
+                        if room.is_empty():
+                            registry.drop_if_empty(room.code)
+                            continue
                         await manager.broadcast(
                             room.code, envelope("game_state", _game_state_msg(room))
                         )
