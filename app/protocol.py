@@ -95,6 +95,37 @@ class ReturnToLobby(BaseModel):
     payload: ReturnToLobbyPayload = Field(default_factory=ReturnToLobbyPayload)
 
 
+class CallEmergencyMeetingPayload(BaseModel):
+    model_config = _camel_config()
+
+
+class CastVotePayload(BaseModel):
+    model_config = _camel_config()
+    target_player_id: str
+
+
+class SkipVotePayload(BaseModel):
+    model_config = _camel_config()
+
+
+class CallEmergencyMeeting(BaseModel):
+    model_config = _camel_config()
+    type: Literal["call_emergency_meeting"]
+    payload: CallEmergencyMeetingPayload = Field(default_factory=CallEmergencyMeetingPayload)
+
+
+class CastVote(BaseModel):
+    model_config = _camel_config()
+    type: Literal["cast_vote"]
+    payload: CastVotePayload
+
+
+class SkipVote(BaseModel):
+    model_config = _camel_config()
+    type: Literal["skip_vote"]
+    payload: SkipVotePayload = Field(default_factory=SkipVotePayload)
+
+
 IncomingMessage = Annotated[
     Union[
         JoinRoom,
@@ -104,6 +135,9 @@ IncomingMessage = Annotated[
         TaskHoldStop,
         TriggerSabotage,
         ReturnToLobby,
+        CallEmergencyMeeting,
+        CastVote,
+        SkipVote,
     ],
     Discriminator("type"),
 ]
@@ -146,6 +180,7 @@ class GameStateMsg(BaseModel):
     players: list[dict[str, Any]]
     tasks: list[dict[str, Any]] = Field(default_factory=list)
     sabotages: list[dict[str, Any]] = Field(default_factory=list)
+    meeting: dict[str, Any] | None = None
 
 
 class PrivateRoleMsg(BaseModel):
@@ -167,6 +202,15 @@ class GameEndedMsg(BaseModel):
     winner: str
     reason: str
     players: list[dict[str, Any]]  # each: {id, name, role, team, completedTasks, triggeredSabotages}
+
+
+class VotingResultMsg(BaseModel):
+    model_config = _camel_config()
+    removed_player_id: str = ""
+    removed_player_name: str = ""
+    was_chaos_agent: bool = False
+    tie: bool = False
+    skipped: bool = False
 
 
 def envelope(type_: str, payload: BaseModel) -> dict[str, Any]:

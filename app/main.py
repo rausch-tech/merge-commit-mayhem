@@ -13,6 +13,8 @@ from app.game.models import InputState, Phase
 from app.game.room_code import generate_unique
 from app.game.sabotages import SABOTAGE_DEFINITIONS
 from app.protocol import (
+    CallEmergencyMeeting,
+    CastVote,
     ErrorMsg,
     GameEndedMsg,
     GameStateMsg,
@@ -22,10 +24,12 @@ from app.protocol import (
     PrivateRoleMsg,
     ReturnToLobby,
     RoomJoinedMsg,
+    SkipVote,
     StartGame,
     TaskHoldStart,
     TaskHoldStop,
     TriggerSabotage,
+    VotingResultMsg,
     envelope,
     parse_incoming,
 )
@@ -83,11 +87,17 @@ async def _tick_loop() -> None:
             await asyncio.sleep(TICK_DT)
             for room in list(registry.active_rooms()):
                 try:
-                    if room.phase is Phase.PLAYING:
+                    if room.phase is Phase.PLAYING or room.phase is Phase.MEETING:
                         room.tick(TICK_DT)
                         await manager.broadcast(
                             room.code, envelope("game_state", _game_state_msg(room))
                         )
+                    if room.last_voting_result is not None:
+                        await manager.broadcast(
+                            room.code,
+                            envelope("voting_result", VotingResultMsg(**room.last_voting_result)),
+                        )
+                        room.last_voting_result = None
                     if room.phase is Phase.ENDED and not room.has_broadcast_end:
                         await manager.broadcast(
                             room.code,
@@ -143,6 +153,12 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 await _handle_task_hold_stop(ws, msg)
             elif isinstance(msg, TriggerSabotage):
                 await _handle_trigger_sabotage(ws, msg)
+            elif isinstance(msg, CallEmergencyMeeting):
+                await _handle_call_emergency_meeting(ws)
+            elif isinstance(msg, CastVote):
+                await _handle_cast_vote(ws, msg)
+            elif isinstance(msg, SkipVote):
+                await _handle_skip_vote(ws)
             elif isinstance(msg, ReturnToLobby):
                 await _handle_return_to_lobby(ws)
     except WebSocketDisconnect:
@@ -256,6 +272,45 @@ async def _handle_trigger_sabotage(ws: WebSocket, msg: TriggerSabotage) -> None:
         return
     try:
         room.apply_sabotage(session.player_id, msg.payload.sabotage_id)
+    except GameRoomError as exc:
+        await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+
+
+async def _handle_call_emergency_meeting(ws: WebSocket) -> None:
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    try:
+        room.call_emergency_meeting(requesting_player_id=session.player_id)
+    except GameRoomError as exc:
+        await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+
+
+async def _handle_cast_vote(ws: WebSocket, msg: CastVote) -> None:
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    try:
+        room.cast_vote(voter_id=session.player_id, target_id=msg.payload.target_player_id)
+    except GameRoomError as exc:
+        await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+
+
+async def _handle_skip_vote(ws: WebSocket) -> None:
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    try:
+        room.skip_vote(voter_id=session.player_id)
     except GameRoomError as exc:
         await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
 

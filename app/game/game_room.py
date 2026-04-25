@@ -117,6 +117,7 @@ class GameRoom:
         self.meeting_title: str = ""
         self.votes: dict[str, str] = {}                       # voter_id -> target_id (or SKIP_TARGET)
         self.players_with_meeting_left: dict[str, bool] = {}  # player_id -> True if can still call
+        self.last_voting_result: dict | None = None
 
     # --- player management -------------------------------------------------
 
@@ -517,9 +518,37 @@ class GameRoom:
         Returns the eliminated player_id or None.
         """
         eliminated_id = _tally_votes(self.votes)
+        # Compute extra fields the client needs in voting_result.
+        counts: dict[str, int] = {}
+        for target in self.votes.values():
+            counts[target] = counts.get(target, 0) + 1
+        max_count = max(counts.values()) if counts else 0
+        winners = [t for t, c in counts.items() if c == max_count]
+        skip_won = (eliminated_id is None) and (
+            (counts.get(SKIP_TARGET, 0) == max_count and max_count > 0)
+        )
+        named_tie = (
+            eliminated_id is None
+            and len(winners) > 1
+            and all(w != SKIP_TARGET for w in winners)
+        )
+
+        was_chaos = False
+        removed_name = ""
         if eliminated_id and eliminated_id in self.players:
             self.players[eliminated_id].is_alive = False
-        # Reset meeting state.
+            was_chaos = self.players[eliminated_id].team == "chaos_agents"
+            removed_name = self.players[eliminated_id].name
+
+        self.last_voting_result = {
+            "removed_player_id": eliminated_id or "",
+            "removed_player_name": removed_name,
+            "was_chaos_agent": was_chaos,
+            "tie": named_tie,
+            "skipped": skip_won,
+        }
+
+        # Reset meeting state and return to PLAYING.
         self.meeting_remaining_seconds = 0.0
         self.meeting_caller_id = None
         self.meeting_title = ""
@@ -667,6 +696,7 @@ class GameRoom:
         self.meeting_title = ""
         self.votes = {}
         self.players_with_meeting_left = {}
+        self.last_voting_result = None
         for player in self.players.values():
             player.role = None
             player.team = None

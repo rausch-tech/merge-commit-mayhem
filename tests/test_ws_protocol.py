@@ -377,3 +377,150 @@ def test_non_demo_single_player_still_rejected():
             err = ws.receive_json()
         assert err["type"] == "error"
         assert err["payload"]["code"] == "NOT_ENOUGH_PLAYERS"
+
+
+# --- VB additions: voting + emergency meeting integration tests -------------
+
+
+def test_call_emergency_meeting_outside_war_room_returns_error():
+    with TestClient(app) as client, client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+        _join(ws_a, "MEET", "Alice")
+        ws_a.receive_json()  # lobby
+        _join(ws_b, "MEET", "Bob")
+        ws_a.receive_json()
+        ws_b.receive_json()
+
+        ws_a.send_json({"type": "start_game", "payload": {}})
+        _drain_until(ws_a, "private_role")
+        _drain_until(ws_a, "game_state")
+        _drain_until(ws_b, "private_role")
+        _drain_until(ws_b, "game_state")
+
+        ws_a.send_json({"type": "call_emergency_meeting", "payload": {}})
+        # Skip interleaved game_state messages while waiting for the error.
+        msg = ws_a.receive_json()
+        while msg["type"] == "game_state":
+            msg = ws_a.receive_json()
+        assert msg["type"] == "error"
+        assert msg["payload"]["code"] == "NOT_IN_WAR_ROOM"
+
+
+def test_call_meeting_from_war_room_transitions_to_meeting_phase():
+    with TestClient(app) as client, client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+        _join(ws_a, "MEET2", "Alice")
+        ws_a.receive_json()
+        _join(ws_b, "MEET2", "Bob")
+        ws_a.receive_json()
+        ws_b.receive_json()
+
+        ws_a.send_json({"type": "start_game", "payload": {}})
+        _drain_until(ws_a, "private_role")
+        _drain_until(ws_a, "game_state")
+        _drain_until(ws_b, "private_role")
+        _drain_until(ws_b, "game_state")
+
+        # Server-side: place Alice in the war room.
+        room = registry.get("MEET2")
+        assert room is not None
+        alice_id = next(p.id for p in room.players.values() if p.name == "Alice")
+        room.players[alice_id].x = 1000.0
+        room.players[alice_id].y = 1000.0
+
+        ws_a.send_json({"type": "call_emergency_meeting", "payload": {}})
+
+        # Drain game_state until phase is "meeting".
+        for _ in range(60):
+            msg = ws_a.receive_json()
+            if msg["type"] == "game_state" and msg["payload"]["phase"] == "meeting":
+                assert msg["payload"]["meeting"]["callerId"] == alice_id
+                break
+        else:
+            raise AssertionError("Did not receive meeting-phase game_state")
+
+
+def test_full_voting_round_eliminates_named_target():
+    with TestClient(app) as client, client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b, client.websocket_connect("/ws") as ws_c:
+        _join(ws_a, "VOTEFL", "Alice")
+        ws_a.receive_json()
+        _join(ws_b, "VOTEFL", "Bob")
+        ws_a.receive_json()
+        ws_b.receive_json()
+        _join(ws_c, "VOTEFL", "Carol")
+        ws_a.receive_json()
+        ws_b.receive_json()
+        ws_c.receive_json()
+
+        ws_a.send_json({"type": "start_game", "payload": {}})
+        for ws in [ws_a, ws_b, ws_c]:
+            _drain_until(ws, "private_role")
+            _drain_until(ws, "game_state")
+
+        room = registry.get("VOTEFL")
+        alice_id = next(p.id for p in room.players.values() if p.name == "Alice")
+        bob_id = next(p.id for p in room.players.values() if p.name == "Bob")
+        carol_id = next(p.id for p in room.players.values() if p.name == "Carol")
+        room.players[alice_id].x = 1000.0
+        room.players[alice_id].y = 1000.0
+
+        ws_a.send_json({"type": "call_emergency_meeting", "payload": {}})
+
+        # Wait for meeting phase to be observed by Alice.
+        for _ in range(60):
+            msg = ws_a.receive_json()
+            if msg["type"] == "game_state" and msg["payload"]["phase"] == "meeting":
+                break
+
+        # Cast votes: Alice + Bob vote Carol; Carol skips.
+        ws_a.send_json({"type": "cast_vote", "payload": {"targetPlayerId": carol_id}})
+        ws_b.send_json({"type": "cast_vote", "payload": {"targetPlayerId": carol_id}})
+        ws_c.send_json({"type": "skip_vote", "payload": {}})
+
+        # Wait for the voting_result broadcast on any of the three sockets.
+        result = _drain_until(ws_a, "voting_result", max_msgs=120)
+        assert result["payload"]["removedPlayerId"] == carol_id
+        assert result["payload"]["removedPlayerName"] == "Carol"
+        assert result["payload"]["tie"] is False
+        assert result["payload"]["skipped"] is False
+        # Phase should be back to playing afterward.
+        for _ in range(20):
+            msg = ws_a.receive_json()
+            if msg["type"] == "game_state" and msg["payload"]["phase"] == "playing":
+                # Carol should be marked dead in the player list.
+                carol_in_state = next(p for p in msg["payload"]["players"] if p["id"] == carol_id)
+                assert carol_in_state["isAlive"] is False
+                break
+        else:
+            raise AssertionError("Phase did not return to playing")
+
+
+def test_meeting_resolves_with_skip_when_only_skips_received():
+    with TestClient(app) as client, client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+        _join(ws_a, "VOTSK", "Alice")
+        ws_a.receive_json()
+        _join(ws_b, "VOTSK", "Bob")
+        ws_a.receive_json()
+        ws_b.receive_json()
+
+        ws_a.send_json({"type": "start_game", "payload": {}})
+        for ws in [ws_a, ws_b]:
+            _drain_until(ws, "private_role")
+            _drain_until(ws, "game_state")
+
+        room = registry.get("VOTSK")
+        alice_id = next(p.id for p in room.players.values() if p.name == "Alice")
+        room.players[alice_id].x = 1000.0
+        room.players[alice_id].y = 1000.0
+        ws_a.send_json({"type": "call_emergency_meeting", "payload": {}})
+
+        for _ in range(60):
+            msg = ws_a.receive_json()
+            if msg["type"] == "game_state" and msg["payload"]["phase"] == "meeting":
+                break
+
+        ws_a.send_json({"type": "skip_vote", "payload": {}})
+        ws_b.send_json({"type": "skip_vote", "payload": {}})
+
+        result = _drain_until(ws_a, "voting_result", max_msgs=120)
+        assert result["payload"]["removedPlayerId"] == ""
+        assert result["payload"]["skipped"] is True
+        assert result["payload"]["tie"] is False

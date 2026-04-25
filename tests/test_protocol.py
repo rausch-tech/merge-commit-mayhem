@@ -184,3 +184,58 @@ def test_game_ended_msg_serializes_to_camel():
     assert dumped["reason"] == "Release deployed."
     assert dumped["players"][0]["completedTasks"] == 5
     assert dumped["players"][0]["triggeredSabotages"] == 0
+
+
+# --- VB additions: voting protocol models -----------------------------------
+
+
+from app.protocol import (
+    CallEmergencyMeeting,
+    CastVote,
+    SkipVote,
+    VotingResultMsg,
+)
+
+
+def test_parse_call_emergency_meeting():
+    raw = {"type": "call_emergency_meeting", "payload": {}}
+    msg = parse_incoming(raw)
+    assert isinstance(msg, CallEmergencyMeeting)
+
+
+def test_parse_cast_vote():
+    raw = {"type": "cast_vote", "payload": {"targetPlayerId": "abc"}}
+    msg = parse_incoming(raw)
+    assert isinstance(msg, CastVote)
+    assert msg.payload.target_player_id == "abc"
+
+
+def test_parse_skip_vote_with_empty_payload():
+    raw = {"type": "skip_vote", "payload": {}}
+    msg = parse_incoming(raw)
+    assert isinstance(msg, SkipVote)
+
+
+def test_voting_result_default_dump():
+    msg = VotingResultMsg()
+    dumped = msg.model_dump(by_alias=True)
+    assert dumped == {
+        "removedPlayerId": "",
+        "removedPlayerName": "",
+        "wasChaosAgent": False,
+        "tie": False,
+        "skipped": False,
+    }
+
+
+def test_voting_result_with_eliminated_player():
+    msg = VotingResultMsg(
+        removed_player_id="p123",
+        removed_player_name="Max",
+        was_chaos_agent=True,
+        tie=False,
+        skipped=False,
+    )
+    dumped = msg.model_dump(by_alias=True)
+    assert dumped["removedPlayerId"] == "p123"
+    assert dumped["wasChaosAgent"] is True
