@@ -222,3 +222,81 @@ button:hover { filter: brightness(1.1); }
   /* keep existing rules — canvas no longer must take full width inside the stage */
   flex: 0 0 900px;
 }
+
+#sabotage-panel {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 10px 12px;
+  border: 1px solid #4a1e1e;
+  min-width: 220px;
+}
+
+#sabotage-panel h3 {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #f87171;
+}
+
+.sabotage-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sabotage-btn {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #4a1e1e;
+  color: var(--text);
+  border: 1px solid #7a2e2e;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sabotage-btn:disabled {
+  cursor: not-allowed;
+  background: #2a1414;
+  color: var(--muted);
+}
+
+.sabotage-btn:hover:not(:disabled) {
+  background: #6a2828;
+}
+
+.sabotage-btn.sabotage-active {
+  border-color: #facc15;
+  box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.4);
+}
+
+.sabotage-cooldown-fill {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 0%;
+  background: rgba(15, 23, 42, 0.55);
+  pointer-events: none;
+  transition: height 80ms linear;
+}
+
+.sabotage-label,
+.sabotage-cooldown {
+  position: relative;  /* sit above the fill */
+  z-index: 1;
+}
+
+.sabotage-cooldown {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: var(--muted);
+}

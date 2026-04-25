@@ -3,6 +3,7 @@ import { attachInput, attachTaskInteraction } from "./input.js";
 import { Renderer } from "./render.js";
 import { Hud } from "./hud.js";
 import { TaskList } from "./tasks.js";
+import { SabotagePanel } from "./sabotages.js";
 
 const state = {
   playerId: null,
@@ -30,6 +31,9 @@ const els = {
 
 const taskSidebarEl = document.getElementById("task-sidebar");
 const taskList = new TaskList(taskSidebarEl);
+
+const sabotagePanelEl = document.getElementById("sabotage-panel");
+const sabotagePanel = new SabotagePanel(sabotagePanelEl, ws);
 
 const wsUrl = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
 const ws = new WsClient(wsUrl);
@@ -77,6 +81,7 @@ ws.on("lobby_state", (payload) => {
 ws.on("private_role", (payload) => {
   state.ownRole = payload;
   hud.setRole(payload.role, payload.team);
+  sabotagePanel.setAvailable(payload.availableSabotages || []);
 });
 
 ws.on("game_state", (payload) => {
@@ -95,6 +100,7 @@ ws.on("game_state", (payload) => {
     pipelineStability: payload.pipelineStability,
     coffeeLevel: payload.coffeeLevel,
   });
+  sabotagePanel.updateFromGameState(payload.sabotages || []);
 });
 
 ws.on("error", (payload) => {
