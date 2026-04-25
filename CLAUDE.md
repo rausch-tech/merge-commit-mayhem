@@ -19,13 +19,15 @@ Wenn eine Feature-Idee Spiellogik in den Client drücken würde → zurückschie
 
 ## Wichtige Orte
 
-- **Design-Bibel** (Master-Paket, von Sven geliefert): `merge_conflict_mayhem_project/`
-- **Aktive Specs**: `docs/superpowers/specs/`
-- **Implementierungspläne**: `docs/superpowers/plans/`
-- **Code**: `app/` (Backend), `static/` (Frontend), `tests/` (pytest)
+- **Roadmap (eine Wahrheit)**: `docs/ROADMAP.md` — Vision + sechs Tier mit konkreten Slices
+- **Map-Schema**: `docs/maps.md`
+- **Doku-Index**: `docs/README.md`
+- **Contributor-Onboarding**: `CONTRIBUTING.md` (top-level)
+- **Repo-Quick-Start**: `README.md` (top-level)
+- **Code**: `app/` (Backend), `static/` (Frontend), `tests/` (pytest), `maps/` (Map-JSONs)
+- **Historisches Design-Paket** (Inspiration, nicht aktuell): `merge_conflict_mayhem_project/`
 
-Aktueller Sprint-Cut siehe:
-`docs/superpowers/specs/2026-04-24-vertical-slice-lobby-movement-design.md`
+Specs/Plans pro Slice sind nicht mehr persistiert — die Roadmap ist die Wahrheit, Slice-Details fließen direkt in Implementer-Prompts. Alte Spec-/Plan-Files wurden 2026-04-25 entfernt.
 
 ## Tooling
 
@@ -45,11 +47,11 @@ Aktueller Sprint-Cut siehe:
 
 ## Workflow-Erwartungen
 
-Größere Features laufen so:
-1. `superpowers:brainstorming` → Spec in `docs/superpowers/specs/`
-2. `superpowers:writing-plans` → Plan in `docs/superpowers/plans/`
-3. `superpowers:subagent-driven-development` → Ausführung im Worktree
-4. `superpowers:finishing-a-development-branch` → Merge-Entscheidung
+- **Slices** sind die Arbeitseinheit. Pro Slice: eigener Branch (`slice/<kurztitel>` oder `feat/<kurz>`), eigener Worktree unter `.worktrees/`, Tests müssen grün bleiben.
+- **Roadmap** (`docs/ROADMAP.md`) bestimmt Reihenfolge. Nicht eigenmächtig springen.
+- **Specs/Plans** schreiben wir nur für nicht-triviale Slices (>1 Tag). Kleinere Slices werden direkt via Implementer-Prompt umgesetzt.
+- **Live-Tests** validieren Tier-Übergänge — Tier ist erst „done" wenn mit echten Spielern getestet.
+- **Live-Server** läuft auf https://mcm.3-78-184-97.sslip.io (AWS EC2, eu-central-1). Deploy via Tarball + scp.
 
 Kleinere Fixes dürfen direkt im aktuellen Branch passieren.
 
