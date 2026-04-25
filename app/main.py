@@ -134,7 +134,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
             if isinstance(msg, JoinRoom):
                 await _handle_join(ws, msg)
             elif isinstance(msg, StartGame):
-                await _handle_start(ws)
+                await _handle_start(ws, msg)
             elif isinstance(msg, PlayerInput):
                 await _handle_input(ws, msg)
             elif isinstance(msg, TaskHoldStart):
@@ -172,7 +172,7 @@ async def _handle_join(ws: WebSocket, msg: JoinRoom) -> None:
     await manager.broadcast(code, envelope("lobby_state", LobbyStateMsg(**room.lobby_snapshot())))
 
 
-async def _handle_start(ws: WebSocket) -> None:
+async def _handle_start(ws: WebSocket, msg: StartGame) -> None:
     session = manager.session_for(ws)
     if session is None:
         return
@@ -180,7 +180,7 @@ async def _handle_start(ws: WebSocket) -> None:
     if room is None:
         return
     try:
-        room.start(requesting_player_id=session.player_id)
+        room.start(requesting_player_id=session.player_id, demo=msg.payload.demo)
     except GameRoomError as exc:
         await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
         return

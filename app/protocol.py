@@ -23,6 +23,7 @@ class JoinRoomPayload(BaseModel):
 
 class StartGamePayload(BaseModel):
     model_config = _camel_config()
+    demo: bool = False
 
 
 class PlayerInputPayload(BaseModel):

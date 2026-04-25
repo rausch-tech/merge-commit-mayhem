@@ -142,6 +142,7 @@ class GameRoom:
         self,
         requesting_player_id: str,
         rng: random.Random | None = None,
+        demo: bool = False,
     ) -> None:
         player = self.players.get(requesting_player_id)
         if player is None or not player.is_host:
@@ -154,16 +155,28 @@ class GameRoom:
                 code="WRONG_PHASE",
                 message=f"Cannot start in phase {self.phase.value}.",
             )
-        if len(self.players) < MIN_PLAYERS_TO_START:
+        if not demo and len(self.players) < MIN_PLAYERS_TO_START:
             raise GameRoomError(
                 code="NOT_ENOUGH_PLAYERS",
                 message=f"Need at least {MIN_PLAYERS_TO_START} players to start.",
             )
+        if demo and len(self.players) == 0:
+            raise GameRoomError(
+                code="NOT_ENOUGH_PLAYERS",
+                message="Demo mode still needs at least one player.",
+            )
 
-        role_map = assign_roles(list(self.players.keys()), rng=rng)
-        for pid, info in role_map.items():
-            self.players[pid].role = info.role
-            self.players[pid].team = info.team
+        if demo and len(self.players) == 1:
+            # Single-player demo: force vibe_coder so the player sees the
+            # full chaos UI (sabotage buttons + role label).
+            only_pid = next(iter(self.players))
+            self.players[only_pid].role = "vibe_coder"
+            self.players[only_pid].team = "chaos_agents"
+        else:
+            role_map = assign_roles(list(self.players.keys()), rng=rng)
+            for pid, info in role_map.items():
+                self.players[pid].role = info.role
+                self.players[pid].team = info.team
 
         for (pos_x, pos_y), player in zip(_START_POSITIONS, self.players.values()):
             player.x = pos_x

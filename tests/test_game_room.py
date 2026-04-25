@@ -368,3 +368,46 @@ def test_tick_movement_respects_slow_speed():
     room.tick(0.1)
     # 60 px/s * 0.1 s = 6 px, not 12 px.
     assert p.x == pytest.approx(406.0)
+
+
+# --- Demo mode -----------------------------------------------------------
+
+
+def test_demo_mode_allows_single_player_start():
+    room = GameRoom(code="DEMO")
+    only = room.add_player("Sven")
+    room.start(requesting_player_id=only.id, rng=random.Random(0), demo=True)
+    assert room.phase is Phase.PLAYING
+
+
+def test_demo_mode_assigns_vibe_coder_to_solo_player():
+    room = GameRoom(code="DEMO")
+    only = room.add_player("Sven")
+    room.start(requesting_player_id=only.id, rng=random.Random(0), demo=True)
+    assert room.players[only.id].role == "vibe_coder"
+    assert room.players[only.id].team == "chaos_agents"
+
+
+def test_demo_mode_with_two_players_uses_normal_role_assignment():
+    room = GameRoom(code="DEMO")
+    a = room.add_player("Alice")
+    b = room.add_player("Bob")
+    room.start(requesting_player_id=a.id, rng=random.Random(0), demo=True)
+    roles = sorted(p.role for p in room.players.values())
+    assert roles == ["developer", "vibe_coder"]
+
+
+def test_non_demo_still_requires_two_players():
+    room = GameRoom(code="DEMO")
+    only = room.add_player("Sven")
+    with pytest.raises(GameRoomError) as exc:
+        room.start(requesting_player_id=only.id, rng=random.Random(0))
+    assert exc.value.code == "NOT_ENOUGH_PLAYERS"
+
+
+def test_demo_mode_with_zero_players_still_errors():
+    """Edge case: a host who somehow starts after everyone left."""
+    room = GameRoom(code="DEMO")
+    # Manually craft an impossible state for the test.
+    with pytest.raises(GameRoomError):
+        room.start(requesting_player_id="nope", rng=random.Random(0), demo=True)

@@ -344,3 +344,36 @@ def test_return_to_lobby_requires_host_and_ended_phase():
         lob_b = _drain_until(ws_b, "lobby_state")
         assert len(lob_a["payload"]["players"]) == 2
         assert len(lob_b["payload"]["players"]) == 2
+
+
+# --- Demo mode (WS) ------------------------------------------------------
+
+
+def test_demo_mode_lets_single_player_start_via_ws():
+    with TestClient(app) as client, client.websocket_connect("/ws") as ws:
+        _join(ws, "DEMO", "Solo")
+        ws.receive_json()  # lobby_state
+        ws.send_json({"type": "start_game", "payload": {"demo": True}})
+        role = _drain_until(ws, "private_role")
+        assert role["payload"]["role"] == "vibe_coder"
+        assert role["payload"]["team"] == "chaos_agents"
+        assert role["payload"]["availableSabotages"] == [
+            "ci_cd_red",
+            "coffee_outage",
+            "mandatory_meeting",
+        ]
+        state = _drain_until(ws, "game_state")
+        assert state["payload"]["phase"] == "playing"
+
+
+def test_non_demo_single_player_still_rejected():
+    with TestClient(app) as client, client.websocket_connect("/ws") as ws:
+        _join(ws, "DEMO", "Solo")
+        ws.receive_json()  # lobby_state
+        ws.send_json({"type": "start_game", "payload": {}})
+        err = ws.receive_json()
+        # Skip any interleaved game_state (defensive — there shouldn't be any here)
+        while err["type"] == "game_state":
+            err = ws.receive_json()
+        assert err["type"] == "error"
+        assert err["payload"]["code"] == "NOT_ENOUGH_PLAYERS"

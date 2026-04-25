@@ -25,6 +25,8 @@ const els = {
   lobbyPlayerList: document.getElementById("lobby-player-list"),
   btnJoin: document.getElementById("btn-join"),
   btnStart: document.getElementById("btn-start"),
+  demoModeRow: document.getElementById("demo-mode-row"),
+  demoMode: document.getElementById("demo-mode"),
   inputName: document.getElementById("input-name"),
   inputRoomCode: document.getElementById("input-room-code"),
   lobbyScreen: document.getElementById("lobby-screen"),
@@ -67,6 +69,7 @@ function renderLobby() {
     els.lobbyPlayerList.appendChild(li);
   }
   els.btnStart.classList.toggle("hidden", !state.isHost);
+  els.demoModeRow.classList.toggle("hidden", !state.isHost);
 }
 
 ws.on("room_joined", (payload) => {
@@ -144,7 +147,8 @@ els.btnJoin.addEventListener("click", () => {
 });
 
 els.btnStart.addEventListener("click", () => {
-  ws.send("start_game", {});
+  const demo = !!els.demoMode.checked;
+  ws.send("start_game", { demo });
 });
 
 attachInput(ws);
