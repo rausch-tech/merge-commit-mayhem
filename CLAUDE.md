@@ -55,4 +55,7 @@ Kleinere Fixes dürfen direkt im aktuellen Branch passieren.
 
 ## Remote
 
-`origin` = `git@gitlab.com:rauschtechnology/mergeconflictmayhem.git`, branch `main`.
+- `origin` = `git@github.com:sven-rausch/merge-commit-mayhem.git`, branch `main` (primary, **push hier**).
+- `gitlab` = `git@gitlab.com:rauschtechnology/mergeconflictmayhem.git` — historisches Mirror, nicht mehr aktiv. Push erforderte ggf. Force wegen Rebase-Divergenz; nicht ungefragt anfassen.
+
+Repo wurde am 2026-04-25 von GitLab nach GitHub verschoben. Tags wurden re-tagged auf den GitHub-Commit-Graph (rebased onto GitHub's init commit).

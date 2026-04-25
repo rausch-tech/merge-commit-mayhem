@@ -1,9 +1,10 @@
 # State & Roadmap
 
 **Stand:** 2026-04-25
-**Branch:** `main`, HEAD `a846a12`
+**Branch:** `main`
 **Tests:** 207 grün (`uv run pytest`)
-**Server:** läuft auf `0.0.0.0:8000` lokal, erreichbar via `http://t-800:8000` über Tailscale
+**Repo (origin):** https://github.com/sven-rausch/merge-commit-mayhem (GitLab `gitlab`-Remote bleibt historisches Mirror)
+**Hosted live:** https://mcm.3-78-184-97.sslip.io (AWS EC2 t4g.nano in eu-central-1, Caddy + LetsEncrypt)
 
 Dieses Dokument ist die kanonische Stand-Aufnahme. Halte es aktuell wenn Slices landen.
 
