@@ -18,11 +18,14 @@ export class Renderer {
     this.canvas = canvas;
     this.players = [];
     this.ownPlayerId = null;
+    this.tasks = [];
+    this.localPlayerInRange = null;  // task-id of the task within interaction radius for the local player, else null
     this._running = false;
   }
 
   setOwnPlayerId(id) { this.ownPlayerId = id; }
   setPlayers(players) { this.players = players; }
+  setTasks(tasks) { this.tasks = tasks; }
 
   start() {
     this._running = true;
@@ -35,6 +38,11 @@ export class Renderer {
   }
 
   stop() { this._running = false; }
+
+  _localPlayer() {
+    if (!this.ownPlayerId) return null;
+    return this.players.find((p) => p.id === this.ownPlayerId) || null;
+  }
 
   _draw() {
     const { ctx, canvas } = this;
@@ -55,7 +63,64 @@ export class Renderer {
       ctx.fillText(room.title.toUpperCase(), room.x + 8, room.y + 8);
     }
 
-    // Players.
+    // Tasks.
+    const local = this._localPlayer();
+    let inRange = null;
+    const TASK_RADIUS = 14;
+    const INTERACT_RADIUS = 40;
+    for (const task of this.tasks) {
+      // Status colors: available green, in_progress blue, cooldown gray.
+      let fill = "#4ade80";
+      if (task.status === "in_progress") fill = "#60a5fa";
+      else if (task.status === "cooldown") fill = "#475569";
+
+      ctx.beginPath();
+      ctx.arc(task.x, task.y, TASK_RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = "#0b0f1f";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Progress ring if in_progress
+      if (task.status === "in_progress" && task.progress > 0) {
+        ctx.beginPath();
+        ctx.arc(
+          task.x, task.y, TASK_RADIUS + 4,
+          -Math.PI / 2,
+          -Math.PI / 2 + (task.progress * Math.PI * 2)
+        );
+        ctx.strokeStyle = "#facc15";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+
+      // 2-letter label inside.
+      ctx.fillStyle = "#0b0f1f";
+      ctx.font = "bold 10px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(task.title.slice(0, 2).toUpperCase(), task.x, task.y);
+
+      // Hover/in-range highlight if local player is within INTERACT_RADIUS and task is available.
+      if (local && task.status !== "cooldown") {
+        const dx = local.x - task.x;
+        const dy = local.y - task.y;
+        if (dx * dx + dy * dy <= INTERACT_RADIUS * INTERACT_RADIUS) {
+          ctx.beginPath();
+          ctx.arc(task.x, task.y, TASK_RADIUS + 8, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(250, 204, 21, 0.7)";
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 3]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          if (!inRange) inRange = task.id;
+        }
+      }
+    }
+    this.localPlayerInRange = inRange;
+
+    // Players (existing rendering).
     for (const player of this.players) {
       ctx.beginPath();
       ctx.arc(player.x, player.y, PLAYER_RADIUS, 0, Math.PI * 2);

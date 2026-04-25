@@ -2,6 +2,7 @@ import { WsClient } from "./ws.js";
 import { attachInput } from "./input.js";
 import { Renderer } from "./render.js";
 import { Hud } from "./hud.js";
+import { TaskList } from "./tasks.js";
 
 const state = {
   playerId: null,
@@ -26,6 +27,9 @@ const els = {
   errorBanner: document.getElementById("error-banner"),
   canvas: document.getElementById("game-canvas"),
 };
+
+const taskSidebarEl = document.getElementById("task-sidebar");
+const taskList = new TaskList(taskSidebarEl);
 
 const wsUrl = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
 const ws = new WsClient(wsUrl);
@@ -83,6 +87,8 @@ ws.on("game_state", (payload) => {
   state.phase = payload.phase;
   state.players = payload.players;
   renderer.setPlayers(payload.players);
+  renderer.setTasks(payload.tasks || []);
+  taskList.render(payload.tasks || []);
   hud.setTimer(payload.remainingSeconds);
   hud.setStats({
     releaseProgress: payload.releaseProgress,
