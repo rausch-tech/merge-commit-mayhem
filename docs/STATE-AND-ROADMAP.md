@@ -144,13 +144,11 @@ Priorisiert. Jede Stufe ist ein abgeschlossener Sprint-Schnitt; nicht alles in e
 
 ### Tier 6 — Sprint 5 (Godot-Client)
 
-Nicht-blockierend; Browser-Client bleibt als Referenz und Web-Fallback. Reicht das WS-Protokoll am Ende der Sprints 1–4 ab, ist der Godot-Port hauptsächlich Render+UI-Arbeit.
+Nicht-blockierend; Browser-Client bleibt als Referenz und Web-Fallback. Ziel: **Among-Us-Polish-Niveau** (echte Tilemap, Charakter-Animationen, Sound-Mixing, smoothes Movement).
 
-| Slice | Was |
-|---|---|
-| **Godot-Projekt-Skelett** | WebSocket-Connect, Lobby-UI, Phase-Routing |
-| **Godot-Welt** | Iso-Tilemap, Charakter-Sprites, Bewegung, HUD |
-| **Godot-Voting + Endscreen** | Overlays, Result-Toast |
+**Eigener Plan:** [`docs/GODOT-TRANSITION.md`](GODOT-TRANSITION.md) — beschreibt was vor Godot stabil sein muss, welche Design-Entscheidungen anstehen (Among-Us-Features ja/nein, Art-Stil + -Quelle, Mobile, Account-System), Arbeitspakete + 6–10 Wochen-Schätzung.
+
+Vor-Godot-Block: 1–2 Wochen (Protokoll-Doku, Map-Editor Phase 1, Tier-1-Mechaniken einbauen, Asset-Pipeline klären). Godot-Sprint: 3–6 Wochen je nach Featureset.
 
 ### Tier 7 — Polish & UX
 
