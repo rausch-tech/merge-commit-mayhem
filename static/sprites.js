@@ -16,6 +16,14 @@ export const SPRITES = {
   // role badges (role_badges.png is 5 cols x 2 rows)
   role_developer:  { sheet: "/images/role_badges.png", cols: 5, rows: 2, col: 0, row: 0 },
   role_vibe_coder: { sheet: "/images/role_badges.png", cols: 5, rows: 2, col: 4, row: 0 },
+
+  // Character sprites — assigned by player color INDEX, not role.
+  character_0: { sheet: "/images/figuren.png", cols: 5, rows: 2, col: 0, row: 0 },
+  character_1: { sheet: "/images/figuren.png", cols: 5, rows: 2, col: 1, row: 0 },
+  character_2: { sheet: "/images/figuren.png", cols: 5, rows: 2, col: 2, row: 0 },
+  character_3: { sheet: "/images/figuren.png", cols: 5, rows: 2, col: 3, row: 0 },
+  character_4: { sheet: "/images/figuren.png", cols: 5, rows: 2, col: 4, row: 0 },
+  character_5: { sheet: "/images/figuren.png", cols: 5, rows: 2, col: 0, row: 1 },
 };
 
 /**

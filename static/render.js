@@ -6,6 +6,21 @@ import { drawSprite, loadSheet } from "./sprites.js";
 // Preload task spritesheet so it's cached before the first frame needs it.
 loadSheet("/images/ui_icon_set.png");
 
+// Preload character sheet so first frame can already use the sprite.
+loadSheet("/images/figuren.png");
+
+// Map hex color → character index (must mirror app/game/game_room.py _COLOR_PALETTE order).
+const COLOR_TO_CHAR_INDEX = {
+  "#4ade80": 0,  // green
+  "#60a5fa": 1,  // blue
+  "#fb923c": 2,  // orange
+  "#c084fc": 3,  // purple
+  "#facc15": 4,  // yellow
+  "#f87171": 5,  // red
+};
+
+const CHARACTER_RENDER_SIZE = 56;  // px on screen — bigger than the old 24px circle
+
 const ROOM_LAYOUT = [
   { id: "open_space",      title: "Open Space",      x: 0,    y: 0,    width: 800, height: 800, color: "#3a4560" },
   { id: "meeting_room",    title: "Meeting Room",    x: 800,  y: 0,    width: 800, height: 800, color: "#5a3a70" },
@@ -160,26 +175,58 @@ export class Renderer {
 
     // Players.
     for (const player of this.players) {
-      ctx.beginPath();
-      ctx.arc(player.x, player.y, PLAYER_RADIUS, 0, Math.PI * 2);
-      ctx.fillStyle = player.color;
-      ctx.fill();
+      const charIndex = COLOR_TO_CHAR_INDEX[player.color] ?? 0;
+      const half = CHARACTER_RENDER_SIZE / 2;
 
-      if (player.id === this.ownPlayerId) {
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 3;
-        ctx.stroke();
-      } else {
+      // Colored ring at feet (player identity color stays visible).
+      ctx.beginPath();
+      ctx.ellipse(
+        player.x, player.y + half * 0.85,
+        half * 0.7, half * 0.22,
+        0, 0, Math.PI * 2
+      );
+      ctx.fillStyle = player.color;
+      ctx.globalAlpha = 0.55;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = "#0b0f1f";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Sprite — fallback to colored circle while loading.
+      const drew = drawSprite(
+        ctx,
+        `character_${charIndex}`,
+        player.x,
+        player.y,
+        CHARACTER_RENDER_SIZE,
+        CHARACTER_RENDER_SIZE,
+      );
+      if (!drew) {
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, PLAYER_RADIUS, 0, Math.PI * 2);
+        ctx.fillStyle = player.color;
+        ctx.fill();
         ctx.strokeStyle = "rgba(0,0,0,0.4)";
         ctx.lineWidth = 1.5;
         ctx.stroke();
       }
 
+      // Local-player highlight: thin white halo around the character.
+      if (player.id === this.ownPlayerId) {
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, half + 2, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      // Name above the head — moved up so it doesn't clip the sprite.
       ctx.fillStyle = "#e6ecff";
-      ctx.font = "12px system-ui, sans-serif";
+      ctx.font = "13px system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "bottom";
-      ctx.fillText(player.name, player.x, player.y - PLAYER_RADIUS - 4);
+      ctx.fillText(player.name, player.x, player.y - half - 6);
     }
 
     ctx.restore();
