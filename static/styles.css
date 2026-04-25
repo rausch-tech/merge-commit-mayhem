@@ -135,3 +135,31 @@ button:hover { filter: brightness(1.1); }
   max-width: 900px;
   image-rendering: pixelated;
 }
+
+.hud-pill {
+  padding: 6px 10px;
+  background: #10152a;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 90px;
+}
+
+.hud-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hud-value {
+  font-weight: 600;
+}
+
+.hud-pill-release .hud-value { color: #4ade80; }    /* green */
+.hud-pill-pipeline .hud-value { color: #60a5fa; }   /* blue */
+.hud-pill-coffee .hud-value { color: #fb923c; }     /* orange */
+.hud-pill-timer .hud-value { color: #facc15; }      /* yellow */
+.hud-pill-role { font-weight: 600; }

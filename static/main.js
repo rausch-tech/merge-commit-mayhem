@@ -84,7 +84,11 @@ ws.on("game_state", (payload) => {
   state.players = payload.players;
   renderer.setPlayers(payload.players);
   hud.setTimer(payload.remainingSeconds);
-  hud.setPlayers(payload.players);
+  hud.setStats({
+    releaseProgress: payload.releaseProgress,
+    pipelineStability: payload.pipelineStability,
+    coffeeLevel: payload.coffeeLevel,
+  });
 });
 
 ws.on("error", (payload) => {

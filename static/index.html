@@ -36,9 +36,23 @@
 
     <section id="game-screen" class="hidden">
       <div id="hud">
-        <div id="hud-timer" class="hud-pill">--:--</div>
-        <div id="hud-role" class="hud-pill">Rolle: —</div>
-        <div id="hud-players" class="hud-pill"></div>
+        <div id="hud-release" class="hud-pill hud-pill-release" title="Release Progress">
+          <span class="hud-label">Release</span>
+          <span class="hud-value">0%</span>
+        </div>
+        <div id="hud-pipeline" class="hud-pill hud-pill-pipeline" title="Pipeline Stability">
+          <span class="hud-label">Pipeline</span>
+          <span class="hud-value">100%</span>
+        </div>
+        <div id="hud-coffee" class="hud-pill hud-pill-coffee" title="Coffee Level">
+          <span class="hud-label">Coffee</span>
+          <span class="hud-value">100%</span>
+        </div>
+        <div id="hud-timer" class="hud-pill hud-pill-timer" title="Timer">
+          <span class="hud-label">Timer</span>
+          <span class="hud-value">--:--</span>
+        </div>
+        <div id="hud-role" class="hud-pill hud-pill-role" title="Deine Rolle">Rolle: —</div>
       </div>
       <canvas id="game-canvas" width="900" height="400"></canvas>
     </section>
