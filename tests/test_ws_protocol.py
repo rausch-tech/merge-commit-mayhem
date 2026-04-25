@@ -251,7 +251,6 @@ def test_game_state_carries_stats_and_tasks_and_sabotages():
         assert p["releaseProgress"] == 0
         assert p["pipelineStability"] == 100
         assert p["coffeeLevel"] == 100
-        assert p["incidentCount"] == 0
         task_ids = {t["id"] for t in p["tasks"]}
         assert "fix_unit_tests" in task_ids
         sab_ids = {s["id"] for s in p["sabotages"]}

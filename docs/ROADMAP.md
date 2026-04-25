@@ -55,7 +55,7 @@ Sechs Tier, in der Reihenfolge wie sie gebaut werden sollten. Jedes Tier hat ein
 | 0.6  | **`docs/DEPLOY.md`** — Deploy-Workflow                                                              | ✅ done   |
 | 0.7  | **`docs/DEV.md`** — lokale Entwicklung                                                              | ✅ done   |
 | 0.8  | **Deploy-Script** — `scripts/deploy.sh`                                                             | ✅ done   |
-| 0.9  | **Dead-Code raus** — `incidentCount` ohne Mechanik raus                                             | offen     |
+| 0.9  | **Dead-Code raus** — `incidentCount` ohne Mechanik raus                                             | ✅ done   |
 | 0.10 | **Reconnect** — Server bewahrt Spieler-Identität 30 s nach Disconnect                               | offen     |
 | 0.11 | **Edge-Cases** — Host-Disconnect mid-Meeting etc.                                                   | offen     |
 | 0.12 | **Auto-Deploy auf main** — GitHub-Actions baut Tarball, scp + ssh-restart auf EC2 (Test-Gate davor) | ✅ done\* |

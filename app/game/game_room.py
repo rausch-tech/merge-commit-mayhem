@@ -99,7 +99,6 @@ class GameRoom:
         self.release_progress: int = 0
         self.pipeline_stability: int = 100
         self.coffee_level: int = 100
-        self.incident_count: int = 0
 
         # Per-player counters for the endscreen. Initialized on start().
         self.completed_tasks_by_player: dict[str, int] = {}
@@ -213,7 +212,6 @@ class GameRoom:
         self.release_progress = 0
         self.pipeline_stability = 100
         self.coffee_level = 100
-        self.incident_count = 0
         self.meeting_active_for = 0.0
         self.winner = None
         self.win_reason = None
@@ -607,7 +605,6 @@ class GameRoom:
             "releaseProgress": int(self.release_progress),
             "pipelineStability": int(self.pipeline_stability),
             "coffeeLevel": int(self.coffee_level),
-            "incidentCount": int(self.incident_count),
             "players": [
                 {
                     "id": p.id,
@@ -716,7 +713,6 @@ class GameRoom:
         self.release_progress = 0
         self.pipeline_stability = 100
         self.coffee_level = 100
-        self.incident_count = 0
         self.meeting_active_for = 0.0
         self.winner = None
         self.win_reason = None

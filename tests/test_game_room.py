@@ -223,7 +223,6 @@ def test_new_room_has_default_stats():
     assert room.release_progress == 0
     assert room.pipeline_stability == 100
     assert room.coffee_level == 100
-    assert room.incident_count == 0
     assert room.meeting_active_for == 0.0
     assert room.winner is None
     assert room.win_reason is None
@@ -248,7 +247,6 @@ def test_public_state_exposes_stats():
     assert state["releaseProgress"] == 0
     assert state["pipelineStability"] == 100
     assert state["coffeeLevel"] == 100
-    assert state["incidentCount"] == 0
 
 
 def test_reset_for_new_round_returns_to_lobby():

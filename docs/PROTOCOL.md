@@ -288,7 +288,6 @@ Wird gesendet bei: jedem Join, jedem Disconnect, `return_to_lobby`.
     "releaseProgress": 38,
     "pipelineStability": 80,
     "coffeeLevel": 100,
-    "incidentCount": 0,
     "players": [
       {
         "id": "abc...",
