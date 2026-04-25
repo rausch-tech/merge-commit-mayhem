@@ -502,6 +502,59 @@ def test_full_voting_round_eliminates_named_target():
             raise AssertionError("Phase did not return to playing")
 
 
+# --- Reconnect integration tests ---
+
+
+def test_rejoin_after_disconnect_during_playing():
+    """A disconnected player can rejoin within the grace period and resume."""
+    with TestClient(app) as client:
+        # Both players join + start the round.
+        with client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+            _join(ws_a, "RECONN", "Alice")
+            ws_a.receive_json()  # lobby
+            _join(ws_b, "RECONN", "Bob")
+            ws_a.receive_json()
+            ws_b.receive_json()
+            ws_a.send_json({"type": "start_game", "payload": {}})
+            _drain_until(ws_a, "private_role")
+            _drain_until(ws_a, "game_state")
+            _drain_until(ws_b, "private_role")
+            _drain_until(ws_b, "game_state")
+            room = registry.get("RECONN")
+            bob_id = next(p.id for p in room.players.values() if p.name == "Bob")
+
+        # Both connections closed. Bob is mid-round → should still be in room.
+        import time
+
+        time.sleep(0.2)
+        assert bob_id in room.players
+        assert room.players[bob_id].is_connected is False
+
+        # Bob reconnects with his playerId.
+        with client.websocket_connect("/ws") as ws_b2:
+            ws_b2.send_json(
+                {"type": "rejoin", "payload": {"roomCode": "RECONN", "playerId": bob_id}}
+            )
+            joined = ws_b2.receive_json()
+            assert joined["type"] == "room_joined"
+            assert joined["payload"]["playerId"] == bob_id
+            role = ws_b2.receive_json()
+            assert role["type"] == "private_role"
+            state = ws_b2.receive_json()
+            assert state["type"] == "game_state"
+            # And the player flag is back.
+            bob_in_state = next(p for p in state["payload"]["players"] if p["id"] == bob_id)
+            assert bob_in_state["isConnected"] is True
+
+
+def test_rejoin_with_unknown_player_id_returns_error():
+    with TestClient(app) as client, client.websocket_connect("/ws") as ws:
+        ws.send_json({"type": "rejoin", "payload": {"roomCode": "NONE", "playerId": "fake"}})
+        err = ws.receive_json()
+        assert err["type"] == "error"
+        assert err["payload"]["code"] == "REJOIN_NOT_AVAILABLE"
+
+
 def test_meeting_resolves_with_skip_when_only_skips_received():
     with (
         TestClient(app) as client,

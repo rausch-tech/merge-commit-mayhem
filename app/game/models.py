@@ -26,6 +26,8 @@ class Player(BaseModel):
     role: str | None = None
     team: str | None = None
     is_alive: bool = True
+    is_connected: bool = True
+    disconnected_at_monotonic: float | None = None
     x: float = 0.0
     y: float = 0.0
     input_state: InputState = Field(default_factory=InputState)

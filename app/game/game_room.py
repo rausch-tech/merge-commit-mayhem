@@ -33,6 +33,7 @@ MAX_PLAYERS = 6
 MIN_PLAYERS_TO_START = 2
 PLAYER_RADIUS = 12
 ROUND_SECONDS = 720.0
+RECONNECT_GRACE_SECONDS = 30.0
 
 MEETING_DURATION_SECONDS = 60.0
 
@@ -153,6 +154,92 @@ class GameRoom:
     def is_empty(self) -> bool:
         return not self.players
 
+    def mark_disconnected(self, player_id: str) -> None:
+        """
+        Player's WS closed while in PLAYING/MEETING phase. Keep their slot,
+        mark them disconnected, release any task holds, transfer host if
+        needed. The grace-period sweep in tick() will fully remove them
+        after RECONNECT_GRACE_SECONDS.
+        """
+        import time
+
+        player = self.players.get(player_id)
+        if player is None:
+            return
+        player.is_connected = False
+        player.disconnected_at_monotonic = time.monotonic()
+        # Release any task holds.
+        for task in self.tasks.values():
+            if player_id in task.per_player_progress:
+                task.per_player_progress.pop(player_id)
+                if not task.per_player_progress and task.status == "in_progress":
+                    task.status = "available"
+        # Reset their input.
+        player.input_state = InputState()
+        # Host transfer if they were host.
+        if player.is_host:
+            player.is_host = False
+            living_others = [
+                p for p in self.players.values() if p.id != player_id and p.is_connected
+            ]
+            if living_others:
+                oldest = min(living_others, key=lambda p: p.joined_at)
+                oldest.is_host = True
+            else:
+                # Fall back to any non-self player.
+                others = [p for p in self.players.values() if p.id != player_id]
+                if others:
+                    oldest = min(others, key=lambda p: p.joined_at)
+                    oldest.is_host = True
+
+    def mark_reconnected(self, player_id: str) -> "Player":
+        """
+        Reattach a disconnected player. Returns the Player object on success.
+        Raises GameRoomError(REJOIN_NOT_AVAILABLE) if the player is unknown,
+        already connected, or grace period expired.
+        """
+        import time
+
+        player = self.players.get(player_id)
+        if player is None:
+            raise GameRoomError(code="REJOIN_NOT_AVAILABLE", message="Player not found in room.")
+        if player.is_connected:
+            raise GameRoomError(
+                code="REJOIN_NOT_AVAILABLE",
+                message="Player is already connected — duplicate session?",
+            )
+        if player.disconnected_at_monotonic is None:
+            raise GameRoomError(
+                code="REJOIN_NOT_AVAILABLE",
+                message="Player has no disconnect timestamp.",
+            )
+        elapsed = time.monotonic() - player.disconnected_at_monotonic
+        if elapsed > RECONNECT_GRACE_SECONDS:
+            raise GameRoomError(
+                code="REJOIN_NOT_AVAILABLE",
+                message="Grace period expired.",
+            )
+        player.is_connected = True
+        player.disconnected_at_monotonic = None
+        return player
+
+    def _sweep_disconnected(self) -> list[str]:
+        """Called from tick(). Remove players whose grace expired. Returns the
+        list of removed player ids so the caller can broadcast the change."""
+        import time
+
+        now = time.monotonic()
+        removed = []
+        for pid, player in list(self.players.items()):
+            if player.is_connected:
+                continue
+            if player.disconnected_at_monotonic is None:
+                continue
+            if now - player.disconnected_at_monotonic > RECONNECT_GRACE_SECONDS:
+                self.remove_player(pid)
+                removed.append(pid)
+        return removed
+
     def _next_color(self) -> str:
         used = {p.color for p in self.players.values()}
         for color in _COLOR_PALETTE:
@@ -243,7 +330,7 @@ class GameRoom:
 
     def apply_input(self, player_id: str, input_state: InputState) -> None:
         player = self.players.get(player_id)
-        if player is None or not player.is_alive:
+        if player is None or not player.is_alive or not player.is_connected:
             return
         player.input_state = input_state
 
@@ -299,6 +386,7 @@ class GameRoom:
         self._tick_tasks(dt)
         self._tick_sabotages(dt)
         self.remaining_seconds = max(0.0, self.remaining_seconds - dt)
+        self._sweep_disconnected()
         self._check_win_conditions()
 
     # --- win conditions ----------------------------------------------------
@@ -614,6 +702,7 @@ class GameRoom:
                     "color": p.color,
                     "isHost": p.is_host,
                     "isAlive": p.is_alive,
+                    "isConnected": p.is_connected,
                 }
                 for p in self.players.values()
             ],
@@ -734,3 +823,5 @@ class GameRoom:
             player.y = 0.0
             player.input_state = InputState()
             player.is_alive = True
+            player.is_connected = True
+            player.disconnected_at_monotonic = None

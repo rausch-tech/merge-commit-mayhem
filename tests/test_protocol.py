@@ -232,3 +232,16 @@ def test_voting_result_with_eliminated_player():
     dumped = msg.model_dump(by_alias=True)
     assert dumped["removedPlayerId"] == "p123"
     assert dumped["wasChaosAgent"] is True
+
+
+# --- Reconnect protocol ---
+
+
+def test_parse_rejoin():
+    raw = {"type": "rejoin", "payload": {"roomCode": "ABCD", "playerId": "abc"}}
+    msg = parse_incoming(raw)
+    from app.protocol import Rejoin
+
+    assert isinstance(msg, Rejoin)
+    assert msg.payload.room_code == "ABCD"
+    assert msg.payload.player_id == "abc"

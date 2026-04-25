@@ -130,8 +130,21 @@ class SkipVote(BaseModel):
     payload: SkipVotePayload = Field(default_factory=SkipVotePayload)
 
 
+class RejoinPayload(BaseModel):
+    model_config = _camel_config()
+    room_code: str
+    player_id: str
+
+
+class Rejoin(BaseModel):
+    model_config = _camel_config()
+    type: Literal["rejoin"]
+    payload: RejoinPayload
+
+
 IncomingMessage = Annotated[
     JoinRoom
+    | Rejoin
     | StartGame
     | PlayerInput
     | TaskHoldStart

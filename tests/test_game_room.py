@@ -411,3 +411,112 @@ def test_demo_mode_with_zero_players_still_errors():
     # Manually craft an impossible state for the test.
     with pytest.raises(GameRoomError):
         room.start(requesting_player_id="nope", rng=random.Random(0), demo=True)
+
+
+# --- Reconnect ---
+
+
+def test_mark_disconnected_keeps_player_in_room():
+    room = _make_started_room(player_count=3)
+    pid = next(iter(room.players))
+    room.mark_disconnected(pid)
+    assert pid in room.players
+    assert room.players[pid].is_connected is False
+    assert room.players[pid].disconnected_at_monotonic is not None
+
+
+def test_mark_disconnected_releases_task_holds():
+    room = _make_started_room(player_count=2)
+    pid = next(iter(room.players))
+    p = room.players[pid]
+    # Move player onto the task so hold_start succeeds.
+    task_x, task_y = room.task_position("fix_unit_tests")
+    p.x, p.y = task_x, task_y
+    room.apply_task_hold_start(pid, "fix_unit_tests")
+    assert pid in room.tasks["fix_unit_tests"].per_player_progress
+    room.mark_disconnected(pid)
+    assert pid not in room.tasks["fix_unit_tests"].per_player_progress
+
+
+def test_mark_disconnected_transfers_host():
+    room = _make_started_room(player_count=3)
+    host = next(p for p in room.players.values() if p.is_host)
+    room.mark_disconnected(host.id)
+    assert room.players[host.id].is_host is False
+    other_hosts = [p for p in room.players.values() if p.is_host and p.id != host.id]
+    assert len(other_hosts) == 1
+
+
+def test_mark_reconnected_within_grace_restores():
+    room = _make_started_room(player_count=2)
+    pid = next(iter(room.players))
+    room.mark_disconnected(pid)
+    p = room.mark_reconnected(pid)
+    assert p.is_connected is True
+    assert p.disconnected_at_monotonic is None
+
+
+def test_mark_reconnected_after_grace_raises():
+    import time
+
+    room = _make_started_room(player_count=2)
+    pid = next(iter(room.players))
+    room.mark_disconnected(pid)
+    # Force disconnect timestamp into the past.
+    room.players[pid].disconnected_at_monotonic = time.monotonic() - 60
+    with pytest.raises(GameRoomError) as exc:
+        room.mark_reconnected(pid)
+    assert exc.value.code == "REJOIN_NOT_AVAILABLE"
+
+
+def test_mark_reconnected_unknown_player_raises():
+    room = _make_started_room(player_count=2)
+    with pytest.raises(GameRoomError):
+        room.mark_reconnected("nonexistent")
+
+
+def test_mark_reconnected_already_connected_raises():
+    room = _make_started_room(player_count=2)
+    pid = next(iter(room.players))
+    with pytest.raises(GameRoomError) as exc:
+        room.mark_reconnected(pid)
+    assert exc.value.code == "REJOIN_NOT_AVAILABLE"
+
+
+def test_disconnected_player_input_ignored():
+    room = _make_started_room(player_count=2)
+    pid = next(iter(room.players))
+    p = room.players[pid]
+    initial_x = p.x
+    room.mark_disconnected(pid)
+    room.apply_input(pid, InputState(right=True))
+    room.tick(0.5)
+    assert p.x == initial_x  # didn't move
+
+
+def test_sweep_removes_after_grace():
+    import time
+
+    room = _make_started_room(player_count=3)
+    pid = next(iter(room.players))
+    room.mark_disconnected(pid)
+    # Force timestamp into past.
+    room.players[pid].disconnected_at_monotonic = time.monotonic() - 60
+    room.tick(0.05)
+    assert pid not in room.players
+
+
+def test_public_state_includes_isconnected():
+    room = _make_started_room(player_count=2)
+    state = room.public_state()
+    for p in state["players"]:
+        assert p["isConnected"] is True
+
+
+def test_reset_restores_isconnected():
+    room = _make_started_room(player_count=3)
+    pid = next(iter(room.players))
+    room.mark_disconnected(pid)
+    room.reset_for_new_round()
+    assert room.players[pid].is_connected is True
+    assert room.players[pid].disconnected_at_monotonic is None

@@ -22,6 +22,7 @@ from app.protocol import (
     LobbyStateMsg,
     PlayerInput,
     PrivateRoleMsg,
+    Rejoin,
     ReturnToLobby,
     RoomJoinedMsg,
     SkipVote,
@@ -141,6 +142,8 @@ async def websocket_endpoint(ws: WebSocket) -> None:
 
             if isinstance(msg, JoinRoom):
                 await _handle_join(ws, msg)
+            elif isinstance(msg, Rejoin):
+                await _handle_rejoin(ws, msg)
             elif isinstance(msg, StartGame):
                 await _handle_start(ws, msg)
             elif isinstance(msg, PlayerInput):
@@ -189,6 +192,55 @@ async def _handle_join(ws: WebSocket, msg: JoinRoom) -> None:
         )
     )
     await manager.broadcast(code, envelope("lobby_state", LobbyStateMsg(**room.lobby_snapshot())))
+
+
+async def _handle_rejoin(ws: WebSocket, msg: Rejoin) -> None:
+    code = msg.payload.room_code.upper()
+    room = registry.get(code)
+    if room is None:
+        await ws.send_json(
+            envelope("error", ErrorMsg(code="REJOIN_NOT_AVAILABLE", message="Room not found."))
+        )
+        return
+    try:
+        player = room.mark_reconnected(msg.payload.player_id)
+    except GameRoomError as exc:
+        await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+        return
+    manager.register(ws, player.id, code)
+    # Send the same trio a fresh join would receive.
+    all_sabotage_ids = [s.id for s in SABOTAGE_DEFINITIONS]
+    await ws.send_json(
+        envelope(
+            "room_joined",
+            RoomJoinedMsg(
+                room_code=code,
+                player_id=player.id,
+                is_host=player.is_host,
+                map=DEFAULT_MAP.model_dump(by_alias=True),
+            ),
+        )
+    )
+    # If they have a role (mid-round), resend it.
+    if player.role and player.team:
+        info = room.private_role_for(player.id)
+        available = all_sabotage_ids if info.team == "chaos_agents" else []
+        await ws.send_json(
+            envelope(
+                "private_role",
+                PrivateRoleMsg(
+                    role=info.role,
+                    team=info.team,
+                    description=info.description,
+                    available_sabotages=available,
+                ),
+            )
+        )
+    # Send fresh state — phase-appropriate.
+    if room.phase is Phase.LOBBY:
+        await ws.send_json(envelope("lobby_state", LobbyStateMsg(**room.lobby_snapshot())))
+    else:
+        await ws.send_json(envelope("game_state", _game_state_msg(room)))
 
 
 async def _handle_start(ws: WebSocket, msg: StartGame) -> None:
@@ -353,20 +405,27 @@ async def _handle_disconnect(ws: WebSocket) -> None:
     room = registry.get(session.room_code)
     if room is None:
         return
-    room.remove_player(session.player_id)
-    if room.is_empty():
-        registry.drop_if_empty(session.room_code)
+    player = room.players.get(session.player_id)
+    if player is None:
         return
-    # Rebroadcast lobby or game state so remaining clients see the departure.
-    if room.phase is Phase.LOBBY:
-        await manager.broadcast(
-            room.code, envelope("lobby_state", LobbyStateMsg(**room.lobby_snapshot()))
-        )
+
+    if room.phase in (Phase.PLAYING, Phase.MEETING) and player.role and player.team:
+        # Mid-round disconnect — preserve identity for grace period.
+        room.mark_disconnected(session.player_id)
+        # Broadcast updated state so others see them as disconnected.
+        await manager.broadcast(room.code, envelope("game_state", _game_state_msg(room)))
     else:
-        await manager.broadcast(
-            room.code,
-            envelope("game_state", _game_state_msg(room)),
-        )
+        # Lobby/Ended — fully remove.
+        room.remove_player(session.player_id)
+        if room.is_empty():
+            registry.drop_if_empty(session.room_code)
+            return
+        if room.phase is Phase.LOBBY:
+            await manager.broadcast(
+                room.code, envelope("lobby_state", LobbyStateMsg(**room.lobby_snapshot()))
+            )
+        else:
+            await manager.broadcast(room.code, envelope("game_state", _game_state_msg(room)))
 
 
 # Static frontend.

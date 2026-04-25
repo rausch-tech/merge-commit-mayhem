@@ -8,6 +8,34 @@ import { EndscreenOverlay } from "./endscreen.js";
 import { playTaskComplete, wireGlobalClickSound } from "./audio.js";
 import { MeetingOverlay, VotingResultToast, EmergencyMeetingBtn } from "./meetings.js";
 
+const SESSION_KEY = "mcm.session";
+
+function saveSession(roomCode, playerId) {
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ roomCode, playerId }));
+  } catch {
+    /* ignore quota errors */
+  }
+}
+
+function loadSession() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function clearSession() {
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 const state = {
   playerId: null,
   isHost: false,
@@ -90,6 +118,7 @@ ws.on("room_joined", (payload) => {
   state.isHost = payload.isHost;
   state.roomCode = payload.roomCode;
   state.map = payload.map || null;
+  saveSession(payload.roomCode, payload.playerId);
   renderer.setOwnPlayerId(payload.playerId);
   renderer.setMap(payload.map || null);
   els.joinForm.classList.add("hidden");
@@ -173,6 +202,14 @@ ws.on("error", (payload) => {
   if (payload.code === "NO_MEETING_LEFT") {
     emergencyBtn.markMeetingUsed();
   }
+  if (payload.code === "REJOIN_NOT_AVAILABLE") {
+    clearSession();
+    // Bring the user back to the join form.
+    els.joinForm.classList.remove("hidden");
+    els.lobbyWaiting.classList.add("hidden");
+    state.playerId = null;
+    state.roomCode = null;
+  }
 });
 
 els.btnJoin.addEventListener("click", () => {
@@ -192,5 +229,12 @@ els.btnStart.addEventListener("click", () => {
 
 attachInput(ws);
 attachTaskInteraction(ws, renderer);
+ws.onOpen(() => {
+  const session = loadSession();
+  if (session && session.roomCode && session.playerId) {
+    ws.send("rejoin", { roomCode: session.roomCode, playerId: session.playerId });
+  }
+  // If no saved session: do nothing — wait for user to click Join.
+});
 ws.connect();
 wireGlobalClickSound();
