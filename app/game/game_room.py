@@ -666,10 +666,6 @@ class GameRoom:
             raise GameRoomError(
                 code="NOT_CHAOS_AGENT", message="Nur Chaos-Agenten koennen Take-Down nutzen."
             )
-        if target_id == killer_id:
-            raise GameRoomError(
-                code="INVALID_TARGET", message="Du kannst dich nicht selbst killen."
-            )
         target = self.players.get(target_id)
         if target is None:
             raise GameRoomError(code="UNKNOWN_TARGET", message="Ziel nicht im Raum.")
@@ -677,6 +673,10 @@ class GameRoom:
             raise GameRoomError(code="UNKNOWN_TARGET", message="Ziel nicht verbunden.")
         if not target.is_alive:
             raise GameRoomError(code="TARGET_ELIMINATED", message="Ziel ist bereits ausgeschaltet.")
+        if target_id == killer_id:
+            raise GameRoomError(
+                code="INVALID_TARGET", message="Du kannst dich nicht selbst killen."
+            )
         dx = killer.x - target.x
         dy = killer.y - target.y
         if (dx * dx + dy * dy) > (TAKEDOWN_RADIUS * TAKEDOWN_RADIUS):
