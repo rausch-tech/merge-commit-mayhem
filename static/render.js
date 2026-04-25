@@ -2,15 +2,19 @@
 // ROOM_LAYOUT mirrors app/game/rooms.py (must match until moved to config).
 
 const ROOM_LAYOUT = [
-  { id: "open_space", title: "Open Space", x: 0, y: 0, width: 300, height: 200, color: "#3a4560" },
-  { id: "meeting_room", title: "Meeting Room", x: 300, y: 0, width: 300, height: 200, color: "#5a3a70" },
-  { id: "kitchen", title: "Kitchen", x: 600, y: 0, width: 300, height: 200, color: "#7a5030" },
-  { id: "server_room", title: "Server Room", x: 0, y: 200, width: 300, height: 200, color: "#2a4a70" },
-  { id: "war_room", title: "War Room", x: 300, y: 200, width: 300, height: 200, color: "#2a607a" },
-  { id: "legacy_basement", title: "Legacy Basement", x: 600, y: 200, width: 300, height: 200, color: "#3a6a3a" },
+  { id: "open_space",      title: "Open Space",      x: 0,    y: 0,    width: 800, height: 800, color: "#3a4560" },
+  { id: "meeting_room",    title: "Meeting Room",    x: 800,  y: 0,    width: 800, height: 800, color: "#5a3a70" },
+  { id: "kitchen",         title: "Kitchen",         x: 1600, y: 0,    width: 800, height: 800, color: "#7a5030" },
+  { id: "server_room",     title: "Server Room",     x: 0,    y: 800,  width: 800, height: 800, color: "#2a4a70" },
+  { id: "war_room",        title: "War Room",        x: 800,  y: 800,  width: 800, height: 800, color: "#2a607a" },
+  { id: "legacy_basement", title: "Legacy Basement", x: 1600, y: 800,  width: 800, height: 800, color: "#3a6a3a" },
 ];
 
 const PLAYER_RADIUS = 12;
+const MAP_WIDTH = 2400;
+const MAP_HEIGHT = 1600;
+
+function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
 
 export class Renderer {
   constructor(canvas) {
@@ -48,6 +52,18 @@ export class Renderer {
     const { ctx, canvas } = this;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Camera centered on local player, clamped to map bounds.
+    const local = this._localPlayer();
+    const cameraX = local
+      ? clamp(local.x - canvas.width / 2, 0, Math.max(0, MAP_WIDTH - canvas.width))
+      : 0;
+    const cameraY = local
+      ? clamp(local.y - canvas.height / 2, 0, Math.max(0, MAP_HEIGHT - canvas.height))
+      : 0;
+
+    ctx.save();
+    ctx.translate(-cameraX, -cameraY);
+
     // Rooms.
     for (const room of ROOM_LAYOUT) {
       ctx.fillStyle = room.color;
@@ -57,19 +73,17 @@ export class Renderer {
       ctx.strokeRect(room.x, room.y, room.width, room.height);
 
       ctx.fillStyle = "rgba(230,236,255,0.85)";
-      ctx.font = "12px system-ui, sans-serif";
+      ctx.font = "16px system-ui, sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
-      ctx.fillText(room.title.toUpperCase(), room.x + 8, room.y + 8);
+      ctx.fillText(room.title.toUpperCase(), room.x + 12, room.y + 12);
     }
 
     // Tasks.
-    const local = this._localPlayer();
     let inRange = null;
     const TASK_RADIUS = 14;
     const INTERACT_RADIUS = 40;
     for (const task of this.tasks) {
-      // Status colors: available green, in_progress blue, cooldown gray.
       let fill = "#4ade80";
       if (task.status === "in_progress") fill = "#60a5fa";
       else if (task.status === "cooldown") fill = "#475569";
@@ -82,7 +96,6 @@ export class Renderer {
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Progress ring if in_progress
       if (task.status === "in_progress" && task.progress > 0) {
         ctx.beginPath();
         ctx.arc(
@@ -95,14 +108,12 @@ export class Renderer {
         ctx.stroke();
       }
 
-      // 2-letter label inside.
       ctx.fillStyle = "#0b0f1f";
       ctx.font = "bold 10px system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(task.title.slice(0, 2).toUpperCase(), task.x, task.y);
 
-      // Hover/in-range highlight if local player is within INTERACT_RADIUS and task is available.
       if (local && task.status !== "cooldown") {
         const dx = local.x - task.x;
         const dy = local.y - task.y;
@@ -120,7 +131,7 @@ export class Renderer {
     }
     this.localPlayerInRange = inRange;
 
-    // Players (existing rendering).
+    // Players.
     for (const player of this.players) {
       ctx.beginPath();
       ctx.arc(player.x, player.y, PLAYER_RADIUS, 0, Math.PI * 2);
@@ -143,5 +154,7 @@ export class Renderer {
       ctx.textBaseline = "bottom";
       ctx.fillText(player.name, player.x, player.y - PLAYER_RADIUS - 4);
     }
+
+    ctx.restore();
   }
 }

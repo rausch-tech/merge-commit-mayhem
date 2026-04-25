@@ -24,15 +24,15 @@ from app.game.tasks import (
 MAX_PLAYERS = 6
 MIN_PLAYERS_TO_START = 2
 PLAYER_RADIUS = 12
-ROUND_SECONDS = 600.0
+ROUND_SECONDS = 720.0
 
 _START_POSITIONS = [
-    (150.0, 100.0),  # open_space center
-    (180.0, 120.0),
-    (120.0, 80.0),
-    (200.0, 100.0),
-    (100.0, 120.0),
-    (170.0, 70.0),
+    (200.0, 200.0),
+    (400.0, 200.0),
+    (600.0, 200.0),
+    (200.0, 400.0),
+    (400.0, 400.0),
+    (600.0, 400.0),
 ]
 
 # Feste 6er-Palette (Doc 07 Farbsystem).
