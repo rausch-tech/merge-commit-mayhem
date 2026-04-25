@@ -300,3 +300,77 @@ button:hover { filter: brightness(1.1); }
   font-size: 0.85rem;
   color: var(--muted);
 }
+
+#endscreen {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 15, 31, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+#endscreen-card {
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 32px 36px;
+  width: 480px;
+  max-width: 92vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+#endscreen-banner {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+#endscreen-banner[data-team="release_team"] { color: #4ade80; }
+#endscreen-banner[data-team="chaos_agents"] { color: #f87171; }
+
+#endscreen-reason {
+  color: var(--muted);
+  margin: 4px 0 24px;
+}
+
+#endscreen-card h3 {
+  margin: 16px 0 8px;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+#endscreen-players {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.endscreen-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1.4fr 1.4fr;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #10152a;
+  border-radius: 6px;
+  border-left: 3px solid #475569;
+  align-items: center;
+}
+
+.endscreen-row-release_team { border-left-color: #60a5fa; }
+.endscreen-row-chaos_agents { border-left-color: #f87171; }
+
+.endscreen-name { font-weight: 600; }
+.endscreen-role { color: var(--muted); font-size: 0.85rem; }
+.endscreen-stats { color: var(--muted); font-size: 0.8rem; text-align: right; }
+
+#endscreen-reset {
+  margin-top: 24px;
+  width: 100%;
+}

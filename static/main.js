@@ -4,6 +4,7 @@ import { Renderer } from "./render.js";
 import { Hud } from "./hud.js";
 import { TaskList } from "./tasks.js";
 import { SabotagePanel } from "./sabotages.js";
+import { EndscreenOverlay } from "./endscreen.js";
 
 const state = {
   playerId: null,
@@ -32,14 +33,16 @@ const els = {
 const taskSidebarEl = document.getElementById("task-sidebar");
 const taskList = new TaskList(taskSidebarEl);
 
-const sabotagePanelEl = document.getElementById("sabotage-panel");
-const sabotagePanel = new SabotagePanel(sabotagePanelEl, ws);
-
 const wsUrl = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
 const ws = new WsClient(wsUrl);
 const hud = new Hud();
 const renderer = new Renderer(els.canvas);
 renderer.start();
+
+const sabotagePanelEl = document.getElementById("sabotage-panel");
+const sabotagePanel = new SabotagePanel(sabotagePanelEl, ws);
+
+const endscreen = new EndscreenOverlay(document.getElementById("endscreen"), ws);
 
 function showError(msg) {
   els.errorBanner.textContent = msg;
@@ -75,7 +78,20 @@ ws.on("room_joined", (payload) => {
 
 ws.on("lobby_state", (payload) => {
   state.players = payload.players;
+  state.phase = "lobby";
+  endscreen.hide();
+  // If we were on the game screen (post-round reset), swap back to lobby.
+  els.gameScreen.classList.add("hidden");
+  els.lobbyScreen.classList.remove("hidden");
+  els.joinForm.classList.add("hidden");          // already joined
+  els.lobbyWaiting.classList.remove("hidden");
+  // Also make sure sabotage panel hides until next start.
+  sabotagePanel.setAvailable([]);
   renderLobby();
+});
+
+ws.on("game_ended", (payload) => {
+  endscreen.show(payload, state.isHost);
 });
 
 ws.on("private_role", (payload) => {
