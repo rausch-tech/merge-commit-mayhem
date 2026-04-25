@@ -11,7 +11,7 @@ Ein Among-Us-artiges Social-Deduction-Game für Tech-Teams. Statt Raumstation: e
 Voraussetzungen: Python 3.12 und [`uv`](https://docs.astral.sh/uv/).
 
 ```bash
-git clone git@github.com:sven-rausch/merge-commit-mayhem.git
+git clone git@github.com:rausch-tech/merge-commit-mayhem.git
 cd merge-commit-mayhem
 uv sync
 uv run uvicorn app.main:app --reload

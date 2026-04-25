@@ -57,6 +57,6 @@ Kleinere Fixes dürfen direkt im aktuellen Branch passieren.
 
 ## Remote
 
-`origin` = `git@github.com:sven-rausch/merge-commit-mayhem.git`, branch `main`.
+`origin` = `git@github.com:rausch-tech/merge-commit-mayhem.git`, branch `main`.
 
-Repo wurde am 2026-04-25 von GitLab (`rauschtechnology/mergeconflictmayhem`) nach GitHub verschoben; Tags wurden auf den GitHub-Commit-Graph re-tagged (rebased onto GitHub's init commit). Das alte GitLab-Repo existiert ggf. noch als Archive, ist aber nicht mehr lokal als Remote eingebunden.
+Repo-History: 2026-04-25 von GitLab (`rauschtechnology/mergeconflictmayhem`) → GitHub (`sven-rausch/merge-commit-mayhem`) → GitHub-Org (`rausch-tech/merge-commit-mayhem`). Tags wurden beim ersten GitHub-Move neu gesetzt (rebase auf GitHub-Init); der spätere Org-Move hat alles 1:1 mitgenommen. Alte Remote-URLs sind nicht mehr eingebunden.

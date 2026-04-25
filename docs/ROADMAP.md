@@ -10,7 +10,7 @@ Dieses Dokument ist der **eine** Plan. Es ist die Wahrheit über den Stand und d
 
 | | |
 |---|---|
-| **Repo** | https://github.com/sven-rausch/merge-commit-mayhem |
+| **Repo** | https://github.com/rausch-tech/merge-commit-mayhem |
 | **Live (Test-Server)** | https://mcm.3-78-184-97.sslip.io |
 | **Backend-Tests** | 207 grün (`uv run pytest`) |
 | **Stack** | Python 3.12 + FastAPI + Pydantic v2 + WebSockets, Vanilla JS + Canvas, Map als JSON-Daten |
