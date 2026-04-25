@@ -6,7 +6,7 @@ Ein Among-Us-artiges Social-Deduction-Game für Tech-Teams. Statt Raumstation: e
 
 **Status:** Spielbar als Browser-Prototyp, in aktiver Entwicklung. Godot-Client folgt nach der Foundation-Cleanup-Phase. Siehe [`docs/ROADMAP.md`](docs/ROADMAP.md) für den vollständigen Plan.
 
-**Live (Test-Server):** https://mcm.3-78-184-97.sslip.io
+**Live (Test-Server):** https://game.prod-is-lava.dev
 
 ## Schnellstart
 

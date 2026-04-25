@@ -11,7 +11,7 @@ Dieses Dokument ist der **eine** Plan. Es ist die Wahrheit über den Stand und d
 |                        |                                                                                                                                 |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | **Repo**               | https://github.com/rausch-tech/merge-commit-mayhem                                                                              |
-| **Live (Test-Server)** | https://mcm.3-78-184-97.sslip.io                                                                                                |
+| **Live (Test-Server)** | https://game.prod-is-lava.dev                                                                                                   |
 | **Backend-Tests**      | 207 grün (`uv run pytest`)                                                                                                      |
 | **Stack**              | Python 3.12 + FastAPI + Pydantic v2 + WebSockets, Vanilla JS + Canvas, Map als JSON-Daten                                       |
 | **Geshippt**           | 8 getaggte Slices: lobby-movement → game-loop → scrolling-camera → spritesheets → character-sprites → walls → voting → map-data |
@@ -50,10 +50,10 @@ Sechs Tier, in der Reihenfolge wie sie gebaut werden sollten. Jedes Tier hat ein
 | 0.1  | **Lint + Format** — `ruff` für Python, `prettier` für JS, pre-commit-Hook                           | ✅ done   |
 | 0.2  | **CI auf GitHub Actions** — pytest + ruff + prettier bei jedem Push/PR                              | ✅ done   |
 | 0.3  | **Frontend-Tests** — Vitest + happy-dom, Smoke-Coverage pro JS-Modul                                | offen     |
-| 0.4  | **`docs/PROTOCOL.md`** — vollständiger WebSocket-Vertrag                                            | offen     |
-| 0.5  | **`docs/ARCHITECTURE.md`** — high-level Overview                                                    | offen     |
+| 0.4  | **`docs/PROTOCOL.md`** — vollständiger WebSocket-Vertrag                                            | ✅ done   |
+| 0.5  | **`docs/ARCHITECTURE.md`** — high-level Overview                                                    | ✅ done   |
 | 0.6  | **`docs/DEPLOY.md`** — Deploy-Workflow                                                              | ✅ done   |
-| 0.7  | **`docs/DEV.md`** — lokale Entwicklung                                                              | offen     |
+| 0.7  | **`docs/DEV.md`** — lokale Entwicklung                                                              | ✅ done   |
 | 0.8  | **Deploy-Script** — `scripts/deploy.sh`                                                             | ✅ done   |
 | 0.9  | **Dead-Code raus** — `incidentCount` ohne Mechanik raus                                             | offen     |
 | 0.10 | **Reconnect** — Server bewahrt Spieler-Identität 30 s nach Disconnect                               | offen     |
