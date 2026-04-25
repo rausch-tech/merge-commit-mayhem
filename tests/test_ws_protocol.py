@@ -272,8 +272,7 @@ def test_game_state_carries_stats_and_tasks_and_sabotages():
 def test_game_ended_broadcast_on_release_win():
     """Drive release_progress to 100 directly via the server-side room and verify
     a game_ended message goes out to both clients."""
-    client = TestClient(app)
-    with client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+    with TestClient(app) as client, client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
         _join(ws_a, "ENDR", "Alice")
         ws_a.receive_json()
         _join(ws_b, "ENDR", "Bob")
@@ -304,8 +303,7 @@ def test_game_ended_broadcast_on_release_win():
 
 
 def test_return_to_lobby_requires_host_and_ended_phase():
-    client = TestClient(app)
-    with client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+    with TestClient(app) as client, client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
         _join(ws_a, "RESET", "Alice")
         ws_a.receive_json()
         _join(ws_b, "RESET", "Bob")
