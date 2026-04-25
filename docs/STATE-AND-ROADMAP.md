@@ -192,3 +192,5 @@ Vor-Godot-Block: 1–2 Wochen (Protokoll-Doku, Map-Editor Phase 1, Tier-1-Mechan
 Danach **Multi-Map + Map-Editor (Phase 1)** — weil das Design-Investment in `slice/map-data-v1` darauf wartet, eingelöst zu werden, und ein Editor lädt zum Mitmachen ein.
 
 Sven entscheidet pro Slice; dieses Doc dokumentiert nur die Optionen.
+
+**Pre-Godot-Cleanup-Plan:** [`docs/PRE-GODOT-CLEANUP.md`](PRE-GODOT-CLEANUP.md) — Checkliste was vor dem Godot-Sprint sauber sein soll (Code-Hygiene, Tests, Doku, Tooling, Mechanik-Vervollständigung, Stabilität, Decisions). ~2–3 Wochen Arbeit, priorisierte Reihenfolge, „Definition of clean" am Ende.
