@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from app.game.models import InputState, Phase, Player
 from app.game.roles import RoleInfo, assign as assign_roles, description_for
 from app.game.voting import SKIP_TARGET, all_chaos_eliminated, tally as _tally_votes
-from app.game.rooms import MAP_HEIGHT, MAP_WIDTH
+from app.game.game_map import GameMap, DEFAULT_MAP, compute_walls, war_room_bounds_for, task_position_map
 from app.game.sabotages import (
     COFFEE_SLOW_SPEED,
     MEETING_DURATION,
@@ -14,7 +14,7 @@ from app.game.sabotages import (
     SabotageDefinition,
     sabotage_by_id,
 )
-from app.game.walls import WALLS, resolve_wall_collision
+from app.game.walls import resolve_wall_collision
 from app.game.tasks import (
     TASK_DEFINITIONS,
     TASK_INTERACTION_RADIUS,
@@ -30,23 +30,12 @@ ROUND_SECONDS = 720.0
 
 MEETING_DURATION_SECONDS = 60.0
 
-WAR_ROOM_BOUNDS = (800, 800, 1600, 1600)  # (x_min, y_min, x_max, y_max)
-
 _MEETING_TITLES = [
     "Wer hat auf main gepusht?",
     "Warum sind die Tests rot?",
     "Wieso ist der Kunde im Sprint?",
     "Wer hat den KI-Agenten unbeaufsichtigt gelassen?",
     "Wer hat den Coffee Token verbraucht?",
-]
-
-_START_POSITIONS = [
-    (200.0, 200.0),
-    (400.0, 200.0),
-    (600.0, 200.0),
-    (200.0, 400.0),
-    (400.0, 400.0),
-    (600.0, 400.0),
 ]
 
 # Feste 6er-Palette (Doc 07 Farbsystem).
@@ -72,6 +61,8 @@ class GameRoomError(Exception):
 @dataclass
 class TaskRuntime:
     definition: TaskDefinition
+    x: float
+    y: float
     status: str = "available"   # "available" | "in_progress" | "cooldown"
     cooldown_remaining: float = 0.0
     per_player_progress: dict[str, float] = field(default_factory=dict)
@@ -85,8 +76,13 @@ class SabotageRuntime:
 
 
 class GameRoom:
-    def __init__(self, code: str) -> None:
+    def __init__(self, code: str, game_map: GameMap | None = None) -> None:
         self.code = code
+        self.map = game_map if game_map is not None else DEFAULT_MAP
+        self._walls = compute_walls(self.map)
+        self._war_room_bounds = war_room_bounds_for(self.map)
+        self._task_position = task_position_map(self.map)
+
         self.phase: Phase = Phase.LOBBY
         self.players: dict[str, Player] = {}
         self.remaining_seconds: float = ROUND_SECONDS
@@ -155,7 +151,7 @@ class GameRoom:
         for color in _COLOR_PALETTE:
             if color not in used:
                 return color
-        # Fallback — kann nur passieren, wenn MAX_PLAYERS > Palette.
+        # Fallback -- kann nur passieren, wenn MAX_PLAYERS > Palette.
         raise GameRoomError(code="NO_COLORS", message="Color palette exhausted.")
 
     # --- lifecycle ---------------------------------------------------------
@@ -200,7 +196,8 @@ class GameRoom:
                 self.players[pid].role = info.role
                 self.players[pid].team = info.team
 
-        for (pos_x, pos_y), player in zip(_START_POSITIONS, self.players.values()):
+        spawn_positions = [(s.x, s.y) for s in self.map.spawn_points]
+        for (pos_x, pos_y), player in zip(spawn_positions, self.players.values()):
             player.x = pos_x
             player.y = pos_y
 
@@ -216,7 +213,12 @@ class GameRoom:
         self.triggered_sabotages_by_player = {pid: 0 for pid in self.players}
 
         self.tasks = {
-            t.id: TaskRuntime(definition=t, status="available")
+            t.id: TaskRuntime(
+                definition=t,
+                x=self._task_position[t.id][0],
+                y=self._task_position[t.id][1],
+                status="available",
+            )
             for t in TASK_DEFINITIONS
         }
 
@@ -262,13 +264,13 @@ class GameRoom:
                 new_x = player.x + step_x
                 if step_x != 0:
                     new_x, _ = resolve_wall_collision(
-                        new_x, player.y, step_x, 0.0, WALLS,
+                        new_x, player.y, step_x, 0.0, self._walls,
                     )
                 # Then y.
                 new_y = player.y + step_y
                 if step_y != 0:
                     _, new_y = resolve_wall_collision(
-                        new_x, new_y, 0.0, step_y, WALLS,
+                        new_x, new_y, 0.0, step_y, self._walls,
                     )
                 player.x = new_x
                 player.y = new_y
@@ -276,12 +278,12 @@ class GameRoom:
                 # Map-edge clamp (perimeter).
                 if player.x < 0:
                     player.x = 0.0
-                elif player.x > MAP_WIDTH:
-                    player.x = float(MAP_WIDTH)
+                elif player.x > self.map.size.width:
+                    player.x = float(self.map.size.width)
                 if player.y < 0:
                     player.y = 0.0
-                elif player.y > MAP_HEIGHT:
-                    player.y = float(MAP_HEIGHT)
+                elif player.y > self.map.size.height:
+                    player.y = float(self.map.size.height)
         self._tick_tasks(dt)
         self._tick_sabotages(dt)
         self.remaining_seconds = max(0.0, self.remaining_seconds - dt)
@@ -292,7 +294,7 @@ class GameRoom:
     def _check_win_conditions(self) -> None:
         """
         Inspect state in priority order and transition to ENDED if a
-        condition is met. Idempotent — does nothing once already ENDED.
+        condition is met. Idempotent -- does nothing once already ENDED.
         """
         if self.phase is not Phase.PLAYING:
             return
@@ -315,7 +317,7 @@ class GameRoom:
     def _current_speed_for(self, player_id: str) -> float:
         """
         Returns the effective movement speed in px/s for a player this tick.
-        Effects (coffee outage + mandatory meeting) do not stack — floor is
+        Effects (coffee outage + mandatory meeting) do not stack -- floor is
         COFFEE_SLOW_SPEED, normal is NORMAL_SPEED.
         """
         if self.coffee_level == 0 or self.meeting_active_for > 0:
@@ -328,8 +330,8 @@ class GameRoom:
         player = self.players.get(player_id)
         if player is None:
             return False
-        dx = player.x - task.definition.x
-        dy = player.y - task.definition.y
+        dx = player.x - task.x
+        dy = player.y - task.y
         return (dx * dx + dy * dy) <= (TASK_INTERACTION_RADIUS * TASK_INTERACTION_RADIUS)
 
     def apply_task_hold_start(self, player_id: str, task_id: str) -> None:
@@ -453,7 +455,7 @@ class GameRoom:
     # --- meeting + voting -------------------------------------------------
 
     def _is_in_war_room(self, player) -> bool:
-        x_min, y_min, x_max, y_max = WAR_ROOM_BOUNDS
+        x_min, y_min, x_max, y_max = self._war_room_bounds
         return x_min <= player.x <= x_max and y_min <= player.y <= y_max
 
     def call_emergency_meeting(
@@ -481,7 +483,7 @@ class GameRoom:
         r = rng or random.SystemRandom()
         self.meeting_title = r.choice(_MEETING_TITLES)
         self.phase = Phase.MEETING
-        # Cancel ongoing task holds — frozen during meeting.
+        # Cancel ongoing task holds -- frozen during meeting.
         for task in self.tasks.values():
             task.per_player_progress = {}
             if task.status == "in_progress":
@@ -563,10 +565,16 @@ class GameRoom:
             counts[target] = counts.get(target, 0) + 1
         return counts
 
+    # --- helper accessors -------------------------------------------------
+
+    def task_position(self, task_id: str) -> tuple[float, float]:
+        """Return (x, y) for the given task_id from the map's task_anchors."""
+        return self._task_position[task_id]
+
     # --- serialization accessors ------------------------------------------
 
     def public_state(self) -> dict:
-        """Oeffentlicher GameState — enthaelt keine Rolle/Team/Input."""
+        """Oeffentlicher GameState -- enthaelt keine Rolle/Team/Input."""
         return {
             "phase": self.phase.value,
             "remainingSeconds": int(self.remaining_seconds),
@@ -591,8 +599,8 @@ class GameRoom:
                     "id": t.definition.id,
                     "title": t.definition.title,
                     "room": t.definition.room,
-                    "x": t.definition.x,
-                    "y": t.definition.y,
+                    "x": t.x,
+                    "y": t.y,
                     "requiredSeconds": t.definition.required_seconds,
                     "status": t.status,
                     "progress": (

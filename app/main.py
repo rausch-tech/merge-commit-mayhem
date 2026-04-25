@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
+from app.game.game_map import DEFAULT_MAP
 from app.game.game_room import GameRoom, GameRoomError
 from app.game.models import InputState, Phase
 from app.game.room_code import generate_unique
@@ -182,7 +183,12 @@ async def _handle_join(ws: WebSocket, msg: JoinRoom) -> None:
     await ws.send_json(
         envelope(
             "room_joined",
-            RoomJoinedMsg(room_code=code, player_id=player.id, is_host=player.is_host),
+            RoomJoinedMsg(
+                room_code=code,
+                player_id=player.id,
+                is_host=player.is_host,
+                map=DEFAULT_MAP.model_dump(by_alias=True),
+            ),
         )
     )
     await manager.broadcast(code, envelope("lobby_state", LobbyStateMsg(**room.lobby_snapshot())))

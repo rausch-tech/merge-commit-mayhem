@@ -1,6 +1,6 @@
 import pytest
 
-from app.game.rooms import ROOM_LAYOUT
+from app.game.game_map import DEFAULT_MAP, task_position_map
 from app.game.sabotages import (
     COFFEE_SLOW_SPEED,
     MEETING_DURATION,
@@ -22,20 +22,23 @@ def test_task_ids_are_unique():
 
 
 def test_task_rooms_exist_in_layout():
-    room_ids = {r["id"] for r in ROOM_LAYOUT}
+    room_ids = {r.id for r in DEFAULT_MAP.rooms}
     for task in TASK_DEFINITIONS:
         assert task.room in room_ids, f"{task.id} refers to unknown room {task.room}"
 
 
 def test_task_positions_are_inside_their_room():
-    rooms = {r["id"]: r for r in ROOM_LAYOUT}
+    """Task anchors in the default map must fall inside the declared room."""
+    rooms = {r.id: r for r in DEFAULT_MAP.rooms}
+    positions = task_position_map(DEFAULT_MAP)
     for task in TASK_DEFINITIONS:
         room = rooms[task.room]
-        assert room["x"] <= task.x <= room["x"] + room["width"], (
-            f"{task.id} x={task.x} outside {task.room} [{room['x']}..{room['x']+room['width']}]"
+        x, y = positions[task.id]
+        assert room.x <= x <= room.x + room.width, (
+            f"{task.id} x={x} outside {task.room} [{room.x}..{room.x + room.width}]"
         )
-        assert room["y"] <= task.y <= room["y"] + room["height"], (
-            f"{task.id} y={task.y} outside {task.room} [{room['y']}..{room['y']+room['height']}]"
+        assert room.y <= y <= room.y + room.height, (
+            f"{task.id} y={y} outside {task.room} [{room.y}..{room.y + room.height}]"
         )
 
 

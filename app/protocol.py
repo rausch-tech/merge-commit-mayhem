@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal, Union  # noqa: UP035 (Union needed for 3.9 compat via Pydantic)
 
 from pydantic import BaseModel, ConfigDict, Discriminator, Field
 from pydantic.alias_generators import to_camel
@@ -161,6 +161,7 @@ class RoomJoinedMsg(BaseModel):
     room_code: str
     player_id: str
     is_host: bool
+    map: dict[str, Any] = Field(default_factory=dict)
 
 
 class LobbyStateMsg(BaseModel):

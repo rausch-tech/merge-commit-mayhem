@@ -205,9 +205,8 @@ def test_eliminated_player_cannot_start_task():
     pid = ids[0]
     room.players[pid].is_alive = False
     # Place near a task.
-    from app.game.tasks import task_by_id
-    defn = task_by_id("fix_unit_tests")
-    room.players[pid].x, room.players[pid].y = defn.x, defn.y
+    tx, ty = room.task_position("fix_unit_tests")
+    room.players[pid].x, room.players[pid].y = tx, ty
     with pytest.raises(GameRoomError) as exc:
         room.apply_task_hold_start(pid, "fix_unit_tests")
     assert exc.value.code == "PLAYER_ELIMINATED"

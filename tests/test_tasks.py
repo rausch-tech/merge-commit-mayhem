@@ -61,9 +61,9 @@ def test_cannot_start_unknown_task():
 def test_cannot_start_task_when_too_far():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    defn = task_by_id("fix_unit_tests")
+    tx, ty = room.task_position("fix_unit_tests")
     # Place player clearly outside radius.
-    _place_on(room, pid, defn.x + TASK_INTERACTION_RADIUS + 5, defn.y)
+    _place_on(room, pid, tx + TASK_INTERACTION_RADIUS + 5, ty)
     with pytest.raises(GameRoomError) as exc:
         room.apply_task_hold_start(pid, "fix_unit_tests")
     assert exc.value.code == "TASK_TOO_FAR"
@@ -72,8 +72,8 @@ def test_cannot_start_task_when_too_far():
 def test_start_task_in_range_marks_in_progress():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    defn = task_by_id("fix_unit_tests")
-    _place_on(room, pid, defn.x, defn.y)
+    tx, ty = room.task_position("fix_unit_tests")
+    _place_on(room, pid, tx, ty)
     room.apply_task_hold_start(pid, "fix_unit_tests")
     assert room.tasks["fix_unit_tests"].status == "in_progress"
     assert pid in room.tasks["fix_unit_tests"].per_player_progress
@@ -85,8 +85,8 @@ def test_start_task_in_range_marks_in_progress():
 def test_stop_removes_progress_and_flips_back_to_available():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    defn = task_by_id("fix_unit_tests")
-    _place_on(room, pid, defn.x, defn.y)
+    tx, ty = room.task_position("fix_unit_tests")
+    _place_on(room, pid, tx, ty)
     room.apply_task_hold_start(pid, "fix_unit_tests")
     room.apply_task_hold_stop(pid, "fix_unit_tests")
     assert room.tasks["fix_unit_tests"].status == "available"
@@ -104,8 +104,8 @@ def test_stop_on_unknown_task_is_noop():
 def test_progress_accumulates_each_tick():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    defn = task_by_id("fix_unit_tests")
-    _place_on(room, pid, defn.x, defn.y)
+    tx, ty = room.task_position("fix_unit_tests")
+    _place_on(room, pid, tx, ty)
     room.apply_task_hold_start(pid, "fix_unit_tests")
     room.tick(0.1)
     assert room.tasks["fix_unit_tests"].per_player_progress[pid] == pytest.approx(0.1)
@@ -116,8 +116,8 @@ def test_progress_accumulates_each_tick():
 def test_task_completion_applies_reward_and_enters_cooldown():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    defn = task_by_id("fix_unit_tests")
-    _place_on(room, pid, defn.x, defn.y)
+    tx, ty = room.task_position("fix_unit_tests")
+    _place_on(room, pid, tx, ty)
     # Freeze player by zeroing their input so movement doesn't push them out of radius.
     room.apply_input(pid, InputState())
     room.apply_task_hold_start(pid, "fix_unit_tests")
@@ -135,8 +135,8 @@ def test_task_completion_applies_reward_and_enters_cooldown():
 def test_task_cooldown_returns_to_available():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    defn = task_by_id("fix_unit_tests")
-    _place_on(room, pid, defn.x, defn.y)
+    tx, ty = room.task_position("fix_unit_tests")
+    _place_on(room, pid, tx, ty)
     room.apply_input(pid, InputState())
     room.apply_task_hold_start(pid, "fix_unit_tests")
     for _ in range(60):
@@ -153,13 +153,13 @@ def test_task_cooldown_returns_to_available():
 def test_player_leaving_radius_drops_progress():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    defn = task_by_id("fix_unit_tests")
-    _place_on(room, pid, defn.x, defn.y)
+    tx, ty = room.task_position("fix_unit_tests")
+    _place_on(room, pid, tx, ty)
     room.apply_input(pid, InputState())
     room.apply_task_hold_start(pid, "fix_unit_tests")
     room.tick(0.1)
     # Yank the player away; next tick the progress should be dropped.
-    _place_on(room, pid, defn.x + TASK_INTERACTION_RADIUS + 20, defn.y)
+    _place_on(room, pid, tx + TASK_INTERACTION_RADIUS + 20, ty)
     room.tick(0.1)
     assert pid not in room.tasks["fix_unit_tests"].per_player_progress
     # No other holder -> status back to available.
@@ -169,8 +169,8 @@ def test_player_leaving_radius_drops_progress():
 def test_refill_coffee_sets_coffee_to_100():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    defn = task_by_id("refill_coffee")
-    _place_on(room, pid, defn.x, defn.y)
+    tx, ty = room.task_position("refill_coffee")
+    _place_on(room, pid, tx, ty)
     room.apply_input(pid, InputState())
     room.coffee_level = 0
     room.apply_task_hold_start(pid, "refill_coffee")
@@ -182,8 +182,8 @@ def test_refill_coffee_sets_coffee_to_100():
 def test_repair_deployment_raises_pipeline_clamped_at_100():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    defn = task_by_id("repair_deployment")
-    _place_on(room, pid, defn.x, defn.y)
+    tx, ty = room.task_position("repair_deployment")
+    _place_on(room, pid, tx, ty)
     room.apply_input(pid, InputState())
     room.pipeline_stability = 92  # +15 would overshoot to 107
     room.apply_task_hold_start(pid, "repair_deployment")
@@ -198,9 +198,9 @@ def test_repair_deployment_raises_pipeline_clamped_at_100():
 def test_parallel_workers_first_finisher_wins():
     room, ids = _room_with_players(2)
     a, b = ids[0], ids[1]
-    defn = task_by_id("fix_unit_tests")
-    _place_on(room, a, defn.x, defn.y)
-    _place_on(room, b, defn.x + 5, defn.y)
+    tx, ty = room.task_position("fix_unit_tests")
+    _place_on(room, a, tx, ty)
+    _place_on(room, b, tx + 5, ty)
     room.apply_input(a, InputState())
     room.apply_input(b, InputState())
     room.apply_task_hold_start(a, "fix_unit_tests")
@@ -224,8 +224,8 @@ def test_parallel_workers_first_finisher_wins():
 def test_cannot_start_task_during_cooldown():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    defn = task_by_id("fix_unit_tests")
-    _place_on(room, pid, defn.x, defn.y)
+    tx, ty = room.task_position("fix_unit_tests")
+    _place_on(room, pid, tx, ty)
     room.apply_input(pid, InputState())
     room.apply_task_hold_start(pid, "fix_unit_tests")
     for _ in range(60):

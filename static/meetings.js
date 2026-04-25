@@ -151,7 +151,7 @@ export class EmergencyMeetingBtn {
   }
 
   update({ phase, players, ownPlayerId, warRoomBounds }) {
-    if (!this._meetingAvailable || phase !== "playing") {
+    if (!warRoomBounds || !this._meetingAvailable || phase !== "playing") {
       this.btn.classList.add("hidden");
       return;
     }

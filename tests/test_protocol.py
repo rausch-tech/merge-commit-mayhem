@@ -59,7 +59,10 @@ def test_parse_rejects_missing_type():
 def test_room_joined_serializes_to_camel_case():
     msg = RoomJoinedMsg(room_code="ABCD", player_id="abc123", is_host=True)
     dumped = msg.model_dump(by_alias=True)
-    assert dumped == {"roomCode": "ABCD", "playerId": "abc123", "isHost": True}
+    assert dumped["roomCode"] == "ABCD"
+    assert dumped["playerId"] == "abc123"
+    assert dumped["isHost"] is True
+    assert "map" in dumped  # map field is present (empty by default)
 
 
 def test_lobby_state_serializes_to_camel_case():

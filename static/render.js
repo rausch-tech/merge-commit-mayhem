@@ -1,5 +1,5 @@
-// Pure rendering. Holds no game state — just takes snapshots.
-// ROOM_LAYOUT mirrors app/game/rooms.py (must match until moved to config).
+// Pure rendering. Holds no game state -- just takes snapshots.
+// Map data is received from the server via setMap() on room_joined.
 
 import { drawSprite, loadSheet } from "./sprites.js";
 
@@ -9,7 +9,7 @@ loadSheet("/images/ui_icon_set.png");
 // Preload character sheet so first frame can already use the sprite.
 loadSheet("/images/figuren.png");
 
-// Map hex color → character index (must mirror app/game/game_room.py _COLOR_PALETTE order).
+// Map hex color to character index (must mirror app/game/game_room.py _COLOR_PALETTE order).
 const COLOR_TO_CHAR_INDEX = {
   "#4ade80": 0,  // green
   "#60a5fa": 1,  // blue
@@ -19,55 +19,53 @@ const COLOR_TO_CHAR_INDEX = {
   "#f87171": 5,  // red
 };
 
-const CHARACTER_RENDER_SIZE = 56;  // px on screen — bigger than the old 24px circle
-
-const ROOM_LAYOUT = [
-  { id: "open_space",      title: "Open Space",      x: 0,    y: 0,    width: 800, height: 800, color: "#3a4560" },
-  { id: "meeting_room",    title: "Meeting Room",    x: 800,  y: 0,    width: 800, height: 800, color: "#5a3a70" },
-  { id: "kitchen",         title: "Kitchen",         x: 1600, y: 0,    width: 800, height: 800, color: "#7a5030" },
-  { id: "server_room",     title: "Server Room",     x: 0,    y: 800,  width: 800, height: 800, color: "#2a4a70" },
-  { id: "war_room",        title: "War Room",        x: 800,  y: 800,  width: 800, height: 800, color: "#2a607a" },
-  { id: "legacy_basement", title: "Legacy Basement", x: 1600, y: 800,  width: 800, height: 800, color: "#3a6a3a" },
-];
-
+const CHARACTER_RENDER_SIZE = 56;  // px on screen
 const PLAYER_RADIUS = 12;
-const MAP_WIDTH = 2400;
-const MAP_HEIGHT = 1600;
 
 const WALL_THICKNESS = 8;
-const DOOR_WIDTH = 120;
 
-// Mirror of app/game/walls.py WALLS — same coordinates so visuals match server collision.
-const WALLS = (() => {
-  const list = [];
-  // Vertical walls at x=800 and x=1600 with doors at y=400, 1200.
-  for (const lineX of [800, 1600]) {
-    let lastY = 0;
-    for (const doorY of [400, 1200]) {
-      const top = doorY - DOOR_WIDTH / 2;
-      if (top > lastY) {
-        list.push([lineX - WALL_THICKNESS, lastY, lineX + WALL_THICKNESS, top]);
+/**
+ * Mirror of the server-side compute_walls() in app/game/game_map.py.
+ * Accepts the map JSON received in room_joined and returns wall rectangles
+ * as [x1, y1, x2, y2] arrays.
+ */
+function computeWallsClient(map) {
+  if (!map || !map.wallLines) return [];
+  const out = [];
+  const mapW = map.size?.width ?? 0;
+  const mapH = map.size?.height ?? 0;
+  for (const line of map.wallLines) {
+    const doors = [...(line.doors || [])].sort((a, b) => a.center - b.center);
+    if (line.axis === "x") {
+      // Vertical wall line at x=line.position
+      let lastY = 0;
+      for (const d of doors) {
+        const top = d.center - Math.floor(d.width / 2);
+        if (top > lastY) {
+          out.push([line.position - WALL_THICKNESS, lastY, line.position + WALL_THICKNESS, top]);
+        }
+        lastY = d.center + Math.floor(d.width / 2);
       }
-      lastY = doorY + DOOR_WIDTH / 2;
-    }
-    if (lastY < MAP_HEIGHT) {
-      list.push([lineX - WALL_THICKNESS, lastY, lineX + WALL_THICKNESS, MAP_HEIGHT]);
+      if (lastY < mapH) {
+        out.push([line.position - WALL_THICKNESS, lastY, line.position + WALL_THICKNESS, mapH]);
+      }
+    } else {
+      // Horizontal wall line at y=line.position
+      let lastX = 0;
+      for (const d of doors) {
+        const left = d.center - Math.floor(d.width / 2);
+        if (left > lastX) {
+          out.push([lastX, line.position - WALL_THICKNESS, left, line.position + WALL_THICKNESS]);
+        }
+        lastX = d.center + Math.floor(d.width / 2);
+      }
+      if (lastX < mapW) {
+        out.push([lastX, line.position - WALL_THICKNESS, mapW, line.position + WALL_THICKNESS]);
+      }
     }
   }
-  // Horizontal wall at y=800 with doors at x=400, 1200, 2000.
-  let lastX = 0;
-  for (const doorX of [400, 1200, 2000]) {
-    const left = doorX - DOOR_WIDTH / 2;
-    if (left > lastX) {
-      list.push([lastX, 800 - WALL_THICKNESS, left, 800 + WALL_THICKNESS]);
-    }
-    lastX = doorX + DOOR_WIDTH / 2;
-  }
-  if (lastX < MAP_WIDTH) {
-    list.push([lastX, 800 - WALL_THICKNESS, MAP_WIDTH, 800 + WALL_THICKNESS]);
-  }
-  return list;
-})();
+  return out;
+}
 
 function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
 
@@ -80,11 +78,18 @@ export class Renderer {
     this.tasks = [];
     this.localPlayerInRange = null;  // task-id of the task within interaction radius for the local player, else null
     this._running = false;
+    this.map = null;     // populated via setMap()
+    this._walls = [];    // computed when setMap is called
   }
 
   setOwnPlayerId(id) { this.ownPlayerId = id; }
   setPlayers(players) { this.players = players; }
   setTasks(tasks) { this.tasks = tasks; }
+
+  setMap(map) {
+    this.map = map;
+    this._walls = computeWallsClient(map);
+  }
 
   start() {
     this._running = true;
@@ -106,21 +111,25 @@ export class Renderer {
   _draw() {
     const { ctx, canvas } = this;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!this.map) return;  // not yet received
+
+    const mapW = this.map.size.width;
+    const mapH = this.map.size.height;
 
     // Camera centered on local player, clamped to map bounds.
     const local = this._localPlayer();
     const cameraX = local
-      ? clamp(local.x - canvas.width / 2, 0, Math.max(0, MAP_WIDTH - canvas.width))
+      ? clamp(local.x - canvas.width / 2, 0, Math.max(0, mapW - canvas.width))
       : 0;
     const cameraY = local
-      ? clamp(local.y - canvas.height / 2, 0, Math.max(0, MAP_HEIGHT - canvas.height))
+      ? clamp(local.y - canvas.height / 2, 0, Math.max(0, mapH - canvas.height))
       : 0;
 
     ctx.save();
     ctx.translate(-cameraX, -cameraY);
 
     // Rooms.
-    for (const room of ROOM_LAYOUT) {
+    for (const room of this.map.rooms) {
       ctx.fillStyle = room.color;
       ctx.fillRect(room.x, room.y, room.width, room.height);
       ctx.strokeStyle = "#0b0f1f";
@@ -138,7 +147,7 @@ export class Renderer {
     ctx.fillStyle = "#0b0f1f";
     ctx.strokeStyle = "#475569";
     ctx.lineWidth = 1;
-    for (const [wx1, wy1, wx2, wy2] of WALLS) {
+    for (const [wx1, wy1, wx2, wy2] of this._walls) {
       ctx.fillRect(wx1, wy1, wx2 - wx1, wy2 - wy1);
       ctx.strokeRect(wx1, wy1, wx2 - wx1, wy2 - wy1);
     }
@@ -178,7 +187,7 @@ export class Renderer {
         ctx.fillText(task.title.slice(0, 2).toUpperCase(), task.x, task.y);
       }
 
-      // Cooldown overlay — semi-transparent black.
+      // Cooldown overlay -- semi-transparent black.
       if (task.status === "cooldown") {
         ctx.beginPath();
         ctx.arc(task.x, task.y, TILE / 2 + 2, 0, Math.PI * 2);
@@ -240,7 +249,7 @@ export class Renderer {
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
-      // Sprite — fallback to colored circle while loading.
+      // Sprite -- fallback to colored circle while loading.
       const drew = drawSprite(
         ctx,
         `character_${charIndex}`,
@@ -268,7 +277,7 @@ export class Renderer {
         ctx.stroke();
       }
 
-      // Name above the head — moved up so it doesn't clip the sprite.
+      // Name above the head -- moved up so it doesn't clip the sprite.
       ctx.fillStyle = "#e6ecff";
       ctx.font = "13px system-ui, sans-serif";
       ctx.textAlign = "center";

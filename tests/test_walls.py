@@ -4,13 +4,17 @@ import pytest
 
 from app.game.game_room import GameRoom
 from app.game.models import InputState, Phase
+from app.game.game_map import DEFAULT_MAP, compute_walls
 from app.game.walls import (
-    DOOR_WIDTH,
+    DOOR_WIDTH_DEFAULT,
     PLAYER_COLLISION_RADIUS,
-    WALLS,
     WALL_THICKNESS,
     resolve_wall_collision,
 )
+
+# Compute walls from the default map (replaces the old module-level WALLS constant).
+WALLS = compute_walls(DEFAULT_MAP)
+DOOR_WIDTH = DOOR_WIDTH_DEFAULT
 
 
 def _started_room_with_player(x: float, y: float) -> tuple[GameRoom, str]:
@@ -27,7 +31,7 @@ def _started_room_with_player(x: float, y: float) -> tuple[GameRoom, str]:
 
 
 def test_resolve_returns_unchanged_when_no_overlap():
-    new_x, new_y = resolve_wall_collision(100.0, 100.0, 5.0, 0.0)
+    new_x, new_y = resolve_wall_collision(100.0, 100.0, 5.0, 0.0, WALLS)
     assert new_x == 100.0
     assert new_y == 100.0
 
@@ -35,7 +39,7 @@ def test_resolve_returns_unchanged_when_no_overlap():
 def test_resolve_blocks_horizontal_against_vertical_wall():
     # Vertical wall at x=800 thickness 8 each side; player radius 20.
     # Player tried to move right and ended up at x=800 (inside the wall + radius).
-    new_x, _ = resolve_wall_collision(800.0, 100.0, 5.0, 0.0)
+    new_x, _ = resolve_wall_collision(800.0, 100.0, 5.0, 0.0, WALLS)
     # Must be pushed left to 800 - 8 - 20 = 772.
     assert new_x == pytest.approx(800 - WALL_THICKNESS - PLAYER_COLLISION_RADIUS)
 
@@ -43,7 +47,7 @@ def test_resolve_blocks_horizontal_against_vertical_wall():
 def test_resolve_blocks_vertical_against_horizontal_wall():
     # x=700 is between the doors at x=400 (range 340-460) and x=1200 (range 1140-1260),
     # so there IS a wall segment here.
-    new_y, = (resolve_wall_collision(700.0, 800.0, 0.0, 5.0)[1],)
+    new_y, = (resolve_wall_collision(700.0, 800.0, 0.0, 5.0, WALLS)[1],)
     assert new_y == pytest.approx(800 - WALL_THICKNESS - PLAYER_COLLISION_RADIUS)
 
 
@@ -53,12 +57,12 @@ def test_resolve_blocks_vertical_against_horizontal_wall():
 def test_door_in_vertical_wall_lets_player_pass():
     # Door at y=400 on the x=800 wall, half-width = DOOR_WIDTH/2 = 60.
     # Player centered at y=400 tries to move from x=799 to x=801.
-    new_x, _ = resolve_wall_collision(801.0, 400.0, 2.0, 0.0)
+    new_x, _ = resolve_wall_collision(801.0, 400.0, 2.0, 0.0, WALLS)
     assert new_x == 801.0
 
 
 def test_door_in_horizontal_wall_lets_player_pass():
-    new_x, new_y = resolve_wall_collision(400.0, 801.0, 0.0, 2.0)
+    new_x, new_y = resolve_wall_collision(400.0, 801.0, 0.0, 2.0, WALLS)
     assert new_y == 801.0
 
 

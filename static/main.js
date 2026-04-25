@@ -15,6 +15,7 @@ const state = {
   phase: "lobby",
   players: [],
   ownRole: null,
+  map: null,
 };
 
 const previousTaskStatus = {};  // taskId -> last seen status
@@ -50,7 +51,12 @@ const sabotagePanel = new SabotagePanel(sabotagePanelEl, ws);
 
 const endscreen = new EndscreenOverlay(document.getElementById("endscreen"), ws);
 
-const WAR_ROOM_BOUNDS = { xMin: 800, yMin: 800, xMax: 1600, yMax: 1600 };
+function warRoomBoundsFromMap(map) {
+  if (!map) return null;
+  const room = (map.rooms || []).find((r) => r.id === map.warRoomId);
+  if (!room) return null;
+  return { xMin: room.x, yMin: room.y, xMax: room.x + room.width, yMax: room.y + room.height };
+}
 
 const meetingOverlay = new MeetingOverlay(
   document.getElementById("meeting-overlay"),
@@ -91,7 +97,9 @@ ws.on("room_joined", (payload) => {
   state.playerId = payload.playerId;
   state.isHost = payload.isHost;
   state.roomCode = payload.roomCode;
+  state.map = payload.map || null;
   renderer.setOwnPlayerId(payload.playerId);
+  renderer.setMap(payload.map || null);
   els.joinForm.classList.add("hidden");
   els.lobbyWaiting.classList.remove("hidden");
   els.lobbyRoomCode.textContent = payload.roomCode;
@@ -160,7 +168,7 @@ ws.on("game_state", (payload) => {
     phase: payload.phase,
     players: payload.players,
     ownPlayerId: state.playerId,
-    warRoomBounds: WAR_ROOM_BOUNDS,
+    warRoomBounds: warRoomBoundsFromMap(state.map),
   });
 });
 
