@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 class Phase(str, Enum):
     LOBBY = "lobby"
     PLAYING = "playing"
+    MEETING = "meeting"
     ENDED = "ended"
 
 
@@ -24,6 +25,7 @@ class Player(BaseModel):
     is_host: bool = False
     role: str | None = None
     team: str | None = None
+    is_alive: bool = True
     x: float = 0.0
     y: float = 0.0
     input_state: InputState = Field(default_factory=InputState)

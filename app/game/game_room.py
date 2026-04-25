@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from app.game.models import InputState, Phase, Player
 from app.game.roles import RoleInfo, assign as assign_roles, description_for
+from app.game.voting import SKIP_TARGET, all_chaos_eliminated, tally as _tally_votes
 from app.game.rooms import MAP_HEIGHT, MAP_WIDTH
 from app.game.sabotages import (
     COFFEE_SLOW_SPEED,
@@ -26,6 +27,18 @@ MAX_PLAYERS = 6
 MIN_PLAYERS_TO_START = 2
 PLAYER_RADIUS = 12
 ROUND_SECONDS = 720.0
+
+MEETING_DURATION_SECONDS = 60.0
+
+WAR_ROOM_BOUNDS = (800, 800, 1600, 1600)  # (x_min, y_min, x_max, y_max)
+
+_MEETING_TITLES = [
+    "Wer hat auf main gepusht?",
+    "Warum sind die Tests rot?",
+    "Wieso ist der Kunde im Sprint?",
+    "Wer hat den KI-Agenten unbeaufsichtigt gelassen?",
+    "Wer hat den Coffee Token verbraucht?",
+]
 
 _START_POSITIONS = [
     (200.0, 200.0),
@@ -97,6 +110,13 @@ class GameRoom:
         self.winner: str | None = None
         self.win_reason: str | None = None
         self.has_broadcast_end: bool = False
+
+        # Meeting state.
+        self.meeting_remaining_seconds: float = 0.0
+        self.meeting_caller_id: str | None = None
+        self.meeting_title: str = ""
+        self.votes: dict[str, str] = {}                       # voter_id -> target_id (or SKIP_TARGET)
+        self.players_with_meeting_left: dict[str, bool] = {}  # player_id -> True if can still call
 
     # --- player management -------------------------------------------------
 
@@ -203,6 +223,12 @@ class GameRoom:
             s.id: SabotageRuntime(definition=s) for s in SABOTAGE_DEFINITIONS
         }
 
+        # Each player gets exactly one emergency meeting per round.
+        self.players_with_meeting_left = {pid: True for pid in self.players}
+        # Make sure everyone is alive at start.
+        for player in self.players.values():
+            player.is_alive = True
+
         self.remaining_seconds = ROUND_SECONDS
         self.phase = Phase.PLAYING
 
@@ -210,11 +236,16 @@ class GameRoom:
 
     def apply_input(self, player_id: str, input_state: InputState) -> None:
         player = self.players.get(player_id)
-        if player is None:
+        if player is None or not player.is_alive:
             return
         player.input_state = input_state
 
     def tick(self, dt: float) -> None:
+        if self.phase is Phase.MEETING:
+            self.meeting_remaining_seconds = max(0.0, self.meeting_remaining_seconds - dt)
+            if self.meeting_remaining_seconds <= 0 or self._all_alive_voted():
+                self._resolve_meeting()
+            return
         if self.phase is not Phase.PLAYING:
             return
         for player in self.players.values():
@@ -266,6 +297,8 @@ class GameRoom:
             return
         if self.pipeline_stability <= 0:
             self._finish_round("chaos_agents", "Die Pipeline ist tot.")
+        elif all_chaos_eliminated(list(self.players.values())):
+            self._finish_round("release_team", "Alle Chaos-Agenten wurden enttarnt.")
         elif self.release_progress >= 100:
             self._finish_round("release_team", "Release deployed.")
         elif self.remaining_seconds <= 0:
@@ -301,6 +334,9 @@ class GameRoom:
     def apply_task_hold_start(self, player_id: str, task_id: str) -> None:
         if self.phase is not Phase.PLAYING:
             raise GameRoomError(code="WRONG_PHASE", message="Tasks only during playing.")
+        player = self.players.get(player_id)
+        if player is None or not player.is_alive:
+            raise GameRoomError(code="PLAYER_ELIMINATED", message="Eliminated players cannot do tasks.")
         task = self.tasks.get(task_id)
         if task is None:
             raise GameRoomError(code="UNKNOWN_TASK", message=f"Unknown task {task_id!r}.")
@@ -372,6 +408,8 @@ class GameRoom:
         player = self.players.get(player_id)
         if player is None:
             raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
+        if not player.is_alive:
+            raise GameRoomError(code="PLAYER_ELIMINATED", message="Eliminated players cannot sabotage.")
         if player.team != "chaos_agents":
             raise GameRoomError(
                 code="NOT_CHAOS_AGENT",
@@ -411,6 +449,91 @@ class GameRoom:
         if self.meeting_active_for > 0:
             self.meeting_active_for = max(0.0, self.meeting_active_for - dt)
 
+    # --- meeting + voting -------------------------------------------------
+
+    def _is_in_war_room(self, player) -> bool:
+        x_min, y_min, x_max, y_max = WAR_ROOM_BOUNDS
+        return x_min <= player.x <= x_max and y_min <= player.y <= y_max
+
+    def call_emergency_meeting(
+        self,
+        requesting_player_id: str,
+        rng: random.Random | None = None,
+    ) -> None:
+        if self.phase is not Phase.PLAYING:
+            raise GameRoomError(code="WRONG_PHASE", message="Meetings only during playing.")
+        player = self.players.get(requesting_player_id)
+        if player is None:
+            raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
+        if not player.is_alive:
+            raise GameRoomError(code="PLAYER_ELIMINATED", message="Eliminated players cannot call meetings.")
+        if not self._is_in_war_room(player):
+            raise GameRoomError(code="NOT_IN_WAR_ROOM", message="Emergency meetings can only be called from the War Room.")
+        if not self.players_with_meeting_left.get(requesting_player_id, False):
+            raise GameRoomError(code="NO_MEETING_LEFT", message="You already used your emergency meeting this round.")
+
+        # Transition to MEETING.
+        self.players_with_meeting_left[requesting_player_id] = False
+        self.meeting_caller_id = requesting_player_id
+        self.meeting_remaining_seconds = MEETING_DURATION_SECONDS
+        self.votes = {}
+        r = rng or random.SystemRandom()
+        self.meeting_title = r.choice(_MEETING_TITLES)
+        self.phase = Phase.MEETING
+        # Cancel ongoing task holds — frozen during meeting.
+        for task in self.tasks.values():
+            task.per_player_progress = {}
+            if task.status == "in_progress":
+                task.status = "available"
+
+    def cast_vote(self, voter_id: str, target_id: str) -> None:
+        if self.phase is not Phase.MEETING:
+            raise GameRoomError(code="WRONG_PHASE", message="No meeting active.")
+        voter = self.players.get(voter_id)
+        if voter is None or not voter.is_alive:
+            raise GameRoomError(code="CANNOT_VOTE", message="Only living players can vote.")
+        target = self.players.get(target_id)
+        if target is None or not target.is_alive:
+            raise GameRoomError(code="INVALID_TARGET", message="Vote target must be a living player.")
+        self.votes[voter_id] = target_id
+
+    def skip_vote(self, voter_id: str) -> None:
+        if self.phase is not Phase.MEETING:
+            raise GameRoomError(code="WRONG_PHASE", message="No meeting active.")
+        voter = self.players.get(voter_id)
+        if voter is None or not voter.is_alive:
+            raise GameRoomError(code="CANNOT_VOTE", message="Only living players can vote.")
+        self.votes[voter_id] = SKIP_TARGET
+
+    def _living_player_ids(self) -> list[str]:
+        return [pid for pid, p in self.players.items() if p.is_alive]
+
+    def _all_alive_voted(self) -> bool:
+        living = set(self._living_player_ids())
+        return living.issubset(set(self.votes.keys()))
+
+    def _resolve_meeting(self) -> str | None:
+        """Tally votes, eliminate the loser if any, transition back to PLAYING.
+        Returns the eliminated player_id or None.
+        """
+        eliminated_id = _tally_votes(self.votes)
+        if eliminated_id and eliminated_id in self.players:
+            self.players[eliminated_id].is_alive = False
+        # Reset meeting state.
+        self.meeting_remaining_seconds = 0.0
+        self.meeting_caller_id = None
+        self.meeting_title = ""
+        self.votes = {}
+        self.phase = Phase.PLAYING
+        return eliminated_id
+
+    def _aggregate_vote_counts(self) -> dict[str, int]:
+        """Return {target_id: count} aggregating cast votes; SKIP_TARGET stays as ''."""
+        counts: dict[str, int] = {}
+        for target in self.votes.values():
+            counts[target] = counts.get(target, 0) + 1
+        return counts
+
     # --- serialization accessors ------------------------------------------
 
     def public_state(self) -> dict:
@@ -430,6 +553,7 @@ class GameRoom:
                     "y": round(p.y, 2),
                     "color": p.color,
                     "isHost": p.is_host,
+                    "isAlive": p.is_alive,
                 }
                 for p in self.players.values()
             ],
@@ -460,6 +584,17 @@ class GameRoom:
                 }
                 for s in self.sabotages.values()
             ],
+            "meeting": (
+                {
+                    "callerId": self.meeting_caller_id,
+                    "title": self.meeting_title,
+                    "remainingSeconds": int(self.meeting_remaining_seconds),
+                    "votesCount": self._aggregate_vote_counts(),
+                    "alreadyVoted": list(self.votes.keys()),
+                }
+                if self.phase is Phase.MEETING
+                else None
+            ),
         }
 
     def ended_snapshot(self) -> dict:
@@ -478,6 +613,7 @@ class GameRoom:
                     "team": p.team or "",
                     "completedTasks": self.completed_tasks_by_player.get(p.id, 0),
                     "triggeredSabotages": self.triggered_sabotages_by_player.get(p.id, 0),
+                    "isAlive": p.is_alive,
                 }
                 for p in self.players.values()
             ],
@@ -526,9 +662,15 @@ class GameRoom:
         self.triggered_sabotages_by_player = {}
         self.tasks = {}
         self.sabotages = {}
+        self.meeting_remaining_seconds = 0.0
+        self.meeting_caller_id = None
+        self.meeting_title = ""
+        self.votes = {}
+        self.players_with_meeting_left = {}
         for player in self.players.values():
             player.role = None
             player.team = None
             player.x = 0.0
             player.y = 0.0
             player.input_state = InputState()
+            player.is_alive = True
