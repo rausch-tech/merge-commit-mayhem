@@ -7,6 +7,7 @@ import { SabotagePanel } from "./sabotages.js";
 import { EndscreenOverlay } from "./endscreen.js";
 import { playTaskComplete, wireGlobalClickSound } from "./audio.js";
 import { MeetingOverlay, VotingResultToast, EmergencyMeetingBtn } from "./meetings.js";
+import { EventFeed } from "./eventfeed.js";
 
 const SESSION_KEY = "mcm.session";
 
@@ -67,6 +68,9 @@ const els = {
 
 const taskSidebarEl = document.getElementById("task-sidebar");
 const taskList = new TaskList(taskSidebarEl);
+
+const eventFeedEl = document.getElementById("event-feed");
+const eventFeed = new EventFeed(eventFeedEl);
 
 const wsUrl = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
 const ws = new WsClient(wsUrl);
@@ -183,6 +187,7 @@ ws.on("game_state", (payload) => {
     coffeeLevel: payload.coffeeLevel,
   });
   sabotagePanel.updateFromGameState(payload.sabotages || []);
+  eventFeed.render(payload.events || []);
 
   // Meeting overlay shows during MEETING phase, hides otherwise.
   meetingOverlay.update({

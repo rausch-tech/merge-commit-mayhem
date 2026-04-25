@@ -231,6 +231,57 @@ button:hover {
   opacity: 0.6;
 }
 
+#event-feed {
+  flex: 0 0 240px;
+  background: var(--panel);
+  padding: 12px;
+  font-size: 0.85rem;
+  overflow-y: auto;
+}
+
+#event-feed h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#event-feed ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.event-row {
+  background: #10152a;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border-left: 3px solid #475569;
+  word-break: break-word;
+}
+
+.event-row-info {
+  border-left-color: #60a5fa;
+}
+.event-row-warn {
+  border-left-color: #fbbf24;
+}
+.event-row-danger {
+  border-left-color: #f87171;
+}
+
+.event-empty {
+  color: var(--muted);
+  font-style: italic;
+  background: transparent;
+  border-left: 3px solid transparent;
+  padding: 8px 10px;
+}
+
 .task-title {
   font-weight: 600;
 }

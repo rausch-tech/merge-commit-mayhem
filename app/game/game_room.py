@@ -1,3 +1,4 @@
+import collections
 import random
 import uuid
 from dataclasses import dataclass, field
@@ -65,6 +66,16 @@ class GameRoomError(Exception):
         return f"{self.code}: {self.message}"
 
 
+_VALID_EVENT_SEVERITIES = ("info", "warn", "danger")
+
+
+@dataclass
+class EventEntry:
+    seq: int  # monotonic per room, starts at 1, only increases
+    severity: str  # "info" | "warn" | "danger"
+    message: str  # plain German text shown to all players
+
+
 @dataclass
 class TaskRuntime:
     definition: TaskDefinition
@@ -123,6 +134,19 @@ class GameRoom:
         self.players_with_meeting_left: dict[str, bool] = {}  # player_id -> True if can still call
         self.last_voting_result: dict | None = None
 
+        # Rolling event feed (server-authoritative). Empty in LOBBY.
+        self.events: collections.deque[EventEntry] = collections.deque(maxlen=20)
+        self._next_event_seq: int = 1
+
+    def _emit_event(self, severity: str, message: str) -> None:
+        """Append an event to the rolling buffer. Internal use only."""
+        if severity not in _VALID_EVENT_SEVERITIES:
+            raise ValueError(
+                f"Invalid event severity {severity!r}; must be one of {_VALID_EVENT_SEVERITIES}."
+            )
+        self.events.append(EventEntry(seq=self._next_event_seq, severity=severity, message=message))
+        self._next_event_seq += 1
+
     # --- player management -------------------------------------------------
 
     def add_player(self, name: str) -> Player:
@@ -168,6 +192,8 @@ class GameRoom:
             return
         player.is_connected = False
         player.disconnected_at_monotonic = time.monotonic()
+        if self.phase in (Phase.PLAYING, Phase.MEETING):
+            self._emit_event("warn", f"{player.name} ist offline gegangen.")
         # Release any task holds.
         for task in self.tasks.values():
             if player_id in task.per_player_progress:
@@ -221,6 +247,8 @@ class GameRoom:
             )
         player.is_connected = True
         player.disconnected_at_monotonic = None
+        if self.phase in (Phase.PLAYING, Phase.MEETING):
+            self._emit_event("info", f"{player.name} ist zurück.")
         return player
 
     def _sweep_disconnected(self) -> list[str]:
@@ -236,8 +264,11 @@ class GameRoom:
             if player.disconnected_at_monotonic is None:
                 continue
             if now - player.disconnected_at_monotonic > RECONNECT_GRACE_SECONDS:
+                name = player.name
                 self.remove_player(pid)
                 removed.append(pid)
+                if self.phase is not Phase.LOBBY:
+                    self._emit_event("warn", f"{name} ist endgültig raus.")
         return removed
 
     def _next_color(self) -> str:
@@ -326,6 +357,11 @@ class GameRoom:
         self.remaining_seconds = ROUND_SECONDS
         self.phase = Phase.PLAYING
 
+        # Reset and seed event feed for the fresh round.
+        self.events.clear()
+        self._next_event_seq = 1
+        self._emit_event("info", "Release-Fenster offen. Los geht's.")
+
     # --- input + tick ------------------------------------------------------
 
     def apply_input(self, player_id: str, input_state: InputState) -> None:
@@ -411,6 +447,8 @@ class GameRoom:
         self.phase = Phase.ENDED
         self.winner = winner
         self.win_reason = reason
+        severity = "info" if winner == "release_team" else "danger"
+        self._emit_event(severity, f"Runde vorbei: {reason}")
 
     # --- speed helpers -----------------------------------------------------
 
@@ -497,6 +535,7 @@ class GameRoom:
                     self.completed_tasks_by_player[winner_pid] = (
                         self.completed_tasks_by_player.get(winner_pid, 0) + 1
                     )
+                    self._emit_event("info", f"{task.definition.title} erledigt.")
                     task.per_player_progress = {}
                     task.status = "cooldown"
                     task.cooldown_remaining = TASK_RESPAWN_COOLDOWN
@@ -541,6 +580,13 @@ class GameRoom:
         self.triggered_sabotages_by_player[player_id] = (
             self.triggered_sabotages_by_player.get(player_id, 0) + 1
         )
+
+        if sabotage_id == "ci_cd_red":
+            self._emit_event("danger", "Die Pipeline ist rot. Niemand weiß warum.")
+        elif sabotage_id == "coffee_outage":
+            self._emit_event("warn", "Die Kaffeemaschine ist offline.")
+        elif sabotage_id == "mandatory_meeting":
+            self._emit_event("warn", "Ein Meeting ohne Agenda wurde gestartet.")
 
     def _tick_sabotages(self, dt: float) -> None:
         for sab in self.sabotages.values():
@@ -662,6 +708,15 @@ class GameRoom:
             "skipped": skip_won,
         }
 
+        # Emit a public, role-neutral event. The text MUST NOT depend on
+        # was_chaos -- doing so would leak role info to spectators.
+        if eliminated_id:
+            self._emit_event("info", f"{removed_name} wurde aus dem Team entfernt.")
+        elif named_tie:
+            self._emit_event("warn", "Patt — niemand wurde entfernt.")
+        elif skip_won:
+            self._emit_event("info", "Niemand wurde entfernt.")
+
         # Reset meeting state and return to PLAYING.
         self.meeting_remaining_seconds = 0.0
         self.meeting_caller_id = None
@@ -744,6 +799,9 @@ class GameRoom:
                 if self.phase is Phase.MEETING
                 else None
             ),
+            "events": [
+                {"seq": e.seq, "severity": e.severity, "message": e.message} for e in self.events
+            ],
         }
 
     def ended_snapshot(self) -> dict:
@@ -816,6 +874,8 @@ class GameRoom:
         self.votes = {}
         self.players_with_meeting_left = {}
         self.last_voting_result = None
+        self.events.clear()
+        self._next_event_seq = 1
         for player in self.players.values():
             player.role = None
             player.team = None

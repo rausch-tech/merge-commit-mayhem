@@ -197,6 +197,7 @@ class GameStateMsg(BaseModel):
     tasks: list[dict[str, Any]] = Field(default_factory=list)
     sabotages: list[dict[str, Any]] = Field(default_factory=list)
     meeting: dict[str, Any] | None = None
+    events: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class PrivateRoleMsg(BaseModel):

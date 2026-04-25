@@ -95,6 +95,19 @@ def test_game_state_serializes_to_camel_case():
     dumped = msg.model_dump(by_alias=True)
     assert dumped["remainingSeconds"] == 598
     assert "phase" in dumped
+    # `events` is part of the public envelope and defaults to an empty list.
+    assert dumped["events"] == []
+
+
+def test_game_state_carries_events_when_present():
+    msg = GameStateMsg(
+        phase="playing",
+        remaining_seconds=598,
+        players=[],
+        events=[{"seq": 1, "severity": "info", "message": "Los geht's."}],
+    )
+    dumped = msg.model_dump(by_alias=True)
+    assert dumped["events"] == [{"seq": 1, "severity": "info", "message": "Los geht's."}]
 
 
 def test_private_role_serializes_as_expected():
