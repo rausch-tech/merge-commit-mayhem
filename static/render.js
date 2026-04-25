@@ -219,8 +219,11 @@ export class Renderer {
 
     // Players.
     for (const player of this.players) {
+      const isDead = player.isAlive === false;
       const charIndex = COLOR_TO_CHAR_INDEX[player.color] ?? 0;
       const half = CHARACTER_RENDER_SIZE / 2;
+      ctx.save();
+      ctx.globalAlpha = isDead ? 0.35 : 1.0;
 
       // Colored ring at feet (player identity color stays visible).
       ctx.beginPath();
@@ -230,9 +233,9 @@ export class Renderer {
         0, 0, Math.PI * 2
       );
       ctx.fillStyle = player.color;
-      ctx.globalAlpha = 0.55;
+      ctx.globalAlpha = isDead ? 0.35 * 0.55 : 0.55;
       ctx.fill();
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = isDead ? 0.35 : 1.0;
       ctx.strokeStyle = "#0b0f1f";
       ctx.lineWidth = 1.5;
       ctx.stroke();
@@ -271,6 +274,8 @@ export class Renderer {
       ctx.textAlign = "center";
       ctx.textBaseline = "bottom";
       ctx.fillText(player.name, player.x, player.y - half - 6);
+
+      ctx.restore();
     }
 
     ctx.restore();

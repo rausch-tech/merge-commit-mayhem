@@ -455,3 +455,160 @@ button:hover { filter: brightness(1.1); }
   align-items: center;
   gap: 6px;
 }
+
+/* Emergency Meeting button — small floating button center-top while in War Room */
+#emergency-meeting-btn {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #f87171;
+  color: #1a0505;
+  border: 2px solid #fee2e2;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(248, 113, 113, 0.4);
+  z-index: 90;
+}
+
+#emergency-meeting-btn:hover {
+  background: #fca5a5;
+}
+
+/* Meeting overlay */
+#meeting-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 15, 31, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 95;
+}
+
+#meeting-card {
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 28px 32px;
+  width: 480px;
+  max-width: 92vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 2px solid #c084fc;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+#meeting-title {
+  margin: 0;
+  color: #c084fc;
+  font-size: 1.4rem;
+}
+
+.meeting-countdown {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 8px 0 18px;
+  color: #facc15;
+  font-variant-numeric: tabular-nums;
+}
+
+#meeting-card h3 {
+  margin: 12px 0 8px;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+#meeting-vote-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.meeting-vote-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #10152a;
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.meeting-vote-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.meeting-vote-btn {
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: none;
+  background: #4ade80;
+  color: #0f172a;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.meeting-vote-btn:disabled {
+  background: #334155;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+#meeting-skip-btn {
+  margin-top: 16px;
+  width: 100%;
+  background: #475569;
+  color: var(--text);
+}
+
+#meeting-skip-btn:hover:not(:disabled) {
+  background: #64748b;
+}
+
+#meeting-skip-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.meeting-status {
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Voting result toast */
+#voting-result-toast {
+  position: fixed;
+  top: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(11, 15, 31, 0.95);
+  border: 2px solid #facc15;
+  border-radius: 12px;
+  padding: 20px 28px;
+  z-index: 96;
+  animation: votingToastFadeIn 200ms ease-out;
+  pointer-events: none;
+}
+
+#voting-result-text {
+  margin: 0;
+  color: #facc15;
+  font-size: 1.2rem;
+  text-align: center;
+}
+
+@keyframes votingToastFadeIn {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}

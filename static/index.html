@@ -79,6 +79,25 @@
         <button id="endscreen-reset" type="button" class="hidden">Zurück zur Lobby</button>
       </div>
     </div>
+
+    <button id="emergency-meeting-btn" class="hidden" type="button">Emergency Meeting</button>
+
+    <div id="meeting-overlay" class="hidden">
+      <div id="meeting-card">
+        <h1 id="meeting-title">Emergency Meeting</h1>
+        <p id="meeting-countdown" class="meeting-countdown">--</p>
+        <h3>Wer war's?</h3>
+        <ul id="meeting-vote-list"></ul>
+        <button id="meeting-skip-btn" type="button">Skip — niemand entfernen</button>
+        <p id="meeting-status" class="meeting-status"></p>
+      </div>
+    </div>
+
+    <div id="voting-result-toast" class="hidden">
+      <div id="voting-result-card">
+        <h2 id="voting-result-text">—</h2>
+      </div>
+    </div>
   </main>
 
   <script type="module" src="/static/main.js"></script>

@@ -6,6 +6,7 @@ import { TaskList } from "./tasks.js";
 import { SabotagePanel } from "./sabotages.js";
 import { EndscreenOverlay } from "./endscreen.js";
 import { playTaskComplete, wireGlobalClickSound } from "./audio.js";
+import { MeetingOverlay, VotingResultToast, EmergencyMeetingBtn } from "./meetings.js";
 
 const state = {
   playerId: null,
@@ -49,6 +50,20 @@ const sabotagePanel = new SabotagePanel(sabotagePanelEl, ws);
 
 const endscreen = new EndscreenOverlay(document.getElementById("endscreen"), ws);
 
+const WAR_ROOM_BOUNDS = { xMin: 800, yMin: 800, xMax: 1600, yMax: 1600 };
+
+const meetingOverlay = new MeetingOverlay(
+  document.getElementById("meeting-overlay"),
+  ws,
+);
+const votingResultToast = new VotingResultToast(
+  document.getElementById("voting-result-toast"),
+);
+const emergencyBtn = new EmergencyMeetingBtn(
+  document.getElementById("emergency-meeting-btn"),
+  ws,
+);
+
 function showError(msg) {
   els.errorBanner.textContent = msg;
   els.errorBanner.classList.remove("hidden");
@@ -86,6 +101,8 @@ ws.on("lobby_state", (payload) => {
   state.players = payload.players;
   state.phase = "lobby";
   endscreen.hide();
+  meetingOverlay.hide();
+  emergencyBtn.reset();
   // If we were on the game screen (post-round reset), swap back to lobby.
   els.gameScreen.classList.add("hidden");
   els.lobbyScreen.classList.remove("hidden");
@@ -130,10 +147,32 @@ ws.on("game_state", (payload) => {
     coffeeLevel: payload.coffeeLevel,
   });
   sabotagePanel.updateFromGameState(payload.sabotages || []);
+
+  // Meeting overlay shows during MEETING phase, hides otherwise.
+  meetingOverlay.update({
+    meeting: payload.meeting,
+    players: payload.players,
+    ownPlayerId: state.playerId,
+  });
+
+  // Emergency button visibility recomputed each tick.
+  emergencyBtn.update({
+    phase: payload.phase,
+    players: payload.players,
+    ownPlayerId: state.playerId,
+    warRoomBounds: WAR_ROOM_BOUNDS,
+  });
+});
+
+ws.on("voting_result", (payload) => {
+  votingResultToast.show(payload, state.players);
 });
 
 ws.on("error", (payload) => {
   showError(`${payload.code}: ${payload.message}`);
+  if (payload.code === "NO_MEETING_LEFT") {
+    emergencyBtn.markMeetingUsed();
+  }
 });
 
 els.btnJoin.addEventListener("click", () => {
