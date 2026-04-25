@@ -14,6 +14,10 @@ from app.game.tasks import TASK_RESPAWN_COOLDOWN, task_by_id
 
 
 def _started_room(player_count: int = 3, seed: int = 0) -> tuple[GameRoom, list[str]]:
+    # Tier 2.1 chaos-parity: require >=3 players so 1 chaos + 2 release keeps
+    # release in the majority and ticks don't immediately end the round.
+    if player_count < 3:
+        player_count = 3
     room = GameRoom(code="EVNT")
     ids = []
     for i in range(player_count):
@@ -246,6 +250,37 @@ def test_idle_tick_does_not_keep_emitting_events():
     for _ in range(20):
         room.tick(0.1)
     assert len(room.events) == pre_count
+
+
+def test_body_found_emits_danger_event_with_both_names():
+    """Tier 2.1: report_body emits a danger-level event naming both the
+    reporter and the victim. Take-Down itself MUST NOT emit an event.
+    """
+    room, ids = _started_room(player_count=4)
+    chaos_id = _chaos_id(room)
+    release_ids = [p.id for p in room.players.values() if p.team == "release_team"]
+    victim_id = release_ids[0]
+    reporter_id = release_ids[1]
+
+    # Stage take-down.
+    room.players[chaos_id].x, room.players[chaos_id].y = 1000.0, 1000.0
+    room.players[victim_id].x, room.players[victim_id].y = 1000.0, 1010.0
+    pre_seqs_kill = {e.seq for e in room.events}
+    body = room.apply_takedown(killer_id=chaos_id, target_id=victim_id)
+    new_after_kill = [e for e in room.events if e.seq not in pre_seqs_kill]
+    assert new_after_kill == [], "Take-Down must not emit any event"
+
+    # Reporter walks to body and reports.
+    room.players[reporter_id].x, room.players[reporter_id].y = body.x, body.y
+    pre_seqs_report = {e.seq for e in room.events}
+    room.apply_report_body(reporter_id=reporter_id, body_id=body.id)
+    new_after_report = [e for e in room.events if e.seq not in pre_seqs_report]
+    assert any(
+        e.severity == "danger"
+        and room.players[reporter_id].name in e.message
+        and room.players[victim_id].name in e.message
+        for e in new_after_report
+    )
 
 
 def test_task_cooldown_does_not_re_emit_completion():

@@ -8,6 +8,8 @@ import { EndscreenOverlay } from "./endscreen.js";
 import { playTaskComplete, wireGlobalClickSound } from "./audio.js";
 import { MeetingOverlay, VotingResultToast, EmergencyMeetingBtn } from "./meetings.js";
 import { EventFeed } from "./eventfeed.js";
+import { TakedownButton } from "./takedown.js";
+import { ReportButton } from "./report.js";
 
 const SESSION_KEY = "mcm.session";
 
@@ -45,6 +47,8 @@ const state = {
   players: [],
   ownRole: null,
   map: null,
+  bodies: [],
+  takedownCooldown: 0,
 };
 
 const previousTaskStatus = {}; // taskId -> last seen status
@@ -99,6 +103,8 @@ function warRoomBoundsFromMap(map) {
 const meetingOverlay = new MeetingOverlay(document.getElementById("meeting-overlay"), ws);
 const votingResultToast = new VotingResultToast(document.getElementById("voting-result-toast"));
 const emergencyBtn = new EmergencyMeetingBtn(document.getElementById("emergency-meeting-btn"), ws);
+const takedownBtn = new TakedownButton(document.getElementById("takedown-btn"), ws);
+const reportBtn = new ReportButton(document.getElementById("report-btn"), ws);
 
 function showError(msg) {
   els.errorBanner.textContent = msg;
@@ -170,8 +176,10 @@ ws.on("game_state", (payload) => {
   }
   state.phase = payload.phase;
   state.players = payload.players;
+  state.bodies = payload.bodies || [];
   renderer.setPlayers(payload.players);
   renderer.setTasks(payload.tasks || []);
+  renderer.setBodies(state.bodies);
   taskList.render(payload.tasks || []);
   for (const t of payload.tasks || []) {
     const prev = previousTaskStatus[t.id];
@@ -202,6 +210,33 @@ ws.on("game_state", (payload) => {
     players: payload.players,
     ownPlayerId: state.playerId,
     warRoomBounds: warRoomBoundsFromMap(state.map),
+  });
+
+  // Take-Down (chaos-only) and Report (anyone) visibility — both server-gated.
+  takedownBtn.update({
+    phase: payload.phase,
+    players: payload.players,
+    ownPlayerId: state.playerId,
+    ownTeam: state.ownRole?.team || null,
+    cooldown: state.takedownCooldown,
+  });
+  reportBtn.update({
+    phase: payload.phase,
+    players: payload.players,
+    ownPlayerId: state.playerId,
+    bodies: state.bodies,
+  });
+});
+
+ws.on("private_state", (payload) => {
+  state.takedownCooldown = payload.takedownCooldownRemaining || 0;
+  // Refresh take-down button immediately so the cooldown text updates.
+  takedownBtn.update({
+    phase: state.phase,
+    players: state.players,
+    ownPlayerId: state.playerId,
+    ownTeam: state.ownRole?.team || null,
+    cooldown: state.takedownCooldown,
   });
 });
 

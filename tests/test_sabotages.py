@@ -7,10 +7,15 @@ from app.game.sabotages import MEETING_DURATION
 
 
 def _room_with_roles() -> tuple[GameRoom, str, str]:
-    """Return (room, chaos_player_id, dev_player_id). Uses seeded rng for determinism."""
+    """Return (room, chaos_player_id, dev_player_id). Uses seeded rng for determinism.
+
+    Uses 3 players so the chaos-parity win condition (Tier 2.1) doesn't fire on
+    the first tick: 1 chaos + 2 release keeps release in the majority.
+    """
     room = GameRoom(code="ABCD")
     p0 = room.add_player("p0")
     room.add_player("p1")
+    room.add_player("p2")
     host_id = p0.id
     room.start(requesting_player_id=host_id, rng=random.Random(0))
     chaos_id = next(p.id for p in room.players.values() if p.team == "chaos_agents")

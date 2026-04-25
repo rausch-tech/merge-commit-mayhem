@@ -120,6 +120,49 @@ def test_playing_state_is_untouched_without_condition():
     assert room.win_reason is None
 
 
+# --- Tier 2.1: chaos parity ------------------------------------------------
+
+
+def test_chaos_parity_one_each_chaos_wins():
+    """1 chaos + 1 release alive → chaos wins via parity."""
+    room = _started_room(n=3)
+    # Eliminate one release_team player, leaving 1 chaos + 1 release alive.
+    release_alive = [p for p in room.players.values() if p.team == "release_team" and p.is_alive]
+    assert len(release_alive) >= 1
+    release_alive[0].is_alive = False
+    room.tick(0.05)
+    assert room.phase is Phase.ENDED
+    assert room.winner == "chaos_agents"
+    assert room.win_reason == "Chaos hat die Mehrheit."
+
+
+def test_no_chaos_parity_when_release_majority():
+    """1 chaos + 2 release alive → no chaos parity yet, round continues."""
+    room = _started_room(n=3)
+    chaos_alive = [p for p in room.players.values() if p.team == "chaos_agents" and p.is_alive]
+    release_alive = [p for p in room.players.values() if p.team == "release_team" and p.is_alive]
+    assert len(chaos_alive) == 1
+    assert len(release_alive) == 2
+    room.tick(0.05)
+    assert room.phase is Phase.PLAYING
+
+
+def test_no_chaos_parity_when_zero_chaos_alive():
+    """0 chaos + 1 release alive: the existing all_chaos_eliminated win takes
+    precedence over chaos parity (which requires chaos_alive > 0)."""
+    room = _started_room(n=3)
+    # Eliminate the chaos player and one release.
+    for p in room.players.values():
+        if p.team == "chaos_agents":
+            p.is_alive = False
+    release_alive = [p for p in room.players.values() if p.team == "release_team" and p.is_alive]
+    release_alive[0].is_alive = False
+    room.tick(0.05)
+    assert room.phase is Phase.ENDED
+    assert room.winner == "release_team"
+    assert room.win_reason == "Alle Chaos-Agenten wurden enttarnt."
+
+
 # --- reset recovers --------------------------------------------------------
 
 

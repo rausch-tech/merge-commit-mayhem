@@ -38,6 +38,10 @@ RECONNECT_GRACE_SECONDS = 30.0
 
 MEETING_DURATION_SECONDS = 60.0
 
+TAKEDOWN_RADIUS = 40.0  # px
+TAKEDOWN_COOLDOWN = 25.0  # seconds
+REPORT_RADIUS = 40.0  # px
+
 _MEETING_TITLES = [
     "Wer hat auf main gepusht?",
     "Warum sind die Tests rot?",
@@ -95,6 +99,16 @@ class SabotageRuntime:
     )
 
 
+@dataclass
+class Body:
+    id: str  # uuid hex
+    x: float
+    y: float
+    victim_player_id: str
+    victim_name: str
+    color: str  # victim's color, for rendering
+
+
 class GameRoom:
     def __init__(self, code: str, game_map: GameMap | None = None) -> None:
         self.code = code
@@ -137,6 +151,11 @@ class GameRoom:
         # Rolling event feed (server-authoritative). Empty in LOBBY.
         self.events: collections.deque[EventEntry] = collections.deque(maxlen=20)
         self._next_event_seq: int = 1
+
+        # Take-Down state. Bodies are created when a chaos agent eliminates a
+        # release-team player; cooldowns gate the next take-down per chaos id.
+        self.bodies: dict[str, Body] = {}
+        self.takedown_cooldowns: dict[str, float] = {}
 
     def _emit_event(self, severity: str, message: str) -> None:
         """Append an event to the rolling buffer. Internal use only."""
@@ -354,6 +373,12 @@ class GameRoom:
         for player in self.players.values():
             player.is_alive = True
 
+        # Take-Down: clear bodies, prime cooldown dict for chaos agents.
+        self.bodies = {}
+        self.takedown_cooldowns = {
+            pid: 0.0 for pid, p in self.players.items() if p.team == "chaos_agents"
+        }
+
         self.remaining_seconds = ROUND_SECONDS
         self.phase = Phase.PLAYING
 
@@ -421,6 +446,7 @@ class GameRoom:
                     player.y = float(self.map.size.height)
         self._tick_tasks(dt)
         self._tick_sabotages(dt)
+        self._tick_takedown_cooldowns(dt)
         self.remaining_seconds = max(0.0, self.remaining_seconds - dt)
         self._sweep_disconnected()
         self._check_win_conditions()
@@ -436,12 +462,25 @@ class GameRoom:
             return
         if self.pipeline_stability <= 0:
             self._finish_round("chaos_agents", "Die Pipeline ist tot.")
-        elif all_chaos_eliminated(list(self.players.values())):
+            return
+        if all_chaos_eliminated(list(self.players.values())):
             self._finish_round("release_team", "Alle Chaos-Agenten wurden enttarnt.")
-        elif self.release_progress >= 100:
+            return
+        chaos_alive = sum(
+            1 for p in self.players.values() if p.is_alive and p.team == "chaos_agents"
+        )
+        release_alive = sum(
+            1 for p in self.players.values() if p.is_alive and p.team == "release_team"
+        )
+        if chaos_alive > 0 and chaos_alive >= release_alive:
+            self._finish_round("chaos_agents", "Chaos hat die Mehrheit.")
+            return
+        if self.release_progress >= 100:
             self._finish_round("release_team", "Release deployed.")
-        elif self.remaining_seconds <= 0:
+            return
+        if self.remaining_seconds <= 0:
             self._finish_round("chaos_agents", "Das Release-Fenster ist geschlossen.")
+            return
 
     def _finish_round(self, winner: str, reason: str) -> None:
         severity = "info" if winner == "release_team" else "danger"
@@ -601,6 +640,115 @@ class GameRoom:
                 sab.active = False
         if self.meeting_active_for > 0:
             self.meeting_active_for = max(0.0, self.meeting_active_for - dt)
+
+    # --- take-down + body-report ------------------------------------------
+
+    def _tick_takedown_cooldowns(self, dt: float) -> None:
+        for pid, cd in list(self.takedown_cooldowns.items()):
+            if cd > 0:
+                self.takedown_cooldowns[pid] = max(0.0, cd - dt)
+
+    def apply_takedown(self, killer_id: str, target_id: str) -> Body:
+        """
+        Eliminate the target via stealth take-down. Authoritative.
+        No event emission -- a take-down must not leak to the public feed.
+        """
+        if self.phase is not Phase.PLAYING:
+            raise GameRoomError(code="WRONG_PHASE", message="Take-Down nur im PLAYING.")
+        killer = self.players.get(killer_id)
+        if killer is None or not killer.is_connected:
+            raise GameRoomError(code="UNKNOWN_PLAYER", message="Killer nicht im Raum.")
+        if not killer.is_alive:
+            raise GameRoomError(
+                code="PLAYER_ELIMINATED", message="Eliminierte Spieler koennen nichts tun."
+            )
+        if killer.team != "chaos_agents":
+            raise GameRoomError(
+                code="NOT_CHAOS_AGENT", message="Nur Chaos-Agenten koennen Take-Down nutzen."
+            )
+        if target_id == killer_id:
+            raise GameRoomError(
+                code="INVALID_TARGET", message="Du kannst dich nicht selbst killen."
+            )
+        target = self.players.get(target_id)
+        if target is None:
+            raise GameRoomError(code="UNKNOWN_TARGET", message="Ziel nicht im Raum.")
+        if not target.is_connected:
+            raise GameRoomError(code="UNKNOWN_TARGET", message="Ziel nicht verbunden.")
+        if not target.is_alive:
+            raise GameRoomError(code="TARGET_ELIMINATED", message="Ziel ist bereits ausgeschaltet.")
+        dx = killer.x - target.x
+        dy = killer.y - target.y
+        if (dx * dx + dy * dy) > (TAKEDOWN_RADIUS * TAKEDOWN_RADIUS):
+            raise GameRoomError(code="OUT_OF_RANGE", message="Ziel ist zu weit weg.")
+        if self.takedown_cooldowns.get(killer_id, 0.0) > 0:
+            raise GameRoomError(code="TAKEDOWN_ON_COOLDOWN", message="Take-Down auf Cooldown.")
+
+        # Snapshot the victim's position before any state mutation.
+        body = Body(
+            id=uuid.uuid4().hex,
+            x=target.x,
+            y=target.y,
+            victim_player_id=target.id,
+            victim_name=target.name,
+            color=target.color,
+        )
+        target.is_alive = False
+        target.input_state = InputState()
+        # Drop any task holds the target had (mirror mark_disconnected cleanup).
+        for task in self.tasks.values():
+            if target_id in task.per_player_progress:
+                task.per_player_progress.pop(target_id)
+                if not task.per_player_progress and task.status == "in_progress":
+                    task.status = "available"
+        self.bodies[body.id] = body
+        self.takedown_cooldowns[killer_id] = TAKEDOWN_COOLDOWN
+        return body
+
+    def apply_report_body(self, reporter_id: str, body_id: str, rng=None) -> None:
+        """
+        Reporter discovers a body. Triggers a meeting that bypasses the
+        war-room requirement and the per-round emergency meeting quota.
+        """
+        if self.phase is not Phase.PLAYING:
+            raise GameRoomError(code="WRONG_PHASE", message="Report nur im PLAYING.")
+        reporter = self.players.get(reporter_id)
+        if reporter is None or not reporter.is_connected:
+            raise GameRoomError(code="UNKNOWN_PLAYER", message="Reporter nicht im Raum.")
+        if not reporter.is_alive:
+            raise GameRoomError(
+                code="PLAYER_ELIMINATED", message="Eliminierte Spieler koennen nichts melden."
+            )
+        body = self.bodies.get(body_id)
+        if body is None:
+            raise GameRoomError(code="UNKNOWN_BODY", message="Unbekannter Body.")
+        dx = reporter.x - body.x
+        dy = reporter.y - body.y
+        if (dx * dx + dy * dy) > (REPORT_RADIUS * REPORT_RADIUS):
+            raise GameRoomError(code="OUT_OF_RANGE", message="Body ist zu weit weg.")
+
+        # Pop the body and emit the public danger event.
+        self.bodies.pop(body_id, None)
+        self._emit_event(
+            "danger",
+            f"{reporter.name} hat einen Body gefunden: {body.victim_name}.",
+        )
+
+        # Direct transition into MEETING. Bypass war-room + meeting quota.
+        self.meeting_caller_id = reporter_id
+        self.meeting_remaining_seconds = MEETING_DURATION_SECONDS
+        self.votes = {}
+        self.meeting_title = f"Body Report: {body.victim_name}"
+        self.phase = Phase.MEETING
+        # Cancel ongoing task holds -- frozen during meeting.
+        for task in self.tasks.values():
+            task.per_player_progress = {}
+            if task.status == "in_progress":
+                task.status = "available"
+
+    def private_state_for(self, player_id: str) -> dict:
+        cd = self.takedown_cooldowns.get(player_id, 0.0)
+        return {"takedownCooldownRemaining": round(cd, 2)}
 
     # --- meeting + voting -------------------------------------------------
 
@@ -802,6 +950,16 @@ class GameRoom:
             "events": [
                 {"seq": e.seq, "severity": e.severity, "message": e.message} for e in self.events
             ],
+            "bodies": [
+                {
+                    "id": b.id,
+                    "x": round(b.x, 2),
+                    "y": round(b.y, 2),
+                    "color": b.color,
+                    "victimName": b.victim_name,
+                }
+                for b in self.bodies.values()
+            ],
         }
 
     def ended_snapshot(self) -> dict:
@@ -876,6 +1034,8 @@ class GameRoom:
         self.last_voting_result = None
         self.events.clear()
         self._next_event_seq = 1
+        self.bodies = {}
+        self.takedown_cooldowns = {}
         for player in self.players.values():
             player.role = None
             player.team = None

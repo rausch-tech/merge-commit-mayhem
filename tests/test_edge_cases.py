@@ -21,7 +21,13 @@ from app.main import app, registry
 
 
 def _make_started_room(player_count: int = 3, seed: int = 0) -> GameRoom:
-    """Create a started GameRoom with *player_count* players."""
+    """Create a started GameRoom with *player_count* players.
+
+    Tier 2.1 chaos-parity: bump 2-player requests to 3 so the new chaos-parity
+    win condition (chaos_alive >= release_alive) does not fire on the first tick.
+    """
+    if player_count < 3:
+        player_count = 3
     room = GameRoom(code="TEST")
     for i in range(player_count):
         room.add_player(f"p{i}")
@@ -122,7 +128,11 @@ def test_host_transfer_chains_through_multiple_disconnects():
 
 def test_last_player_disconnect_in_ended_phase_drops_room():
     """In ENDED phase, _handle_disconnect fully removes the player immediately
-    (no grace period) and drops the room."""
+    (no grace period) and drops the room.
+
+    Uses 3 players so the Tier 2.1 chaos-parity rule does not fire first; the
+    test is about ENDED-phase cleanup, not which winner.
+    """
     with TestClient(app) as client:
 
         @pytest.fixture(autouse=True)
@@ -130,7 +140,11 @@ def test_last_player_disconnect_in_ended_phase_drops_room():
             yield
             registry._rooms.clear()
 
-        with client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+        with (
+            client.websocket_connect("/ws") as ws_a,
+            client.websocket_connect("/ws") as ws_b,
+            client.websocket_connect("/ws") as ws_c,
+        ):
             ws_a.send_json(
                 {"type": "join_room", "payload": {"roomCode": "ECDROP", "playerName": "Alice"}}
             )
@@ -144,25 +158,35 @@ def test_last_player_disconnect_in_ended_phase_drops_room():
             ws_a.receive_json()  # lobby_state broadcast
             ws_b.receive_json()  # lobby_state
 
+            ws_c.send_json(
+                {"type": "join_room", "payload": {"roomCode": "ECDROP", "playerName": "Carol"}}
+            )
+            ws_c.receive_json()  # room_joined
+            ws_a.receive_json()  # lobby_state broadcast
+            ws_b.receive_json()  # lobby_state broadcast
+            ws_c.receive_json()  # lobby_state
+
             ws_a.send_json({"type": "start_game", "payload": {}})
             for _ in range(4):
                 ws_a.receive_json()
             for _ in range(2):
                 ws_b.receive_json()
+            for _ in range(2):
+                ws_c.receive_json()
 
             # Force ENDED.
             room = registry.get("ECDROP")
             assert room is not None
             room.release_progress = 100
 
-            # Drain game_ended from both.
-            for ws in [ws_a, ws_b]:
+            # Drain game_ended from all.
+            for ws in [ws_a, ws_b, ws_c]:
                 for _ in range(60):
                     m = ws.receive_json()
                     if m["type"] == "game_ended":
                         break
 
-        # Both WS closed. In ENDED phase → fully removed immediately, no grace.
+        # All WS closed. In ENDED phase → fully removed immediately, no grace.
         time.sleep(0.1)
         assert registry.get("ECDROP") is None, "Room must be gone after last player leaves ENDED"
 
@@ -229,7 +253,11 @@ def test_disconnect_during_solo_task_hold_releases_task():
 
 def test_rejoin_during_meeting_can_vote():
     """Bob disconnects mid-PLAYING. Alice calls a meeting. Bob rejoins during
-    MEETING and receives game_state with phase=meeting. He can then cast a vote."""
+    MEETING and receives game_state with phase=meeting. He can then cast a vote.
+
+    Uses 3 players (Alice, Bob, Carol) so the Tier 2.1 chaos-parity rule does
+    not fire while the test is mid-flow.
+    """
     with TestClient(app) as client:
 
         @pytest.fixture(autouse=True)
@@ -240,6 +268,7 @@ def test_rejoin_during_meeting_can_vote():
         with (
             client.websocket_connect("/ws") as ws_a,
             client.websocket_connect("/ws") as ws_b,
+            client.websocket_connect("/ws") as ws_c,
         ):
             ws_a.send_json(
                 {"type": "join_room", "payload": {"roomCode": "ECMTG", "playerName": "Alice"}}
@@ -254,11 +283,21 @@ def test_rejoin_during_meeting_can_vote():
             ws_a.receive_json()
             ws_b.receive_json()
 
+            ws_c.send_json(
+                {"type": "join_room", "payload": {"roomCode": "ECMTG", "playerName": "Carol"}}
+            )
+            ws_c.receive_json()  # room_joined
+            ws_a.receive_json()
+            ws_b.receive_json()
+            ws_c.receive_json()
+
             ws_a.send_json({"type": "start_game", "payload": {}})
             for _ in range(2):
                 ws_a.receive_json()
             for _ in range(2):
                 ws_b.receive_json()
+            for _ in range(2):
+                ws_c.receive_json()
 
             room = registry.get("ECMTG")
             alice_id = next(p.id for p in room.players.values() if p.name == "Alice")
@@ -532,21 +571,28 @@ def test_load_map_with_missing_required_field_raises_loudly():
 
 def test_disconnected_chaos_does_not_count_as_eliminated_for_win():
     """A chaos player who disconnects (but is still within grace) is alive but
-    not connected. The all_chaos_eliminated win-condition must NOT fire."""
+    not connected. The all_chaos_eliminated win-condition must NOT fire.
+
+    We use 1 chaos + 2 release so that the Tier 2.1 chaos-parity rule
+    (chaos_alive >= release_alive) does not also fire and confound this test.
+    """
     room = GameRoom(code="WIN")
     chaos = room.add_player("ChaosPerson")
-    release = room.add_player("ReleasePerson")
+    release_a = room.add_player("ReleasePersonA")
+    release_b = room.add_player("ReleasePersonB")
 
     # Force roles manually so the test is deterministic.
     chaos.role = "vibe_coder"
     chaos.team = "chaos_agents"
-    release.role = "developer"
-    release.team = "release_team"
+    release_a.role = "developer"
+    release_a.team = "release_team"
+    release_b.role = "developer"
+    release_b.team = "release_team"
 
     # Simulate start state (no proper start() to avoid role assignment).
     room.phase = Phase.PLAYING
-    room.completed_tasks_by_player = {chaos.id: 0, release.id: 0}
-    room.triggered_sabotages_by_player = {chaos.id: 0, release.id: 0}
+    room.completed_tasks_by_player = {chaos.id: 0, release_a.id: 0, release_b.id: 0}
+    room.triggered_sabotages_by_player = {chaos.id: 0, release_a.id: 0, release_b.id: 0}
     from app.game.game_room import TASK_DEFINITIONS, TaskRuntime
 
     room.tasks = {
@@ -560,9 +606,14 @@ def test_disconnected_chaos_does_not_count_as_eliminated_for_win():
     from app.game.game_room import SABOTAGE_DEFINITIONS, SabotageRuntime
 
     room.sabotages = {s.id: SabotageRuntime(definition=s) for s in SABOTAGE_DEFINITIONS}
-    room.players_with_meeting_left = {chaos.id: True, release.id: True}
+    room.players_with_meeting_left = {
+        chaos.id: True,
+        release_a.id: True,
+        release_b.id: True,
+    }
     chaos.is_alive = True
-    release.is_alive = True
+    release_a.is_alive = True
+    release_b.is_alive = True
 
     # Chaos player disconnects (within grace period).
     room.mark_disconnected(chaos.id)
@@ -587,9 +638,14 @@ def test_disconnected_chaos_does_not_count_as_eliminated_for_win():
 
 
 def test_solo_demo_player_disconnect_room_is_empty_after_grace():
-    """After a solo demo player disconnects and grace expires, the room becomes
-    empty. After the tick sweep the room is empty; the tick loop (fixed in
-    EC15) then drops it from the registry via drop_if_empty."""
+    """After a solo player disconnects in the PLAYING phase and grace expires,
+    the room becomes empty. After the tick sweep the room is empty; the tick
+    loop (fixed in EC15) then drops it from the registry via drop_if_empty.
+
+    Tier 2.1 note: a solo demo round now ends immediately on the first tick
+    (chaos parity: 1 chaos + 0 release). To still exercise the
+    PLAYING-phase grace-expiry sweep we drive a 3-player room here instead.
+    """
     with TestClient(app) as client:
 
         @pytest.fixture(autouse=True)
@@ -597,34 +653,52 @@ def test_solo_demo_player_disconnect_room_is_empty_after_grace():
             yield
             registry._rooms.clear()
 
-        with client.websocket_connect("/ws") as ws:
-            ws.send_json(
-                {
-                    "type": "join_room",
-                    "payload": {"roomCode": "EC15", "playerName": "Solo"},
-                }
-            )
-            ws.receive_json()  # room_joined
-            ws.receive_json()  # lobby_state
+        with (
+            client.websocket_connect("/ws") as ws_a,
+            client.websocket_connect("/ws") as ws_b,
+            client.websocket_connect("/ws") as ws_c,
+        ):
+            for ws, name in [(ws_a, "Alice"), (ws_b, "Bob"), (ws_c, "Carol")]:
+                ws.send_json(
+                    {
+                        "type": "join_room",
+                        "payload": {"roomCode": "EC15", "playerName": name},
+                    }
+                )
+                ws.receive_json()  # room_joined
+            # Drain lobby_state broadcasts on each connection.
+            for _ in range(3):
+                ws_a.receive_json()
+            for _ in range(2):
+                ws_b.receive_json()
+            ws_c.receive_json()
 
-            ws.send_json({"type": "start_game", "payload": {"demo": True}})
-            ws.receive_json()  # private_role
-            ws.receive_json()  # game_state
+            ws_a.send_json({"type": "start_game", "payload": {}})
+            for _ in range(2):
+                ws_a.receive_json()  # private_role + initial game_state
+            for _ in range(2):
+                ws_b.receive_json()
+            for _ in range(2):
+                ws_c.receive_json()
 
             room = registry.get("EC15")
             assert room is not None
-            solo_id = next(iter(room.players))
+            pids = list(room.players.keys())
 
-        # WS closed → _handle_disconnect marks as disconnected (mid PLAYING).
+        # All WS closed → _handle_disconnect marks each as disconnected
+        # (mid PLAYING; phase has not yet ended because chaos_alive < release_alive).
         time.sleep(0.2)
-        assert room.players[solo_id].is_connected is False
+        for pid in pids:
+            if pid in room.players:
+                assert room.players[pid].is_connected is False
 
-        # Force grace into the past.
-        room.players[solo_id].disconnected_at_monotonic = time.monotonic() - (
-            RECONNECT_GRACE_SECONDS + 5
-        )
+        # Force grace into the past for everyone.
+        past = time.monotonic() - (RECONNECT_GRACE_SECONDS + 5)
+        for pid in pids:
+            if pid in room.players:
+                room.players[pid].disconnected_at_monotonic = past
 
-        # Single tick should sweep the player out.
+        # Single tick should sweep all players out.
         room.tick(0.05)
         assert room.is_empty(), "Room must be empty after grace expires"
 

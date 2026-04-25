@@ -142,6 +142,28 @@ class Rejoin(BaseModel):
     payload: RejoinPayload
 
 
+class TriggerTakedownPayload(BaseModel):
+    model_config = _camel_config()
+    target_player_id: str
+
+
+class TriggerTakedown(BaseModel):
+    model_config = _camel_config()
+    type: Literal["trigger_takedown"]
+    payload: TriggerTakedownPayload
+
+
+class ReportBodyPayload(BaseModel):
+    model_config = _camel_config()
+    body_id: str
+
+
+class ReportBody(BaseModel):
+    model_config = _camel_config()
+    type: Literal["report_body"]
+    payload: ReportBodyPayload
+
+
 IncomingMessage = Annotated[
     JoinRoom
     | Rejoin
@@ -153,7 +175,9 @@ IncomingMessage = Annotated[
     | ReturnToLobby
     | CallEmergencyMeeting
     | CastVote
-    | SkipVote,
+    | SkipVote
+    | TriggerTakedown
+    | ReportBody,
     Discriminator("type"),
 ]
 
@@ -198,6 +222,7 @@ class GameStateMsg(BaseModel):
     sabotages: list[dict[str, Any]] = Field(default_factory=list)
     meeting: dict[str, Any] | None = None
     events: list[dict[str, Any]] = Field(default_factory=list)
+    bodies: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class PrivateRoleMsg(BaseModel):
@@ -206,6 +231,11 @@ class PrivateRoleMsg(BaseModel):
     team: str
     description: str
     available_sabotages: list[str] = Field(default_factory=list)
+
+
+class PrivateStateMsg(BaseModel):
+    model_config = _camel_config()
+    takedown_cooldown_remaining: float = 0.0
 
 
 class ErrorMsg(BaseModel):

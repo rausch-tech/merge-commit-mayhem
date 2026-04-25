@@ -78,6 +78,7 @@ export class Renderer {
     this.players = [];
     this.ownPlayerId = null;
     this.tasks = [];
+    this.bodies = [];
     this.localPlayerInRange = null; // task-id of the task within interaction radius for the local player, else null
     this._running = false;
     this.map = null; // populated via setMap()
@@ -92,6 +93,9 @@ export class Renderer {
   }
   setTasks(tasks) {
     this.tasks = tasks;
+  }
+  setBodies(bodies) {
+    this.bodies = bodies || [];
   }
 
   setMap(map) {
@@ -252,6 +256,31 @@ export class Renderer {
       }
     }
     this.localPlayerInRange = inRange;
+
+    // Bodies (rendered BEFORE players so live players draw on top).
+    for (const body of this.bodies) {
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      // Filled circle in the victim's color, slightly desaturated via alpha.
+      ctx.beginPath();
+      ctx.arc(body.x, body.y, PLAYER_RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = body.color || "#475569";
+      ctx.fill();
+      // Darker outline so the body reads as inert vs a live player.
+      ctx.strokeStyle = "rgba(0,0,0,0.85)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // X marker so it's unmistakably "down".
+      ctx.beginPath();
+      ctx.moveTo(body.x - 6, body.y - 6);
+      ctx.lineTo(body.x + 6, body.y + 6);
+      ctx.moveTo(body.x + 6, body.y - 6);
+      ctx.lineTo(body.x - 6, body.y + 6);
+      ctx.strokeStyle = "rgba(15, 23, 42, 0.95)";
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // Players.
     for (const player of this.players) {

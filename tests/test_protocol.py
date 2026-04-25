@@ -11,6 +11,8 @@ from app.protocol import (
     LobbyStateMsg,
     PlayerInput,
     PrivateRoleMsg,
+    PrivateStateMsg,
+    ReportBody,
     ReturnToLobby,
     RoomJoinedMsg,
     SkipVote,
@@ -18,6 +20,7 @@ from app.protocol import (
     TaskHoldStart,
     TaskHoldStop,
     TriggerSabotage,
+    TriggerTakedown,
     VotingResultMsg,
     parse_incoming,
 )
@@ -258,3 +261,55 @@ def test_parse_rejoin():
     assert isinstance(msg, Rejoin)
     assert msg.payload.room_code == "ABCD"
     assert msg.payload.player_id == "abc"
+
+
+# --- Tier 2.1: Take-Down + Body-Report protocol -----------------------------
+
+
+def test_parse_trigger_takedown_camel_case():
+    raw = {"type": "trigger_takedown", "payload": {"targetPlayerId": "abc"}}
+    msg = parse_incoming(raw)
+    assert isinstance(msg, TriggerTakedown)
+    assert msg.payload.target_player_id == "abc"
+
+
+def test_parse_report_body_camel_case():
+    raw = {"type": "report_body", "payload": {"bodyId": "deadbeef"}}
+    msg = parse_incoming(raw)
+    assert isinstance(msg, ReportBody)
+    assert msg.payload.body_id == "deadbeef"
+
+
+def test_private_state_msg_serializes_camel_case():
+    msg = PrivateStateMsg(takedown_cooldown_remaining=12.5)
+    dumped = msg.model_dump(by_alias=True)
+    assert dumped == {"takedownCooldownRemaining": 12.5}
+
+
+def test_private_state_msg_default_zero():
+    msg = PrivateStateMsg()
+    dumped = msg.model_dump(by_alias=True)
+    assert dumped == {"takedownCooldownRemaining": 0.0}
+
+
+def test_game_state_msg_bodies_default_empty_and_round_trip():
+    msg = GameStateMsg(phase="playing", remaining_seconds=300, players=[])
+    dumped = msg.model_dump(by_alias=True)
+    assert "bodies" in dumped
+    assert dumped["bodies"] == []
+
+    body_payload = {
+        "id": "bid",
+        "x": 100.0,
+        "y": 200.0,
+        "color": "#facc15",
+        "victimName": "Ada",
+    }
+    msg2 = GameStateMsg(
+        phase="playing",
+        remaining_seconds=300,
+        players=[],
+        bodies=[body_payload],
+    )
+    dumped2 = msg2.model_dump(by_alias=True)
+    assert dumped2["bodies"] == [body_payload]

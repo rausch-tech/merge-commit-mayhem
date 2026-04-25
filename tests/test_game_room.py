@@ -72,6 +72,15 @@ def test_unique_colors_assigned():
 
 
 def _make_started_room(player_count: int = 3) -> GameRoom:
+    """Spawn a started GameRoom with at least 3 players.
+
+    Tier 2.1's chaos-parity win condition fires on tick when chaos_alive >=
+    release_alive. Tests that tick must keep release in the majority, so we
+    bump 2-player requests to 3 silently — the first two ids stay in deterministic
+    join order, so callers indexing into them still get the expected pair.
+    """
+    if player_count < 3:
+        player_count = 3
     room = GameRoom(code="ABCD")
     host = room.add_player("Sven")
     for i in range(player_count - 1):

@@ -22,7 +22,9 @@ from app.protocol import (
     LobbyStateMsg,
     PlayerInput,
     PrivateRoleMsg,
+    PrivateStateMsg,
     Rejoin,
+    ReportBody,
     ReturnToLobby,
     RoomJoinedMsg,
     SkipVote,
@@ -30,6 +32,7 @@ from app.protocol import (
     TaskHoldStart,
     TaskHoldStop,
     TriggerSabotage,
+    TriggerTakedown,
     VotingResultMsg,
     envelope,
     parse_incoming,
@@ -96,6 +99,19 @@ async def _tick_loop() -> None:
                         await manager.broadcast(
                             room.code, envelope("game_state", _game_state_msg(room))
                         )
+                        # Per-chaos-agent private_state with their take-down
+                        # cooldown. Release-team players don't get this msg
+                        # (avoids cluttering their channel + zero-leak surface).
+                        for session in manager.sessions_in_room(room.code):
+                            player = room.players.get(session.player_id)
+                            if player is None or player.team != "chaos_agents":
+                                continue
+                            await session.ws.send_json(
+                                envelope(
+                                    "private_state",
+                                    PrivateStateMsg(**room.private_state_for(session.player_id)),
+                                )
+                            )
                     if room.last_voting_result is not None:
                         await manager.broadcast(
                             room.code,
@@ -163,6 +179,10 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 await _handle_cast_vote(ws, msg)
             elif isinstance(msg, SkipVote):
                 await _handle_skip_vote(ws)
+            elif isinstance(msg, TriggerTakedown):
+                await _handle_trigger_takedown(ws, msg)
+            elif isinstance(msg, ReportBody):
+                await _handle_report_body(ws, msg)
             elif isinstance(msg, ReturnToLobby):
                 await _handle_return_to_lobby(ws)
     except WebSocketDisconnect:
@@ -369,6 +389,32 @@ async def _handle_skip_vote(ws: WebSocket) -> None:
         return
     try:
         room.skip_vote(voter_id=session.player_id)
+    except GameRoomError as exc:
+        await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+
+
+async def _handle_trigger_takedown(ws: WebSocket, msg: TriggerTakedown) -> None:
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    try:
+        room.apply_takedown(killer_id=session.player_id, target_id=msg.payload.target_player_id)
+    except GameRoomError as exc:
+        await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+
+
+async def _handle_report_body(ws: WebSocket, msg: ReportBody) -> None:
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    try:
+        room.apply_report_body(reporter_id=session.player_id, body_id=msg.payload.body_id)
     except GameRoomError as exc:
         await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
 

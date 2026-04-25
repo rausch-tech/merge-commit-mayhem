@@ -259,23 +259,31 @@ def test_game_state_carries_stats_and_tasks_and_sabotages():
 
 def test_game_ended_broadcast_on_release_win():
     """Drive release_progress to 100 directly via the server-side room and verify
-    a game_ended message goes out to both clients."""
+    a game_ended message goes out to all clients.
+
+    Uses 3 players so the Tier 2.1 chaos-parity rule (chaos_alive >= release_alive)
+    does not fire before release_progress reaches 100.
+    """
     with (
         TestClient(app) as client,
         client.websocket_connect("/ws") as ws_a,
         client.websocket_connect("/ws") as ws_b,
+        client.websocket_connect("/ws") as ws_c,
     ):
         _join(ws_a, "ENDR", "Alice")
         ws_a.receive_json()
         _join(ws_b, "ENDR", "Bob")
         ws_a.receive_json()
         ws_b.receive_json()
+        _join(ws_c, "ENDR", "Carol")
+        ws_a.receive_json()
+        ws_b.receive_json()
+        ws_c.receive_json()
 
         ws_a.send_json({"type": "start_game", "payload": {}})
-        _drain_until(ws_a, "private_role")
-        _drain_until(ws_a, "game_state")
-        _drain_until(ws_b, "private_role")
-        _drain_until(ws_b, "game_state")
+        for ws in [ws_a, ws_b, ws_c]:
+            _drain_until(ws, "private_role")
+            _drain_until(ws, "game_state")
 
         # Server-side: force release_progress to 100 so the next tick ends the round.
         room = registry.get("ENDR")
@@ -295,16 +303,23 @@ def test_game_ended_broadcast_on_release_win():
 
 
 def test_return_to_lobby_requires_host_and_ended_phase():
+    """Uses 3 players so chaos parity (Tier 2.1) doesn't end the round on the
+    first tick before we drive release_progress to 100."""
     with (
         TestClient(app) as client,
         client.websocket_connect("/ws") as ws_a,
         client.websocket_connect("/ws") as ws_b,
+        client.websocket_connect("/ws") as ws_c,
     ):
         _join(ws_a, "RESET", "Alice")
         ws_a.receive_json()
         _join(ws_b, "RESET", "Bob")
         ws_a.receive_json()
         ws_b.receive_json()
+        _join(ws_c, "RESET", "Carol")
+        ws_a.receive_json()
+        ws_b.receive_json()
+        ws_c.receive_json()
 
         # Before start → wrong phase
         ws_a.send_json({"type": "return_to_lobby", "payload": {}})
@@ -316,15 +331,15 @@ def test_return_to_lobby_requires_host_and_ended_phase():
 
         # Start round
         ws_a.send_json({"type": "start_game", "payload": {}})
-        _drain_until(ws_a, "private_role")
-        _drain_until(ws_a, "game_state")
-        _drain_until(ws_b, "private_role")
-        _drain_until(ws_b, "game_state")
+        for ws in [ws_a, ws_b, ws_c]:
+            _drain_until(ws, "private_role")
+            _drain_until(ws, "game_state")
 
         # End the round
         registry.get("RESET").release_progress = 100
         _drain_until(ws_a, "game_ended", max_msgs=50)
         _drain_until(ws_b, "game_ended", max_msgs=50)
+        _drain_until(ws_c, "game_ended", max_msgs=50)
 
         # Non-host tries to reset
         ws_b.send_json({"type": "return_to_lobby", "payload": {}})
@@ -334,12 +349,14 @@ def test_return_to_lobby_requires_host_and_ended_phase():
         assert err["type"] == "error"
         assert err["payload"]["code"] == "NOT_HOST"
 
-        # Host resets → both get lobby_state
+        # Host resets → all get lobby_state
         ws_a.send_json({"type": "return_to_lobby", "payload": {}})
         lob_a = _drain_until(ws_a, "lobby_state")
         lob_b = _drain_until(ws_b, "lobby_state")
-        assert len(lob_a["payload"]["players"]) == 2
-        assert len(lob_b["payload"]["players"]) == 2
+        lob_c = _drain_until(ws_c, "lobby_state")
+        assert len(lob_a["payload"]["players"]) == 3
+        assert len(lob_b["payload"]["players"]) == 3
+        assert len(lob_c["payload"]["players"]) == 3
 
 
 # --- Demo mode (WS) ------------------------------------------------------
@@ -379,22 +396,28 @@ def test_non_demo_single_player_still_rejected():
 
 
 def test_call_emergency_meeting_outside_war_room_returns_error():
+    """Uses 3 players so the Tier 2.1 chaos-parity rule does not end the round
+    before we get to call the meeting."""
     with (
         TestClient(app) as client,
         client.websocket_connect("/ws") as ws_a,
         client.websocket_connect("/ws") as ws_b,
+        client.websocket_connect("/ws") as ws_c,
     ):
         _join(ws_a, "MEET", "Alice")
         ws_a.receive_json()  # lobby
         _join(ws_b, "MEET", "Bob")
         ws_a.receive_json()
         ws_b.receive_json()
+        _join(ws_c, "MEET", "Carol")
+        ws_a.receive_json()
+        ws_b.receive_json()
+        ws_c.receive_json()
 
         ws_a.send_json({"type": "start_game", "payload": {}})
-        _drain_until(ws_a, "private_role")
-        _drain_until(ws_a, "game_state")
-        _drain_until(ws_b, "private_role")
-        _drain_until(ws_b, "game_state")
+        for ws in [ws_a, ws_b, ws_c]:
+            _drain_until(ws, "private_role")
+            _drain_until(ws, "game_state")
 
         ws_a.send_json({"type": "call_emergency_meeting", "payload": {}})
         # Skip interleaved game_state messages while waiting for the error.
@@ -406,22 +429,28 @@ def test_call_emergency_meeting_outside_war_room_returns_error():
 
 
 def test_call_meeting_from_war_room_transitions_to_meeting_phase():
+    """Uses 3 players so chaos parity (Tier 2.1) doesn't end the round before
+    Alice can call the meeting."""
     with (
         TestClient(app) as client,
         client.websocket_connect("/ws") as ws_a,
         client.websocket_connect("/ws") as ws_b,
+        client.websocket_connect("/ws") as ws_c,
     ):
         _join(ws_a, "MEET2", "Alice")
         ws_a.receive_json()
         _join(ws_b, "MEET2", "Bob")
         ws_a.receive_json()
         ws_b.receive_json()
+        _join(ws_c, "MEET2", "Carol")
+        ws_a.receive_json()
+        ws_b.receive_json()
+        ws_c.receive_json()
 
         ws_a.send_json({"type": "start_game", "payload": {}})
-        _drain_until(ws_a, "private_role")
-        _drain_until(ws_a, "game_state")
-        _drain_until(ws_b, "private_role")
-        _drain_until(ws_b, "game_state")
+        for ws in [ws_a, ws_b, ws_c]:
+            _drain_until(ws, "private_role")
+            _drain_until(ws, "game_state")
 
         # Server-side: place Alice in the war room.
         room = registry.get("MEET2")
@@ -443,11 +472,17 @@ def test_call_meeting_from_war_room_transitions_to_meeting_phase():
 
 
 def test_full_voting_round_eliminates_named_target():
+    """Uses 4 players so post-elimination state still keeps release in the
+    majority. After voting Carol out, 3 players remain: Alice, Bob, Dave —
+    the Tier 2.1 chaos-parity rule (chaos_alive >= release_alive) doesn't
+    fire because at most 1 of the 3 is chaos.
+    """
     with (
         TestClient(app) as client,
         client.websocket_connect("/ws") as ws_a,
         client.websocket_connect("/ws") as ws_b,
         client.websocket_connect("/ws") as ws_c,
+        client.websocket_connect("/ws") as ws_d,
     ):
         _join(ws_a, "VOTEFL", "Alice")
         ws_a.receive_json()
@@ -458,9 +493,14 @@ def test_full_voting_round_eliminates_named_target():
         ws_a.receive_json()
         ws_b.receive_json()
         ws_c.receive_json()
+        _join(ws_d, "VOTEFL", "Dave")
+        ws_a.receive_json()
+        ws_b.receive_json()
+        ws_c.receive_json()
+        ws_d.receive_json()
 
         ws_a.send_json({"type": "start_game", "payload": {}})
-        for ws in [ws_a, ws_b, ws_c]:
+        for ws in [ws_a, ws_b, ws_c, ws_d]:
             _drain_until(ws, "private_role")
             _drain_until(ws, "game_state")
 
@@ -468,6 +508,25 @@ def test_full_voting_round_eliminates_named_target():
         alice_id = next(p.id for p in room.players.values() if p.name == "Alice")
         _bob_id = next(p.id for p in room.players.values() if p.name == "Bob")
         carol_id = next(p.id for p in room.players.values() if p.name == "Carol")
+        # Force Carol to be release_team so eliminating her does NOT trigger
+        # the all-chaos-eliminated win, and 3 release survive (vs at most 1
+        # chaos), keeping the round in PLAYING phase post-vote.
+        room.players[carol_id].role = "developer"
+        room.players[carol_id].team = "release_team"
+        # Make sure exactly one of the others is chaos (the rest are release).
+        chaos_now = next(
+            (p for p in room.players.values() if p.id != carol_id and p.team == "chaos_agents"),
+            None,
+        )
+        if chaos_now is None:
+            # No chaos among the others — promote Bob as chaos.
+            room.players[_bob_id].role = "vibe_coder"
+            room.players[_bob_id].team = "chaos_agents"
+            # And demote any other chaos player to release.
+            for p in room.players.values():
+                if p.id != _bob_id and p.team == "chaos_agents":
+                    p.role = "developer"
+                    p.team = "release_team"
         room.players[alice_id].x = 2000.0
         room.players[alice_id].y = 2000.0
 
@@ -479,12 +538,13 @@ def test_full_voting_round_eliminates_named_target():
             if msg["type"] == "game_state" and msg["payload"]["phase"] == "meeting":
                 break
 
-        # Cast votes: Alice + Bob vote Carol; Carol skips.
+        # Cast votes: Alice + Bob + Dave vote Carol; Carol skips.
         ws_a.send_json({"type": "cast_vote", "payload": {"targetPlayerId": carol_id}})
         ws_b.send_json({"type": "cast_vote", "payload": {"targetPlayerId": carol_id}})
+        ws_d.send_json({"type": "cast_vote", "payload": {"targetPlayerId": carol_id}})
         ws_c.send_json({"type": "skip_vote", "payload": {}})
 
-        # Wait for the voting_result broadcast on any of the three sockets.
+        # Wait for the voting_result broadcast on any of the four sockets.
         result = _drain_until(ws_a, "voting_result", max_msgs=120)
         assert result["payload"]["removedPlayerId"] == carol_id
         assert result["payload"]["removedPlayerName"] == "Carol"
@@ -556,19 +616,26 @@ def test_rejoin_with_unknown_player_id_returns_error():
 
 
 def test_meeting_resolves_with_skip_when_only_skips_received():
+    """Uses 3 players so the Tier 2.1 chaos-parity rule does not fire while we
+    drive the meeting to a skip resolution."""
     with (
         TestClient(app) as client,
         client.websocket_connect("/ws") as ws_a,
         client.websocket_connect("/ws") as ws_b,
+        client.websocket_connect("/ws") as ws_c,
     ):
         _join(ws_a, "VOTSK", "Alice")
         ws_a.receive_json()
         _join(ws_b, "VOTSK", "Bob")
         ws_a.receive_json()
         ws_b.receive_json()
+        _join(ws_c, "VOTSK", "Carol")
+        ws_a.receive_json()
+        ws_b.receive_json()
+        ws_c.receive_json()
 
         ws_a.send_json({"type": "start_game", "payload": {}})
-        for ws in [ws_a, ws_b]:
+        for ws in [ws_a, ws_b, ws_c]:
             _drain_until(ws, "private_role")
             _drain_until(ws, "game_state")
 
@@ -585,6 +652,7 @@ def test_meeting_resolves_with_skip_when_only_skips_received():
 
         ws_a.send_json({"type": "skip_vote", "payload": {}})
         ws_b.send_json({"type": "skip_vote", "payload": {}})
+        ws_c.send_json({"type": "skip_vote", "payload": {}})
 
         result = _drain_until(ws_a, "voting_result", max_msgs=120)
         assert result["payload"]["removedPlayerId"] == ""
