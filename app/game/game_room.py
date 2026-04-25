@@ -444,11 +444,11 @@ class GameRoom:
             self._finish_round("chaos_agents", "Das Release-Fenster ist geschlossen.")
 
     def _finish_round(self, winner: str, reason: str) -> None:
+        severity = "info" if winner == "release_team" else "danger"
+        self._emit_event(severity, f"Runde vorbei: {reason}")
         self.phase = Phase.ENDED
         self.winner = winner
         self.win_reason = reason
-        severity = "info" if winner == "release_team" else "danger"
-        self._emit_event(severity, f"Runde vorbei: {reason}")
 
     # --- speed helpers -----------------------------------------------------
 
