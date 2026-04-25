@@ -138,6 +138,34 @@ def test_takedown_self_target_rejected():
     assert exc.value.code == "INVALID_TARGET"
 
 
+def test_takedown_chaos_cannot_kill_chaos():
+    """Friendly fire guard: a chaos agent must not be able to take down another
+    chaos agent. Without this guard, chaos parity could fire against chaos's
+    own team if two chaos agents bumped into each other near a button mash."""
+    room = GameRoom(code="TKDN")
+    ids = [room.add_player(f"p{i}").id for i in range(6)]
+    # Force a fixed role layout: 2 chaos, 4 release.
+    room.start(requesting_player_id=ids[0], rng=random.Random(0))
+    chaos_ids = [pid for pid, p in room.players.items() if p.team == "chaos_agents"]
+    if len(chaos_ids) < 2:
+        # Bump a release player into chaos manually to construct the scenario
+        # (default 6-player rng layout may yield only 1 chaos).
+        release_ids = [pid for pid, p in room.players.items() if p.team == "release_team"]
+        room.players[release_ids[0]].team = "chaos_agents"
+        room.players[release_ids[0]].role = "vibe_coder"
+        chaos_ids.append(release_ids[0])
+        room.takedown_cooldowns[release_ids[0]] = 0.0
+    killer_id, target_id = chaos_ids[0], chaos_ids[1]
+    room.players[killer_id].x, room.players[killer_id].y = 500.0, 500.0
+    room.players[target_id].x, room.players[target_id].y = 500.0, 510.0
+    with pytest.raises(GameRoomError) as exc:
+        room.apply_takedown(killer_id=killer_id, target_id=target_id)
+    assert exc.value.code == "INVALID_TARGET"
+    # Target must remain alive and no body must have been created.
+    assert room.players[target_id].is_alive is True
+    assert room.bodies == {}
+
+
 def test_takedown_only_in_playing_phase():
     room, _ = _started_room()
     chaos_id, release_ids = _split_by_team(room)

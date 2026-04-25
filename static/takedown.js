@@ -32,6 +32,7 @@ export class TakedownButton {
     for (const p of this._players) {
       if (p.id === this._ownPlayerId) continue;
       if (p.isAlive === false) continue;
+      if (p.isConnected === false) continue;
       const dx = me.x - p.x;
       const dy = me.y - p.y;
       const distSq = dx * dx + dy * dy;

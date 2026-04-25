@@ -677,6 +677,11 @@ class GameRoom:
             raise GameRoomError(
                 code="INVALID_TARGET", message="Du kannst dich nicht selbst killen."
             )
+        if target.team == "chaos_agents":
+            raise GameRoomError(
+                code="INVALID_TARGET",
+                message="Chaos-Agenten koennen sich nicht gegenseitig ausschalten.",
+            )
         dx = killer.x - target.x
         dy = killer.y - target.y
         if (dx * dx + dy * dy) > (TAKEDOWN_RADIUS * TAKEDOWN_RADIUS):

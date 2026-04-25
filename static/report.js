@@ -18,6 +18,7 @@ export class ReportButton {
     if (this.btn.disabled) return;
     const body = this._closestValidBody();
     if (!body) return;
+    this.btn.disabled = true;
     this.ws.send("report_body", { bodyId: body.id });
   }
 
