@@ -5,6 +5,7 @@ import { Hud } from "./hud.js";
 import { TaskList } from "./tasks.js";
 import { SabotagePanel } from "./sabotages.js";
 import { EndscreenOverlay } from "./endscreen.js";
+import { playTaskComplete, wireGlobalClickSound } from "./audio.js";
 
 const state = {
   playerId: null,
@@ -14,6 +15,8 @@ const state = {
   players: [],
   ownRole: null,
 };
+
+const previousTaskStatus = {};  // taskId -> last seen status
 
 const els = {
   joinForm: document.getElementById("join-form"),
@@ -110,6 +113,13 @@ ws.on("game_state", (payload) => {
   renderer.setPlayers(payload.players);
   renderer.setTasks(payload.tasks || []);
   taskList.render(payload.tasks || []);
+  for (const t of payload.tasks || []) {
+    const prev = previousTaskStatus[t.id];
+    if (prev === "in_progress" && t.status === "cooldown") {
+      playTaskComplete();
+    }
+    previousTaskStatus[t.id] = t.status;
+  }
   hud.setTimer(payload.remainingSeconds);
   hud.setStats({
     releaseProgress: payload.releaseProgress,
@@ -140,3 +150,4 @@ els.btnStart.addEventListener("click", () => {
 attachInput(ws);
 attachTaskInteraction(ws, renderer);
 ws.connect();
+wireGlobalClickSound();

@@ -316,6 +316,12 @@ async def _handle_disconnect(ws: WebSocket) -> None:
 # scopes — otherwise a stray ws:// to anything other than /ws would crash
 # StaticFiles with AssertionError. The root path is served explicitly below.
 _static_dir = Path(__file__).parent.parent / "static"
+_images_dir = Path(__file__).parent.parent / "images"
+_sounds_dir = Path(__file__).parent.parent / "sounds"
+if _images_dir.exists():
+    app.mount("/images", StaticFiles(directory=_images_dir), name="images")
+if _sounds_dir.exists():
+    app.mount("/sounds", StaticFiles(directory=_sounds_dir), name="sounds")
 app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
 
