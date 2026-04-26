@@ -17,6 +17,7 @@ import { TakedownButton } from "./takedown.js";
 import { ReportButton } from "./report.js";
 import { InGameMenu } from "./menu.js";
 import { MiniGameModal } from "./minigames/base.js";
+import { TouchControls } from "./touch-controls.js";
 
 const SESSION_KEY = "mcm.session";
 
@@ -434,6 +435,47 @@ attachInput(ws);
 attachTaskInteraction(ws, renderer, () => miniGameModal.isOpen());
 attachRepairInteraction(ws, renderer);
 attachVentInteraction(ws, renderer);
+
+// Quick-hack mobile controls. Activated only when the device exposes a
+// coarse pointer (touchscreen). Maps onto the same WS messages as keyboard.
+const isTouch = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+if (isTouch) {
+  document.body.classList.add("touch-active");
+  const touchEl = document.getElementById("touch-controls");
+  touchEl.classList.remove("hidden");
+  let lastTaskHoldId = null;
+  new TouchControls(touchEl, {
+    onMove: (axis) => ws.send("player_input", axis),
+    onTaskDown: () => {
+      const taskId = renderer.localPlayerInRange;
+      if (!taskId) return;
+      lastTaskHoldId = taskId;
+      ws.send("task_hold_start", { taskId });
+    },
+    onTaskUp: () => {
+      if (lastTaskHoldId === null) return;
+      // While a mini-game modal is open, the cancel-button owns the stop;
+      // suppress here as on keyboard E-up.
+      const stoppedId = lastTaskHoldId;
+      lastTaskHoldId = null;
+      if (miniGameModal.isOpen()) return;
+      ws.send("task_hold_stop", { taskId: stoppedId });
+    },
+    onRepair: () => {
+      const sabotageId = renderer.localPlayerNearPanel;
+      if (!sabotageId) return;
+      ws.send("repair_sabotage", { sabotageId });
+    },
+    onVent: () => {
+      const vent = renderer.localPlayerNearVent;
+      if (!vent || !vent.connectedTo?.length) return;
+      // Cycle locally: pick first connection on each tap (server validates).
+      const targetVentId = vent.connectedTo[0];
+      ws.send("use_vent", { targetVentId });
+    },
+    onMenu: () => menu.toggle(),
+  });
+}
 ws.onOpen(() => {
   const session = loadSession();
   if (session && session.roomCode && session.playerId) {

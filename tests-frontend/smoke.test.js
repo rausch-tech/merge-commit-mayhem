@@ -22,6 +22,7 @@ const modules = [
   "../static/minigames/base.js",
   "../static/minigames/registry.js",
   "../static/minigames/test_suite_repair.js",
+  "../static/touch-controls.js",
 ];
 
 describe("static module smoke", () => {
