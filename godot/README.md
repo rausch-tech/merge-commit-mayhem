@@ -8,7 +8,7 @@ Bootstrapping-Spike für den späteren Tier-4-Godot-Client.
 
 ## Was das ist
 
-Schmaler Godot-4.3-Client, der gegen den existierenden FastAPI-Backend
+Schmaler Godot-4.6-Client, der gegen den existierenden FastAPI-Backend
 WebSocket spricht. Validiert Protokoll-Erwartungen, kein Gameplay.
 
 Vollständige Doku: `../docs/superpowers/specs/2026-04-26-godot-spike-design.md`
@@ -16,14 +16,30 @@ und `../docs/CLIENT.md` (inkl. Test-Plan in Sektion 6).
 
 ## Voraussetzungen
 
-- **Godot 4.3 LTS** ([Download](https://godotengine.org/download))
+- **Godot 4.6** ([Download](https://godotengine.org/download))
 - **MCM-Backend** läuft lokal: `cd .. && uv run uvicorn app.main:app --reload`
 
 ## Projekt öffnen
 
-1. Godot 4.3 starten.
+1. Godot 4.6 starten.
 2. Project Manager → "Import" → `godot/project.godot` wählen.
 3. "Import & Edit".
+
+### Setup auf Windows + WSL2 (Sven's Setup)
+
+Backend läuft in WSL, Godot-Editor auf Windows. Path-Mapping und
+Networking:
+
+- **Project öffnen:** im Godot-Project-Manager unter Windows den UNC-Pfad eingeben:
+  `\\wsl.localhost\Ubuntu\home\sr\se\mcm\.worktrees\godot-spike\godot\project.godot`
+  (Distro-Name ggf. ersetzen — `wsl -l` zeigt deine Distros).
+- **Backend-Connect:** WSL2 forwarded `localhost:8000` standardmäßig nach
+  Windows. Im Connect-UI bleibt `ws://localhost:8000/ws` korrekt.
+  Falls das nicht klappt (manche WSL-Konfigurationen blocken inbound):
+  in WSL `ip addr show eth0` → `inet`-Zeile, IP statt `localhost` benutzen.
+- **Performance:** UNC-Pfade sind langsamer als nativer Windows-FS, aber für
+  einen Spike vollkommen ausreichend. Falls Editor-Hänger nerven: Repo
+  einmal nach `C:\` clonen (Backend bleibt in WSL). Fürs erste reicht UNC.
 
 ## Spike starten
 

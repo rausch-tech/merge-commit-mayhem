@@ -2,10 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> **Roadmap-Update 2026-04-27:** Tier 3 heißt jetzt „Mini-Games (Task-Tiefe)", die Godot-Migration
-> ist auf **Tier 4** gewandert. Tier-Referenzen unten beziehen sich auf den Stand bei Plan-Erstellung
-> (2026-04-26). Aktuelle Nummerierung in `docs/ROADMAP.md` und in den Resume-Notes.
-> Der Plan wurde inline implementiert und ist abgeschlossen — siehe Resume-Notes für Status.
+> **Updates 2026-04-27:**
+> - **Roadmap restrukturiert:** Tier 3 = Mini-Games, Godot-Migration ist Tier 4.
+>   Tier-Referenzen unten = Stand bei Plan-Erstellung.
+> - **Godot-Version:** Plan sagte „4.3 LTS" — falsch (Godot hat kein offizielles LTS).
+>   Aktuell verwendet wird **4.6** stable.
+> - **Sven's Setup:** Windows + WSL2 (Backend in WSL, Godot-Editor auf Windows).
+>
+> Der Plan wurde inline implementiert und ist abgeschlossen — siehe Resume-Notes
+> (`docs/superpowers/notes/2026-04-26-godot-spike-resume.md`) für Status und Setup-Details.
 
 **Goal:** Schmaler Godot-4.3-Client gegen den existierenden FastAPI-Backend, der das WS-Protokoll real validiert, `docs/CLIENT.md` mit gemessenen Werten füllt und ein Skelett für Tier 3 hinterlässt.
 

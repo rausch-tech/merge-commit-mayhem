@@ -10,7 +10,7 @@
 
 ## TL;DR
 
-Der gesamte **Spike-Code ist geschrieben und committet** auf `slice/godot-spike` (6 Commits, gebrancht von `main`). Was noch fehlt, ist **Runtime-Verification mit echtem Godot 4.3 Editor** (Test-Plan in `docs/CLIENT.md §6`). Backend ist nicht angefasst. Pre-Spike-Doku-Lücken in `docs/PROTOCOL.md` und `docs/maps.md` wurden auf `main` gefixt.
+Der gesamte **Spike-Code ist geschrieben und committet** auf `slice/godot-spike` (mittlerweile 10+ Commits, gebrancht von `main`). Was noch fehlt, ist **Runtime-Verification mit echtem Godot 4.6 Editor** (Test-Plan in `docs/CLIENT.md §6`). Backend ist nicht angefasst. Pre-Spike-Doku-Lücken in `docs/PROTOCOL.md` und `docs/maps.md` wurden auf `main` gefixt.
 
 **Nichts wurde gepusht.** Branch ist lokal.
 
@@ -42,20 +42,38 @@ Während der Spike pausierte, wurden auf `main` 14 Commits gemerged:
 
 ## Wenn du wieder einsteigst — die ersten 10 Minuten
 
-1. **Godot 4.3 LTS installieren**, falls noch nicht: <https://godotengine.org/download/archive/4.3-stable/>. Linux-AppImage reicht.
-2. **In den Worktree wechseln:**
+**Sven's Setup:** Windows + WSL2. Backend (`uv run uvicorn`) läuft in WSL, Godot-Editor auf Windows. Claude hat nur Zugriff auf WSL — Iteration-Loop ist: du siehst was in Windows-Godot passiert, sagst mir Bescheid, ich fixe Code in WSL, du F5 nochmal.
+
+1. **Godot 4.6 auf Windows installieren**, falls noch nicht: <https://godotengine.org/download> (Standard-Variante reicht, kein .NET-Build nötig).
+2. **In WSL: in den Worktree wechseln und Status prüfen:**
    ```bash
    cd /home/sr/se/mcm/.worktrees/godot-spike
    git status     # erwartet: clean, on slice/godot-spike
    ```
-3. **Backend in einem zweiten Terminal vom Main-Repo aus starten** (Backend-Code lebt auf `main`, nicht auf dem Spike-Branch):
+3. **In WSL: Backend in einem zweiten Terminal starten** (Backend-Code lebt auf `main`, nicht auf dem Spike-Branch):
    ```bash
    cd /home/sr/se/mcm
    uv run uvicorn app.main:app --reload
    ```
-4. **Test-Plan abarbeiten:** `docs/CLIENT.md §6` listet vier konkrete Akzeptanzpfade (Connect, Map-Layout, Movement, Reconnect). Die ersten drei sind je < 2 Minuten, Reconnect-Test ca. 5 Minuten.
+4. **Auf Windows: Godot-Project-Manager → Import →** UNC-Pfad eingeben:
+   `\\wsl.localhost\Ubuntu\home\sr\se\mcm\.worktrees\godot-spike\godot\project.godot`
+   (`wsl -l` in PowerShell zeigt deine Distros, falls "Ubuntu" nicht passt).
+5. **Test-Plan abarbeiten:** `docs/CLIENT.md §6` listet vier konkrete Akzeptanzpfade (Connect, Map-Layout, Movement, Reconnect). Die ersten drei sind je < 2 Minuten, Reconnect-Test ca. 5 Minuten.
 
-Erwartetes Ergebnis: alles grün, ggf. ein oder zwei kleinere Bugs (typische Godot-4-Quirks bei der ersten echten Ausführung).
+Erwartetes Ergebnis: alles grün, ggf. ein oder zwei kleinere Bugs (typische Godot-4-Quirks bei der ersten echten Ausführung) plus möglicherweise ein WSL-Networking-Issue (siehe nächste Sektion).
+
+---
+
+## Windows + WSL2 — Setup-Spezifika
+
+- **File-Access:** Windows-Godot greift auf WSL-Files via UNC-Pfad zu (`\\wsl.localhost\<Distro>\...`). Funktioniert nativ ohne Mount, ist aber langsamer als lokal. Für einen Spike vollkommen OK; falls Editor-Hänger frustrieren, Worktree einmal nach `C:\` kopieren (Backend bleibt in WSL — nur die Godot-Dateien müssen auf Windows-FS liegen). Aber: zuerst UNC versuchen.
+- **WebSocket-Connect:** WSL2 forwarded `localhost:8000` standardmäßig nach Windows. Connect-URL bleibt `ws://localhost:8000/ws`. Falls der Connect failt:
+  - In WSL: `ip addr show eth0 | grep inet` → `inet 172.x.x.x/...`-Zeile, die IP nehmen.
+  - Im Godot-Connect-UI: `ws://172.x.x.x:8000/ws` statt `localhost`.
+  - Oder `ip route show | grep -i default` zeigt die Windows-Host-IP — die ist auch erreichbar.
+  - Falls das auch nicht klappt: Windows-Firewall könnte inbound TCP 8000 blocken; uvicorn zusätzlich auf `0.0.0.0` binden: `uv run uvicorn app.main:app --host 0.0.0.0 --reload`.
+- **Path-Limit:** Windows hat eine 260-Zeichen-Path-Limitation by default. Der UNC-Pfad oben + Godot-Cache-Files im `.godot/`-Subfolder kann das überschreiten. Falls beim Editor-Import seltsame "path too long"-Fehler kommen: in Windows long-paths aktivieren (`gpedit.msc` → Computer Configuration → Administrative Templates → System → Filesystem → "Enable Win32 long paths"), oder Worktree näher an die Wurzel verschieben.
+- **Iteration-Loop:** Du testest in Windows-Godot. Wenn was kaputt ist, sagst du mir genau was (Editor-Fehler, Verbindung scheitert, Box rendert falsch). Ich edite die Files in WSL — Windows-Godot sieht die Änderungen sofort, Auto-Reload funktioniert oft, sonst Editor neu laden. F5 nochmal.
 
 ---
 
@@ -63,7 +81,7 @@ Erwartetes Ergebnis: alles grün, ggf. ein oder zwei kleinere Bugs (typische God
 
 ```
 godot/                          # NEU: Godot-Subfolder
-├── project.godot               # 4.3-Konfig, gl_compatibility-Renderer (Web-Export-tauglich)
+├── project.godot               # 4.6-Konfig, gl_compatibility-Renderer (Web-Export-tauglich)
 ├── icon.svg                    # Platzhalter
 ├── README.md                   # How-to-run
 ├── scenes/
@@ -123,7 +141,7 @@ Wir haben den Plan zwar als Skript benutzt, aber inline implementiert (kein Suba
 
 Funktional identisch zum Plan. Nur weniger Atomicity, dafür schnellere Iteration. Falls Runtime-Tests Bugs aufdecken, einfach Fix-Commits oben drauf.
 
-**Eine kleine Plan-Abweichung in `main.gd::_switch_to_world()`:** Statt `_ws.reparent(world)` und Mein-Self-Hide nutze ich `add_child.call_deferred(world) + await get_tree().process_frame`. Begründung: Reparent in Godot 4.3 kann während Signal-Dispatch Crashes verursachen wenn der WSClient gerade ein Message-Signal feuert. Das ist die robustere Variante. Der Plan ist hier theoretisch, mein Code praktisch.
+**Eine kleine Plan-Abweichung in `main.gd::_switch_to_world()`:** Statt `_ws.reparent(world)` und Mein-Self-Hide nutze ich `add_child.call_deferred(world) + await get_tree().process_frame`. Begründung: Reparent in Godot 4.x kann während Signal-Dispatch Crashes verursachen wenn der WSClient gerade ein Message-Signal feuert. Das ist die robustere Variante. Der Plan ist hier theoretisch, mein Code praktisch.
 
 ---
 
@@ -131,7 +149,7 @@ Funktional identisch zum Plan. Nur weniger Atomicity, dafür schnellere Iteratio
 
 In Reihenfolge der Priorität:
 
-1. **Godot lokal installieren.** Godot 4.3 LTS, nicht 4.4 (LTS-Argument für langen Tier-4-Sprint).
+1. **Godot lokal installieren.** Godot 4.6 (aktuelle stable, Stand 2026-04-27). Eine ursprüngliche Version der Spec hatte „4.3 LTS" — das war ein Fehler von Claude, Godot hat kein offizielles LTS-Programm.
 2. **Test-Plan durchlaufen** (`docs/CLIENT.md §6`):
    - Test 1 (Connect+Lobby): erwartet grün out-of-the-box.
    - Test 2 (Map-Layout): wahrscheinlich grün, Camera2D-Zoom evtl. justieren wenn der Browser-Editor-Vergleich zeigt dass Map nicht zentriert ist.
@@ -146,9 +164,9 @@ In Reihenfolge der Priorität:
 
 ## Bekannte Risiken / mögliche Stolpersteine bei Runtime-Verify
 
-- **Godot 4.3 `Dictionary.hash()` in `input_sender.gd`:** Ich verlasse mich darauf, dass zwei Dictionaries mit gleichen Keys/Values gleichen Hash haben. In Godot 4 ist das so — falls nicht, fallback auf direkten Vergleich der vier Bool-Felder.
+- **Godot 4.x `Dictionary.hash()` in `input_sender.gd`:** Ich verlasse mich darauf, dass zwei Dictionaries mit gleichen Keys/Values gleichen Hash haben. In Godot 4 ist das so — falls nicht, fallback auf direkten Vergleich der vier Bool-Felder.
 - **`Color(hex)` mit `#RRGGBB`-Strings:** Funktioniert in Godot 4 ab 4.0 — sollte safe sein.
-- **`draw_string` ohne expliziten Font:** `ThemeDB.fallback_font` ist die korrekte 4.3-API (war früher `Theme.get_default_font()`).
+- **`draw_string` ohne expliziten Font:** `ThemeDB.fallback_font` ist die korrekte 4.x-API (war in 3.x `Theme.get_default_font()`).
 - **`World`-Scene-Reparent:** Die `call_deferred + process_frame`-Logik in `_switch_to_world()` sollte sauber sein, aber wenn der Spike beim Connect crashed, ist das der erste Verdächtige.
 - **WSClient-Signals nach `add_child(world)`:** Da `_ws` Kind von Main bleibt (wir hängen NICHT um), bleiben Signals zu `_on_message` verbunden. Renderer-Updates laufen über `_renderer`-Referenz. Sollte funktionieren.
 
@@ -166,5 +184,5 @@ In Reihenfolge der Priorität:
 
 - **Brainstorming-Entscheidung war:** Mono-Repo, nicht separates Repo (Begründung in Spec §4: Protokoll-Drift wäre größtes Risiko).
 - **Spike-Scope-Entscheidung:** Option C (Connect + Lobby + Map + Player + Interpolation), nicht A oder B. Begründung: ohne Map-Render-Validation wäre Koordinaten-Konvention nur theoretisch.
-- **Godot-Version-Entscheidung:** 4.3 LTS, nicht 4.4 latest. Begründung: Tier 4 ist langer Sprint (~5–7 Wochen), LTS reduziert Breakage.
+- **Godot-Version-Entscheidung (revidiert 2026-04-27):** Godot 4.6 (aktuell stable). Original-Spec hatte „4.3 LTS" mit dem Argument „LTS reduziert Breakage" — beides falsch: Godot hat kein offizielles LTS-Programm, und für ein neu beginnendes Skelett ist die aktuelle stable das Richtige (frischste Bug-Fixes, Community-Docs/Tutorials). Sven hat den Fehler bemerkt, korrigiert in Commit nach `8fff9bd`.
 - **Implementation-Style-Entscheidung:** Inline statt Subagent-Driven. Begründung: Subagent-Overhead (Implementer + 2 Reviews pro Task) lohnt sich nicht für Spike-Code, der eh visuelle Acceptance braucht.

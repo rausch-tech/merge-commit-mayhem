@@ -8,7 +8,7 @@
 > mit *real gemessenen* Werten gefüllt. Sektionen mit `[VERIFY:Phase-X]` werden im Spike validiert.
 >
 > **Status (Stand 2026-04-26):** Spike-Code ist auf Branch `slice/godot-spike` committet, aber
-> noch nicht in Godot 4.3 Editor live ausgeführt (lokaler Editor fehlt). Werte mit
+> noch nicht in Godot 4.6 Editor live ausgeführt (Sven's Setup: WSL2 = Backend, Windows = Godot). Werte mit
 > `[VERIFY:Phase-X]` sind theoretisch korrekt nach Plan, brauchen aber Runtime-Verification
 > sobald Godot installiert ist — siehe Sektion 6 unten.
 
@@ -61,7 +61,9 @@ Weitere Lücken kommen hier rein, sobald der Spike runtime-verifiziert wurde.
 
 ## 6. Test-Plan (für Runtime-Verification mit Godot)
 
-Sobald Godot 4.3 LTS lokal installiert ist, einmal alle vier Akzeptanzpfade durchlaufen und die Marker oben mit gemessenen Werten ersetzen. Voraussetzung: Backend läuft (`uv run uvicorn app.main:app --reload`), Browser-Tab unter `http://localhost:8000/` joint Raum `ABCD` mit Name "Browser".
+Sobald Godot 4.6 lokal installiert ist, einmal alle vier Akzeptanzpfade durchlaufen und die Marker oben mit gemessenen Werten ersetzen. Voraussetzung: Backend läuft (`uv run uvicorn app.main:app --reload`), Browser-Tab unter `http://localhost:8000/` joint Raum `ABCD` mit Name "Browser".
+
+**Sven's Setup (Windows + WSL2):** Backend in WSL, Godot-Editor auf Windows. Project-Path im Godot-Project-Manager: `\\wsl.localhost\Ubuntu\home\sr\se\mcm\.worktrees\godot-spike\godot\project.godot`. Connect-URL bleibt `ws://localhost:8000/ws` (WSL2 forwarded localhost). Falls Connect failed: in WSL `ip addr show eth0` → `inet`-IP statt `localhost` verwenden. Details siehe `godot/README.md`.
 
 ### Test 1 — Connect & Lobby (validiert §1, §3 partiell)
 1. Godot-Editor → Project Manager → Import `godot/project.godot`.

@@ -4,10 +4,14 @@
 **Datum:** 2026-04-26
 **Roadmap-Verortung:** Vorbereitung für Tier 3, läuft parallel zu Tier 1.9 / Tier 2 ohne deren Reihenfolge zu ändern.
 
-> **Roadmap-Update 2026-04-27:** Die Roadmap wurde nach Spec-Erstellung restrukturiert. Tier 3 ist
-> jetzt „Mini-Games (Task-Tiefe)", die Godot-Migration ist auf **Tier 4** gewandert. Inhaltlich
-> ändert das am Spike nichts — alle Tier-3-Referenzen unten beziehen sich auf das, was inzwischen
-> Tier 4 heißt. Aktuelle Tier-Nummerierung steht in `docs/ROADMAP.md` und in den Resume-Notes
+> **Updates 2026-04-27:**
+> - **Roadmap restrukturiert:** Tier 3 ist jetzt „Mini-Games (Task-Tiefe)", die Godot-Migration ist
+>   auf **Tier 4** gewandert. Tier-3-Referenzen unten = inzwischen Tier 4.
+> - **Godot-Version korrigiert:** Spec sagte „4.3 LTS" — falsch, Godot hat kein offizielles LTS-Programm.
+>   Aktuell ist 4.6 stable, das ist auch im Spike eingestellt.
+> - **Sven's Setup:** Windows + WSL2 (Backend in WSL, Godot-Editor auf Windows).
+>
+> Aktuelle Tier-Nummerierung und Setup-Spezifika in `docs/ROADMAP.md` und in den Resume-Notes
 > (`docs/superpowers/notes/2026-04-26-godot-spike-resume.md`).
 
 ---

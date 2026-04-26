@@ -146,7 +146,7 @@ Naming-Prinzip: nerdig, dev-thematisch, „kill" wird vermieden zugunsten von ha
 | P4.1 | `docs/CLIENT.md` mit Koordinaten/Tick/Reconnect-Sektionen + Test-Plan                                                              | ✅ done                                 |
 | P4.2 | Spike-Code: Connect, Map-Render, Player-Boxen, Input mit Snapshot-Interpolation                                                    | ✅ done                                 |
 | P4.3 | Pre-Spike-Doku-Fixes auf `main` (PROTOCOL.md: rejoin/multi-map/game_state/private_state, maps.md: Map-Größe, REJOIN_NOT_AVAILABLE) | ✅ done                                 |
-| P4.4 | Runtime-Verification mit echtem Godot 4.3 Editor — siehe `docs/CLIENT.md §6` Test-Plan                                             | offen (wartet auf lokalen Godot-Editor) |
+| P4.4 | Runtime-Verification mit echtem Godot 4.6 Editor (Sven's Setup: WSL2 + Windows) — siehe `docs/CLIENT.md §6`                       | offen (wartet auf Godot-Install)        |
 
 **Spec:** `docs/superpowers/specs/2026-04-26-godot-spike-design.md`. **Plan:** `docs/superpowers/plans/2026-04-26-godot-spike.md`. **Resume-Notes:** `docs/superpowers/notes/2026-04-26-godot-spike-resume.md`.
 
