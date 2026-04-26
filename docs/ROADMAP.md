@@ -6,19 +6,35 @@ Dieses Dokument ist der **eine** Plan. Es ist die Wahrheit über den Stand und d
 
 ---
 
-## Stand (2026-04-25)
+## Stand (2026-04-26)
 
-|                        |                                                                                                                                 |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Repo**               | https://github.com/rausch-tech/merge-commit-mayhem                                                                              |
-| **Live (Test-Server)** | https://game.prod-is-lava.dev                                                                                                   |
-| **Backend-Tests**      | 207 grün (`uv run pytest`)                                                                                                      |
-| **Stack**              | Python 3.12 + FastAPI + Pydantic v2 + WebSockets, Vanilla JS + Canvas, Map als JSON-Daten                                       |
-| **Geshippt**           | 8 getaggte Slices: lobby-movement → game-loop → scrolling-camera → spritesheets → character-sprites → walls → voting → map-data |
+|                         |                                                                                                                                                                                                                                                                                                                       |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Repo**                | https://github.com/rausch-tech/merge-commit-mayhem                                                                                                                                                                                                                                                                    |
+| **Live (Test-Server)**  | https://game.prod-is-lava.dev                                                                                                                                                                                                                                                                                         |
+| **Backend-Tests**       | 433 grün (`uv run pytest`)                                                                                                                                                                                                                                                                                            |
+| **Frontend-Tests**      | 27 grün (`npx vitest run`)                                                                                                                                                                                                                                                                                            |
+| **Stack**               | Python 3.12 + FastAPI + Pydantic v2 + WebSockets, Vanilla JS + Canvas, Map als JSON-Daten, Vitest + happy-dom für Frontend-Smoke                                                                                                                                                                                      |
+| **Geshippte Tier 0–3**  | Foundation cleanup, Mechanik-Komplettierung, Among-Us-Features, Mini-Game-Framework — alles auf Live deployt                                                                                                                                                                                                          |
+| **Geshippte Slice-IDs** | lobby-movement → game-loop → scrolling-camera → spritesheets → character-sprites → walls → voting → map-data → eventfeed → incidents → tasks-1.4 → sabotages-1.4 → multi-chaos → audio-mute → map-editor → multi-map → in-game-menu → take-down → spectator → lights-out → vents → comms-outage → minigames-framework |
 
-Was funktioniert: drei Browser-Tabs joinen einen Raum, Host startet, Rollen werden privat verteilt, Spieler bewegen sich mit WASD durch eine 2400×1600-Karte mit Räumen + Wänden + Türen, machen Tasks, Chaos sabotiert, Voting im War Room kann Spieler eliminieren, Endscreen mit Rollen-Reveal. Demo-Mode für Solo-Test.
+**Was funktioniert (Live, Stand 2026-04-26):**
 
-Was noch nicht: vents, killable players + body discovery, lights/comms-Sabotage, eventfeed, take-down-Mechanik. Außerdem: Code-Hygiene (kein Lint, keine CI, keine Frontend-Tests), Doku unvollständig (kein protocol.md, kein contributing.md), 4 Tasks und 3 Sabotagen sind nach 5 min repetitiv.
+- 4–12 Spieler joinen einen Raum (Multi-Map-Auswahl in Lobby, Map-Editor unter `/editor`).
+- 4800×3200-Map mit Räumen, Wänden, Türen, Vents, Sabotage-Panels. Camera scrollt am Spieler.
+- Rollen werden privat verteilt (vibe_coder/developer, mehrere Chaos ab 7 Spielern).
+- Hold-E auf 7 von 8 Tasks; `fix_unit_tests` startet das Mini-Game „Test-Suite reparieren" (klick 5 Tests in numerischer Reihenfolge).
+- 7 Sabotagen: ci_cd_red, coffee_outage, mandatory_meeting, merge_conflict_storm, fake_customer_request, flaky_tests, lights_out (Vignette + Repair am Panel im Server-Room), comms_outage (Slack-Down: Tasks + andere Sabotagen blockiert, Repair am Panel im War-Room).
+- Take-Down + Body-Discovery + Report-Trigger; Spectator-Mode für Geister (können noch Tasks erledigen).
+- Vents: Chaos-only Teleport-Netzwerk, V-Taste cycelt durch Verbindungen.
+- Voting + Endscreen mit Rollen-Reveal; In-Game-Menü via ESC mit Lobby verlassen / Runde beenden / Audio.
+- Eventfeed rechts neben Canvas; konsistente HUD-Stats (Release, Pipeline, Coffee, Incidents, Timer, Rolle).
+- Auto-Deploy auf jedem main-Push via GitHub Actions; CI gates pytest + vitest + ruff (lint+format) + prettier.
+
+**Offen vor dem Godot-Sprint:**
+
+- 0.13 Live-Test mit Team — die einzige Tier-0-Lücke; bestätigt Tier 0–3 in echter Spielsituation.
+- Asset-Pipeline-Entscheidung (Tier 4.0.x) bevor Tier 4 startet.
 
 ---
 
@@ -214,17 +230,17 @@ Diese Tier ist absichtlich vage — was hier passiert hängt davon ab wie das Ga
 
 ## Was als nächstes konkret zu tun ist
 
-**Aktueller Stand (2026-04-26):** Tier 0–2 sind durch (außer 0.13 Live-Test). Browser-Client deckt das gesamte Among-Us-Feature-Set ab.
+**Aktueller Stand (2026-04-26):** Tier 0–3 sind durch (außer 0.13 Live-Test). Browser-Client deckt das gesamte Among-Us-Feature-Set ab + Mini-Game-Framework mit erstem Beispiel.
 
-**Als nächstes:** Tier 3 — Mini-Game-Framework + erstes Beispiel (~3 Tage). Pattern-Klarheit vor Godot.
+**Als nächstes:** **Tier 0.13 Live-Test mit Team** — bestätigt das Bauwerk in echter Spielsituation, surface Bugs bevor wir den Godot-Sprint starten. Plus iterative Mini-Game-Erweiterungen (Tier-3-Slices) je nachdem welche Tasks sich auf Live als platt anfühlen.
 
-**Danach:** Tier 0.13 Live-Test mit Team — bestätigt Tier 0–3 in echter Spielsituation, surfact Bugs vor dem Godot-Sprint.
+**Vor Godot:** Asset-Pipeline-Entscheidung (Tier 4.0.x) — Pixel-Art-Pack einkaufen vs. AI-generierte DevOps-Sprites. Sven entscheidet.
 
 **Wochen 1–7 ab Godot-Start:** Tier 4 (Godot-Migration mit Polish).
 
 **Anschließend:** Tier 5–7 als ongoing Slices.
 
-Mit Asset-Pack-Hilfe und ohne Mobile/Account: ~2 Monate ab Tier 3 bis „polished public-fähig".
+Mit Asset-Pack-Hilfe und ohne Mobile/Account: ~2 Monate ab Tier 4 bis „polished public-fähig".
 
 ---
 

@@ -103,3 +103,28 @@ export function attachRepairInteraction(wsClient, renderer) {
     wsClient.send("repair_sabotage", { sabotageId });
   });
 }
+
+/**
+ * V-key vents (Tier 2.3). When the local chaos player is at a vent, V cycles
+ * through the connected destinations on each press. Server validates source
+ * proximity + target connectivity, so the cycle index is purely client-side
+ * convenience.
+ */
+export function attachVentInteraction(wsClient, renderer) {
+  let lastSourceId = null;
+  let cycleIndex = 0;
+  window.addEventListener("keydown", (e) => {
+    if (e.code !== "KeyV") return;
+    if (e.repeat) return;
+    const vent = renderer.localPlayerNearVent;
+    if (!vent || !vent.connectedTo || vent.connectedTo.length === 0) return;
+    e.preventDefault();
+    if (vent.id !== lastSourceId) {
+      lastSourceId = vent.id;
+      cycleIndex = 0;
+    }
+    const targetVentId = vent.connectedTo[cycleIndex % vent.connectedTo.length];
+    cycleIndex = (cycleIndex + 1) % vent.connectedTo.length;
+    wsClient.send("use_vent", { targetVentId });
+  });
+}
