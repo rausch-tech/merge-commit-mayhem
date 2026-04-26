@@ -89,6 +89,21 @@ class SabotagePanel(BaseModel):
     y: float
 
 
+class Vent(BaseModel):
+    """Tier 2.3: a vent through which chaos agents can teleport.
+
+    `connected_to` is a list of vent ids reachable from this one. Edges should
+    be symmetric (if A lists B, B should list A) but the server treats the
+    field literally — so a one-way vent is technically representable.
+    """
+
+    model_config = _camel()
+    id: str
+    x: float
+    y: float
+    connected_to: list[str] = Field(default_factory=list)
+
+
 class GameMap(BaseModel):
     model_config = _camel()
     name: str
@@ -98,6 +113,7 @@ class GameMap(BaseModel):
     spawn_points: list[SpawnPoint] = Field(default_factory=list)
     task_anchors: list[TaskAnchor] = Field(default_factory=list)
     sabotage_panels: list[SabotagePanel] = Field(default_factory=list)
+    vents: list[Vent] = Field(default_factory=list)
     war_room_id: str
 
 

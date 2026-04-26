@@ -37,6 +37,7 @@ from app.protocol import (
     TaskHoldStop,
     TriggerSabotage,
     TriggerTakedown,
+    UseVent,
     VotingResultMsg,
     envelope,
     parse_incoming,
@@ -231,6 +232,8 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 await _handle_abort_round(ws)
             elif isinstance(msg, RepairSabotage):
                 await _handle_repair_sabotage(ws, msg)
+            elif isinstance(msg, UseVent):
+                await _handle_use_vent(ws, msg)
     except WebSocketDisconnect:
         pass
     finally:
@@ -411,6 +414,20 @@ async def _handle_repair_sabotage(ws: WebSocket, msg: RepairSabotage) -> None:
         return
     try:
         room.repair_sabotage(session.player_id, msg.payload.sabotage_id)
+    except GameRoomError as exc:
+        await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+
+
+async def _handle_use_vent(ws: WebSocket, msg: UseVent) -> None:
+    """Tier 2.3: chaos teleports through a vent edge."""
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    try:
+        room.use_vent(session.player_id, msg.payload.target_vent_id)
     except GameRoomError as exc:
         await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
 

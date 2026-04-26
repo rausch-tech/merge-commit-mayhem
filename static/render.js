@@ -83,6 +83,9 @@ export class Renderer {
     this.localPlayerNearPanel = null; // sabotage-id of an active repair panel within reach, else null (Tier 2.4)
     this.activePanels = []; // [{sabotageId, x, y}] for currently-broken sabotages
     this.lightsOff = false; // toggles the radial vignette (Tier 2.4)
+    this.vents = []; // [{id, x, y, connectedTo: [...]}] (Tier 2.3)
+    this.ownTeam = null; // 'release_team' | 'chaos_agents' | null
+    this.localPlayerNearVent = null; // vent object the local chaos player is in reach of, else null
     this._running = false;
     this.map = null; // populated via setMap()
     this._walls = []; // computed when setMap is called
@@ -105,6 +108,12 @@ export class Renderer {
   }
   setLightsOff(value) {
     this.lightsOff = !!value;
+  }
+  setVents(vents) {
+    this.vents = vents || [];
+  }
+  setOwnTeam(team) {
+    this.ownTeam = team || null;
   }
 
   setMap(map) {
@@ -306,6 +315,46 @@ export class Renderer {
       }
     }
     this.localPlayerNearPanel = nearPanel;
+
+    // Vents (Tier 2.3). Drawn for everyone — they are part of the world's
+    // architecture. Only chaos can interact with them.
+    const VENT_INTERACT_RADIUS = 50;
+    let nearVent = null;
+    for (const vent of this.vents) {
+      ctx.save();
+      // Dark steel grille icon — small rectangle with parallel lines.
+      ctx.fillStyle = "#1f2937";
+      ctx.fillRect(vent.x - 14, vent.y - 12, 28, 24);
+      ctx.strokeStyle = "#475569";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(vent.x - 14, vent.y - 12, 28, 24);
+      ctx.beginPath();
+      for (let i = 0; i < 4; i++) {
+        const yy = vent.y - 9 + i * 6;
+        ctx.moveTo(vent.x - 11, yy);
+        ctx.lineTo(vent.x + 11, yy);
+      }
+      ctx.strokeStyle = "#94a3b8";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+
+      if (this.ownTeam === "chaos_agents" && local) {
+        const dx = local.x - vent.x;
+        const dy = local.y - vent.y;
+        if (dx * dx + dy * dy <= VENT_INTERACT_RADIUS * VENT_INTERACT_RADIUS) {
+          ctx.beginPath();
+          ctx.arc(vent.x, vent.y, VENT_INTERACT_RADIUS, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(96, 165, 250, 0.7)";
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          if (!nearVent) nearVent = vent;
+        }
+      }
+    }
+    this.localPlayerNearVent = nearVent;
 
     // Bodies (rendered BEFORE players so live players draw on top).
     for (const body of this.bodies) {

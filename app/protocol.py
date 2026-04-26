@@ -206,6 +206,17 @@ class RepairSabotage(BaseModel):
     payload: RepairSabotagePayload
 
 
+class UseVentPayload(BaseModel):
+    model_config = _camel_config()
+    target_vent_id: str
+
+
+class UseVent(BaseModel):
+    model_config = _camel_config()
+    type: Literal["use_vent"]
+    payload: UseVentPayload
+
+
 IncomingMessage = Annotated[
     JoinRoom
     | Rejoin
@@ -223,7 +234,8 @@ IncomingMessage = Annotated[
     | SelectMap
     | LeaveRoom
     | AbortRound
-    | RepairSabotage,
+    | RepairSabotage
+    | UseVent,
     Discriminator("type"),
 ]
 

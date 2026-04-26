@@ -26,6 +26,7 @@ from app.game.tasks import (
     TASK_DEFINITIONS,
     TASK_INTERACTION_RADIUS,
     TASK_RESPAWN_COOLDOWN,
+    VENT_INTERACTION_RADIUS,
     TaskDefinition,
 )
 from app.game.voting import SKIP_TARGET, all_chaos_eliminated
@@ -729,6 +730,54 @@ class GameRoom:
         elif sabotage_id == "lights_out":
             self._emit_event("danger", "PagerDuty-Storm — alle starren auf ihre Telefone.")
 
+    def use_vent(self, player_id: str, target_vent_id: str) -> None:
+        """Tier 2.3: chaos-only teleport through the vent network.
+
+        The player must currently be next to a vent ('source'); target_vent_id
+        must be in that source vent's connected_to list. Teleport snaps the
+        player to the target's coordinates. Wall collision is bypassed by
+        construction (the move is a discrete jump, not a swept motion).
+        """
+        if self.phase is not Phase.PLAYING:
+            raise GameRoomError(
+                code="WRONG_PHASE", message="Vents only work during a running round."
+            )
+        player = self.players.get(player_id)
+        if player is None:
+            raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
+        if not player.is_alive:
+            raise GameRoomError(
+                code="PLAYER_ELIMINATED", message="Eliminated players cannot vent."
+            )
+        if player.team != "chaos_agents":
+            raise GameRoomError(
+                code="NOT_CHAOS_AGENT", message="Only chaos agents can use vents."
+            )
+        # Find source vent: closest vent within reach.
+        source = None
+        best_dist_sq = VENT_INTERACTION_RADIUS * VENT_INTERACTION_RADIUS
+        for v in self.map.vents:
+            dx = player.x - v.x
+            dy = player.y - v.y
+            d2 = dx * dx + dy * dy
+            if d2 <= best_dist_sq:
+                source = v
+                best_dist_sq = d2
+        if source is None:
+            raise GameRoomError(code="NO_VENT_NEARBY", message="No vent in reach.")
+        if target_vent_id not in source.connected_to:
+            raise GameRoomError(
+                code="VENT_NOT_CONNECTED",
+                message=f"Vent {target_vent_id!r} is not reachable from {source.id!r}.",
+            )
+        target = next((v for v in self.map.vents if v.id == target_vent_id), None)
+        if target is None:
+            raise GameRoomError(
+                code="UNKNOWN_VENT", message=f"Vent {target_vent_id!r} does not exist."
+            )
+        player.x = float(target.x)
+        player.y = float(target.y)
+
     def repair_sabotage(self, player_id: str, sabotage_id: str) -> None:
         """Tier 2.4: a player at the matching sabotage panel clears the effect.
 
@@ -1126,6 +1175,10 @@ class GameRoom:
             "sabotagePanels": [
                 {"sabotageId": p.sabotage_id, "x": p.x, "y": p.y}
                 for p in self.map.sabotage_panels
+            ],
+            "vents": [
+                {"id": v.id, "x": v.x, "y": v.y, "connectedTo": list(v.connected_to)}
+                for v in self.map.vents
             ],
         }
 

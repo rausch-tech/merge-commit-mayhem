@@ -1,5 +1,10 @@
 import { WsClient } from "./ws.js";
-import { attachInput, attachRepairInteraction, attachTaskInteraction } from "./input.js";
+import {
+  attachInput,
+  attachRepairInteraction,
+  attachTaskInteraction,
+  attachVentInteraction,
+} from "./input.js";
 import { Renderer } from "./render.js";
 import { Hud } from "./hud.js";
 import { TaskList } from "./tasks.js";
@@ -259,6 +264,7 @@ ws.on("private_role", (payload) => {
   state.ownRole = payload;
   hud.setRole(payload.role, payload.team);
   sabotagePanel.setAvailable(payload.availableSabotages || []);
+  renderer.setOwnTeam(payload.team || null);
   _refreshMenu();
 });
 
@@ -298,6 +304,9 @@ ws.on("game_state", (payload) => {
   );
   renderer.setActivePanels(activePanels);
   renderer.setLightsOff(!!payload.lightsOff);
+  // Tier 2.3: vents are part of the static map snapshot but the server now
+  // re-broadcasts them in every game_state for client-side simplicity.
+  renderer.setVents(payload.vents || []);
   taskList.render(payload.tasks || []);
   for (const t of payload.tasks || []) {
     const prev = previousTaskStatus[t.id];
@@ -409,6 +418,7 @@ if (els.mapDropdown) {
 attachInput(ws);
 attachTaskInteraction(ws, renderer);
 attachRepairInteraction(ws, renderer);
+attachVentInteraction(ws, renderer);
 ws.onOpen(() => {
   const session = loadSession();
   if (session && session.roomCode && session.playerId) {

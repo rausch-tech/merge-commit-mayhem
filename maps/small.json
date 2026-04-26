@@ -26,5 +26,9 @@
   "sabotagePanels": [
     { "sabotageId": "lights_out", "x": 1800, "y": 400 }
   ],
+  "vents": [
+    { "id": "v_open",    "x": 200,  "y": 200,  "connectedTo": ["v_kitchen"] },
+    { "id": "v_kitchen", "x": 200,  "y": 1400, "connectedTo": ["v_open"] }
+  ],
   "warRoomId": "war_room"
 }
