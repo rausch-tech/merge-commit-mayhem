@@ -86,6 +86,9 @@ func _switch_to_world() -> void:
 	_renderer = world.get_node("Renderer") as DebugRenderer
 	_renderer.set_map(_map)
 	_renderer.set_self_player_id(_player_id)
+	var sender := world.get_node("InputSender") as InputSender
+	if sender != null:
+		sender.attach(_ws)
 	visible = false
 
 func _append_log(line: String) -> void:
