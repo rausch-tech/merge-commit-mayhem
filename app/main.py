@@ -13,12 +13,14 @@ from app.game.game_room import GameRoom, GameRoomError
 from app.game.models import InputState, Phase
 from app.game.sabotages import SABOTAGE_DEFINITIONS
 from app.protocol import (
+    AbortRound,
     CallEmergencyMeeting,
     CastVote,
     ErrorMsg,
     GameEndedMsg,
     GameStateMsg,
     JoinRoom,
+    LeaveRoom,
     LobbyStateMsg,
     PlayerInput,
     PrivateRoleMsg,
@@ -222,6 +224,10 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 await _handle_select_map(ws, msg)
             elif isinstance(msg, ReturnToLobby):
                 await _handle_return_to_lobby(ws)
+            elif isinstance(msg, LeaveRoom):
+                await _handle_leave_room(ws)
+            elif isinstance(msg, AbortRound):
+                await _handle_abort_round(ws)
     except WebSocketDisconnect:
         pass
     finally:
@@ -494,6 +500,66 @@ async def _handle_return_to_lobby(ws: WebSocket) -> None:
             envelope(
                 "error",
                 ErrorMsg(code="WRONG_PHASE", message="Only allowed in ENDED phase."),
+            )
+        )
+        return
+    room.reset_for_new_round()
+    await manager.broadcast(
+        room.code,
+        envelope("lobby_state", _lobby_state_msg(room)),
+    )
+
+
+async def _handle_leave_room(ws: WebSocket) -> None:
+    """Player explicitly leaves the room (in-game menu → 'Lobby verlassen').
+
+    Differs from _handle_disconnect in two ways: it is intentional, so we do
+    not preserve identity for grace-period reconnect; and the WS stays open
+    so the client can immediately re-join under a new identity if it wants.
+    """
+    session = manager.forget(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    if session.player_id not in room.players:
+        return
+    room.remove_player(session.player_id)
+    if room.is_empty():
+        registry.drop_if_empty(session.room_code)
+        return
+    if room.phase is Phase.LOBBY:
+        await manager.broadcast(room.code, envelope("lobby_state", _lobby_state_msg(room)))
+    else:
+        for s in manager.sessions_in_room(room.code):
+            await s.ws.send_json(envelope("game_state", _game_state_msg_for(room, s.player_id)))
+
+
+async def _handle_abort_round(ws: WebSocket) -> None:
+    """Host bricht eine laufende Runde ab (in-game menu → 'Runde beenden').
+
+    Erlaubt nur in PLAYING/MEETING und nur dem Host. Setzt den Raum direkt
+    zurück in die Lobby — kein Endscreen, weil die Rollen-Reveal bei einem
+    bewussten Host-Abbruch unangebracht ist.
+    """
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    player = room.players.get(session.player_id)
+    if player is None or not player.is_host:
+        await ws.send_json(
+            envelope("error", ErrorMsg(code="NOT_HOST", message="Only host can abort the round."))
+        )
+        return
+    if room.phase not in (Phase.PLAYING, Phase.MEETING):
+        await ws.send_json(
+            envelope(
+                "error",
+                ErrorMsg(code="WRONG_PHASE", message="Can only abort a running round."),
             )
         )
         return

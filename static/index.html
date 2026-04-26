@@ -124,6 +124,25 @@
           <h2 id="voting-result-text">—</h2>
         </div>
       </div>
+
+      <div id="in-game-menu" class="hidden" role="dialog" aria-modal="true" aria-label="Pause-Menü">
+        <div id="in-game-menu-card">
+          <h2>Pause</h2>
+          <section id="menu-recap" class="hidden">
+            <h3>Deine Rolle</h3>
+            <p id="menu-role-line">—</p>
+            <h3>Aufgaben</h3>
+            <ul id="menu-task-list"></ul>
+          </section>
+          <section id="menu-audio-slot"></section>
+          <div id="menu-actions">
+            <button id="menu-leave-btn" type="button">Raum verlassen</button>
+            <button id="menu-abort-btn" type="button" class="hidden">Runde beenden</button>
+            <button id="menu-close-btn" type="button">Schließen</button>
+          </div>
+          <p id="menu-hint">Drücke ESC zum Schließen</p>
+        </div>
+      </div>
     </main>
 
     <script type="module" src="/static/main.js"></script>

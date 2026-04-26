@@ -10,6 +10,7 @@ import { MeetingOverlay, VotingResultToast, EmergencyMeetingBtn } from "./meetin
 import { EventFeed } from "./eventfeed.js";
 import { TakedownButton } from "./takedown.js";
 import { ReportButton } from "./report.js";
+import { InGameMenu } from "./menu.js";
 
 const SESSION_KEY = "mcm.session";
 
@@ -115,6 +116,53 @@ const emergencyBtn = new EmergencyMeetingBtn(document.getElementById("emergency-
 const takedownBtn = new TakedownButton(document.getElementById("takedown-btn"), ws);
 const reportBtn = new ReportButton(document.getElementById("report-btn"), ws);
 
+const menu = new InGameMenu(
+  document.getElementById("in-game-menu"),
+  document.getElementById("audio-controls"),
+  {
+    onLeave: () => {
+      ws.send("leave_room", {});
+      clearSession();
+      // Reset client state and bring the join form back. The server has
+      // already removed our player record; staying connected on the WS is
+      // fine — the next join_room creates a fresh identity.
+      state.playerId = null;
+      state.isHost = false;
+      state.roomCode = null;
+      state.phase = "lobby";
+      state.players = [];
+      state.ownRole = null;
+      state.map = null;
+      state.bodies = [];
+      state.amDead = false;
+      renderer.setOwnPlayerId(null);
+      renderer.setMap(null);
+      renderer.setPlayers([]);
+      els.gameScreen.classList.add("hidden");
+      els.lobbyScreen.classList.remove("hidden");
+      els.lobbyWaiting.classList.add("hidden");
+      els.joinForm.classList.remove("hidden");
+      els.ghostBanner.classList.add("hidden");
+      endscreen.hide();
+      meetingOverlay.hide();
+      sabotagePanel.setAvailable([]);
+    },
+    onAbort: () => {
+      ws.send("abort_round", {});
+    },
+  }
+);
+
+function _refreshMenu(tasks) {
+  menu.update({
+    inRoom: !!state.playerId,
+    isHost: state.isHost,
+    phase: state.phase,
+    ownRole: state.ownRole,
+    tasks: tasks || [],
+  });
+}
+
 function showError(msg) {
   els.errorBanner.textContent = msg;
   els.errorBanner.classList.remove("hidden");
@@ -173,6 +221,7 @@ ws.on("room_joined", (payload) => {
   els.joinForm.classList.add("hidden");
   els.lobbyWaiting.classList.remove("hidden");
   els.lobbyRoomCode.textContent = payload.roomCode;
+  _refreshMenu();
 });
 
 ws.on("lobby_state", (payload) => {
@@ -196,7 +245,10 @@ ws.on("lobby_state", (payload) => {
   els.lobbyWaiting.classList.remove("hidden");
   // Also make sure sabotage panel hides until next start.
   sabotagePanel.setAvailable([]);
+  // Reset role recap; a new round assigns a fresh role.
+  state.ownRole = null;
   renderLobby();
+  _refreshMenu();
 });
 
 ws.on("game_ended", (payload) => {
@@ -207,6 +259,7 @@ ws.on("private_role", (payload) => {
   state.ownRole = payload;
   hud.setRole(payload.role, payload.team);
   sabotagePanel.setAvailable(payload.availableSabotages || []);
+  _refreshMenu();
 });
 
 ws.on("game_state", (payload) => {
@@ -285,6 +338,8 @@ ws.on("game_state", (payload) => {
     ownPlayerId: state.playerId,
     bodies: state.bodies,
   });
+
+  _refreshMenu(payload.tasks);
 });
 
 ws.on("private_state", (payload) => {

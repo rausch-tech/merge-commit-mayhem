@@ -175,6 +175,26 @@ class SelectMap(BaseModel):
     payload: SelectMapPayload
 
 
+class LeaveRoomPayload(BaseModel):
+    model_config = _camel_config()
+
+
+class LeaveRoom(BaseModel):
+    model_config = _camel_config()
+    type: Literal["leave_room"]
+    payload: LeaveRoomPayload = Field(default_factory=LeaveRoomPayload)
+
+
+class AbortRoundPayload(BaseModel):
+    model_config = _camel_config()
+
+
+class AbortRound(BaseModel):
+    model_config = _camel_config()
+    type: Literal["abort_round"]
+    payload: AbortRoundPayload = Field(default_factory=AbortRoundPayload)
+
+
 IncomingMessage = Annotated[
     JoinRoom
     | Rejoin
@@ -189,7 +209,9 @@ IncomingMessage = Annotated[
     | SkipVote
     | TriggerTakedown
     | ReportBody
-    | SelectMap,
+    | SelectMap
+    | LeaveRoom
+    | AbortRound,
     Discriminator("type"),
 ]
 
