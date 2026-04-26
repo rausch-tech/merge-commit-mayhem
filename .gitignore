@@ -35,3 +35,10 @@ package-lock.json
 
 # Playwright MCP scratch dir (per-session screenshots/snapshots)
 .playwright-mcp/
+
+# Godot 3D Spike (Spike-2)
+godot-3d/.godot/
+godot-3d/exports/
+godot-3d/**/*.import
+godot-3d/**/*.uid
+godot-3d/feedback/

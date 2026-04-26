@@ -1,0 +1,29 @@
+; Godot 4.6 — 3D Bootstrapping-Spike (Spike-2)
+;
+; Ziel: validieren dass KayKit GLTF-Models + Animations sauber laufen,
+; Camera von schraeg-oben "wie Among Us"-Look gibt, WASD-Movement smooth ist,
+; Web-Export mit Mobile-Renderer praktikabel funktioniert.
+;
+; Kein Backend-Connect — pures lokales Rendering + Movement.
+
+config_version=5
+
+[application]
+
+config/name="MCM Godot 3D Spike (Spike-2)"
+config/version="0.0.1-spike-3d"
+run/main_scene="res://scenes/test_world.tscn"
+config/features=PackedStringArray("4.6", "Mobile")
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/mode=2
+window/subwindows/embed_subwindows=false
+window/stretch/mode="viewport"
+
+[rendering]
+
+renderer/rendering_method="mobile"
+renderer/rendering_method.mobile="mobile"
