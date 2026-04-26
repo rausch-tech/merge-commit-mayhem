@@ -214,3 +214,34 @@ Siehe [`DEPLOY.md`](DEPLOY.md). Kurz: GitHub Actions baut Tarball, scp + ssh-res
 4. **JSON-Config für Tasks/Sabotagen/Rollen.** Tier 5. Macht Mod-Beiträge code-frei möglich.
 
 Detail siehe `docs/ROADMAP.md`.
+
+---
+
+## 11. Performance-Baseline (Stand 2026-04-26)
+
+Synthetisches Last-Skript (`scripts/perf_baseline.py`) misst die Server-Hot-Path-Kosten ohne WS-Layer — der relevante Bottleneck (Tick-Compute + Per-Viewer-Payload-Serialisation) ist von Socket-I/O unabhängig. Lokal auf einem Laptop, CPython 3.12, 400 Ticks (~20 s wall):
+
+| Szenario           | Tick p99    | Payload p99 (1 Viewer) | Aggregat / Tick (12 Viewer) | Throughput  | Headroom (50 ms Tick-Budget) |
+| ------------------ | ----------- | ---------------------- | --------------------------- | ----------- | ---------------------------- |
+| 4 Spieler          | 0.16 ms     | 3.4 KB                 | 13.5 KB                     | 263 KB/s    | ~310x                        |
+| 12 Spieler         | 0.60 ms     | 4.5 KB                 | 54 KB                       | 1.06 MB/s   | ~84x                         |
+
+Lesart:
+
+- **Tick-Compute** ist nicht ansatzweise der Engpass — selbst bei voller 12-Spieler-Lobby liegt p99 bei 0.6 ms, das sind 1.2 % des 50-ms-Budgets pro Tick.
+- **Payload-Größe** wächst sub-linear mit Spielerzahl (3.4 → 4.5 KB für 3x Spieler) — die meisten Bytes sind Map/Sabotagen/Vents, die Player-Liste ist klein.
+- **Aggregat** ist linear in Viewer-Anzahl (4.5 KB × 12 ≈ 54 KB pro Tick) — bei 20 Hz ergibt das ~1 MB/s Server-Egress für eine volle Runde.
+- **Headroom** ist beruhigend: ein 12-Spieler-Tick könnte ~80x langsamer werden, bevor der Server hinterherhinkt.
+
+Was die Baseline NICHT abdeckt:
+
+- Reale WS-Layer-Latenz (Send-Buffer, Network-Stack, Caddy-Proxy)
+- Client-Render-Performance
+- Mehrere parallele Räume gleichzeitig
+- Mini-Game-State-Frames während aktiver Sessions
+
+Wenn das Spiel jenseits von 1 Raum × 12 Spieler skaliert, einfach den Run wiederholen mit höherer Spielerzahl oder mehreren Räumen — die Methodik bleibt gleich. Befehl:
+
+```bash
+uv run python scripts/perf_baseline.py --players 12 --seconds 20
+```
