@@ -105,13 +105,29 @@ Naming-Prinzip: nerdig, dev-thematisch, „kill" wird vermieden zugunsten von ha
 
 **Done-Kriterium:** Alle 6 Features implementiert + getestet. Game spielt sich „wie Among Us, aber dev-themed". Mit Live-Tests bestätigt.
 
+### Pre-Tier-3 — Godot-Bootstrapping-Spike (code done, runtime-verification offen)
+
+**Ziel:** Protokoll-Annahmen vor dem Tier-3-Sprint validieren, Doku-Lücken schließen, Skelett-Repo-Struktur etablieren.
+
+| #    | Was                                                                                                                                | Status                                  |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| P3.0 | `godot/`-Subfolder, `project.godot`, Branch `slice/godot-spike`, `.gitignore`                                                      | done                                    |
+| P3.1 | `docs/CLIENT.md` mit Koordinaten/Tick/Reconnect-Sektionen + Test-Plan                                                              | done                                    |
+| P3.2 | Spike-Code: Connect, Map-Render, Player-Boxen, Input mit Snapshot-Interpolation                                                    | done                                    |
+| P3.3 | Pre-Spike-Doku-Fixes auf `main` (PROTOCOL.md: rejoin/multi-map/game_state/private_state, maps.md: Map-Größe, REJOIN_NOT_AVAILABLE) | done (commit `19ecbbf`)                 |
+| P3.4 | Runtime-Verification mit echtem Godot 4.3 Editor — siehe `docs/CLIENT.md §6` Test-Plan                                             | offen (wartet auf lokalen Godot-Editor) |
+
+**Spec:** `docs/superpowers/specs/2026-04-26-godot-spike-design.md`. **Plan:** `docs/superpowers/plans/2026-04-26-godot-spike.md`.
+
+**Branch:** `slice/godot-spike` (im Worktree `.worktrees/godot-spike/`). Merge nach `main` erst nach P3.4 + ggf. den daraus folgenden Code-Anpassungen.
+
 ### Tier 3 — Godot-Migration
 
 **Ziel:** Browser-Client bleibt als Web-Fallback und Reference-Implementation. Godot wird der polished primary client mit echten Charakter-Animationen, Tilemaps, Sound-Mixing und Particle-Effects.
 
 **Aufwand:** ~5–7 Wochen.
 
-Der Godot-Sprint kommt **nach** Tier 0–2, weil:
+Der Godot-Sprint kommt **nach** Tier 0–2 (und nach Pre-Tier-3-Runtime-Verification), weil:
 
 - Mit unfinishedem Browser doppelte Feature-Arbeit
 - Ohne Foundation-Cleanup (Tier 0) keine Test-Sicherheit beim Porten

@@ -6,6 +6,11 @@
 >
 > Diese Datei wird durch den Godot-Spike (siehe `superpowers/specs/2026-04-26-godot-spike-design.md`)
 > mit *real gemessenen* Werten gefüllt. Sektionen mit `[VERIFY:Phase-X]` werden im Spike validiert.
+>
+> **Status (Stand 2026-04-26):** Spike-Code ist auf Branch `slice/godot-spike` committet, aber
+> noch nicht in Godot 4.3 Editor live ausgeführt (lokaler Editor fehlt). Werte mit
+> `[VERIFY:Phase-X]` sind theoretisch korrekt nach Plan, brauchen aber Runtime-Verification
+> sobald Godot installiert ist — siehe Sektion 6 unten.
 
 ## 1. Koordinaten- und Skalierungs-Konvention
 
@@ -51,4 +56,35 @@ Pre-Spike wurden bereits folgende Lücken in `docs/PROTOCOL.md` und `docs/maps.m
 - `private_state`-Message neu dokumentiert (per-Chaos-Take-Down-Cooldown).
 - `REJOIN_NOT_AVAILABLE` in der Error-Code-Tabelle ergänzt.
 
-Weitere Lücken, die der Spike *neu* entdeckt, werden hier aufgelistet (Phase 6 füllt das nach Spike-Ende).
+Weitere Lücken kommen hier rein, sobald der Spike runtime-verifiziert wurde.
+
+## 6. Test-Plan (für Runtime-Verification mit Godot)
+
+Sobald Godot 4.3 LTS lokal installiert ist, einmal alle vier Akzeptanzpfade durchlaufen und die Marker oben mit gemessenen Werten ersetzen. Voraussetzung: Backend läuft (`uv run uvicorn app.main:app --reload`), Browser-Tab unter `http://localhost:8000/` joint Raum `ABCD` mit Name "Browser".
+
+### Test 1 — Connect & Lobby (validiert §1, §3 partiell)
+1. Godot-Editor → Project Manager → Import `godot/project.godot`.
+2. F5. Im Spike-Fenster URL `ws://localhost:8000/ws`, Room `ABCD`, Name `Godot`, Connect.
+3. **Erwartung:** Log zeigt `[ws] connected`, `[room_joined]`, `[lobby_state] players=[Browser, Godot]`. Browser-Tab zeigt zwei Spieler in der Lobby.
+
+### Test 2 — Map-Layout (validiert §1)
+1. Test 1 muss durchgelaufen sein.
+2. **Erwartung:** Spike-Fenster zeigt 6 farbige Räume, rote Wand-Linien, blaue Door-Marker, grüne Spawn-Kreuze, gelbe Task-Anker. Layout entspricht dem Browser-Editor unter `http://localhost:8000/editor`.
+3. **Falls verzerrt:** Camera2D-Zoom in `godot/scenes/debug_world.tscn` justieren, gemessenen Wert in §1 (Default-Zoom-Faktor) eintragen.
+
+### Test 3 — Player + Movement (validiert §2)
+1. Browser-Host: "Spielstart" mit Demo-Mode (oder weitere Tabs joinen).
+2. **Erwartung:** Im Spike erscheinen farbige Boxen mit Namen. Eigene Box hat weißen Outline.
+3. WASD/Pfeiltasten halten — eigene Box bewegt sich smooth, Browser-Box folgt smooth.
+4. **Falls ruckelig:** Snapshot-Buffer-Logik in `debug_renderer.gd::_process()` debuggen.
+
+### Test 4 — Reconnect (validiert §3)
+1. Spike laufen lassen, im Log `playerId=<X>` notieren.
+2. **Test 4a:** Spike schließen, sofort neu starten mit gleichem Namen → wird derselbe Spieler reaktiviert? Ergebnis in §3 eintragen.
+3. **Test 4b:** `main.gd::_on_connected` temporär auf `rejoin` umstellen mit hartcodierter `playerId`, neu testen.
+4. **Test 4c:** 35 s warten nach Spike-Schließen, dann neu starten — `REJOIN_NOT_AVAILABLE`?
+
+Nach allen vier Tests:
+- `[VERIFY:Phase-X]`-Marker durch echte Werte ersetzen
+- Sektion 5 um neu entdeckte Lücken erweitern
+- `main.gd` zurück auf `join_room` reverten falls für Test 4b geändert
