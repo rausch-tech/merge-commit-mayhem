@@ -151,7 +151,7 @@ def test_task_with_negative_incidents_change_reduces_incidents():
     room.incidents = 60
 
     # Replace one runtime task's definition with a clone that carries the new field.
-    runtime = room.tasks["fix_unit_tests"]
+    runtime = room.tasks["review_pr"]
     runtime.definition = replace(runtime.definition, incidents_change=-15)
     room._apply_task_reward(runtime.definition)
 

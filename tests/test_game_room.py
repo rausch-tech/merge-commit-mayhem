@@ -482,12 +482,12 @@ def test_mark_disconnected_releases_task_holds():
     pid = next(iter(room.players))
     p = room.players[pid]
     # Move player onto the task so hold_start succeeds.
-    task_x, task_y = room.task_position("fix_unit_tests")
+    task_x, task_y = room.task_position("review_pr")
     p.x, p.y = task_x, task_y
-    room.apply_task_hold_start(pid, "fix_unit_tests")
-    assert pid in room.tasks["fix_unit_tests"].per_player_progress
+    room.apply_task_hold_start(pid, "review_pr")
+    assert pid in room.tasks["review_pr"].per_player_progress
     room.mark_disconnected(pid)
-    assert pid not in room.tasks["fix_unit_tests"].per_player_progress
+    assert pid not in room.tasks["review_pr"].per_player_progress
 
 
 def test_mark_disconnected_transfers_host():

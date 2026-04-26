@@ -23,6 +23,10 @@ class TaskDefinition:
     pipeline_stability_reward: int = 0
     coffee_level_set: int | None = None  # if set, coffee_level is clamped to this value
     incidents_change: int = 0  # negative reduces incidents on completion
+    # Tier 3: when set, task_hold_start opens the named mini-game instead of
+    # starting the hold-E progress bar. ``required_seconds`` is ignored on
+    # this path; the mini-game decides its own duration via plugin logic.
+    mini_game: str | None = None
 
 
 TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
@@ -32,6 +36,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         room="open_space",
         required_seconds=5.0,
         release_progress_reward=10,
+        mini_game="test_suite_repair",
     ),
     TaskDefinition(
         id="review_pr",

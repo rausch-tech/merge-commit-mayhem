@@ -11,6 +11,9 @@ from app.game.game_map import (
     task_position_map,
     war_room_bounds_for,
 )
+from app.game.minigames.base import MiniGamePluginError
+from app.game.minigames.registry import get_plugin as get_mini_game_plugin
+from app.game.minigames.registry import is_known as mini_game_is_known
 from app.game.models import InputState, Phase, Player
 from app.game.roles import RoleInfo, description_for
 from app.game.roles import assign as assign_roles
@@ -121,6 +124,16 @@ class Body:
     color: str  # victim's color, for rendering
 
 
+@dataclass
+class MiniGameSession:
+    """Tier 3.1: per-player live mini-game state. The framework owns this
+    dict; the plugin owns its inner ``state`` schema."""
+
+    plugin_id: str
+    task_id: str
+    state: dict
+
+
 class GameRoom:
     def __init__(
         self,
@@ -184,6 +197,14 @@ class GameRoom:
         self.bodies: dict[str, Body] = {}
         self.takedown_cooldowns: dict[str, float] = {}
 
+        # Tier 3.1: active mini-games per player (max one each). Keyed by
+        # player_id; the framework treats this as authoritative.
+        self.active_mini_games: dict[str, MiniGameSession] = {}
+        # Tier 3.1: framework-emitted events for mini-game lifecycle. Drained
+        # by the WS layer once per tick / on_input. Each entry is a tuple
+        # (player_id, kind, payload) where kind is 'started'|'state'|'completed'.
+        self.pending_mini_game_events: list[tuple[str, str, dict]] = []
+
     def _emit_event(self, severity: str, message: str) -> None:
         """Append an event to the rolling buffer. Internal use only."""
         if severity not in _VALID_EVENT_SEVERITIES:
@@ -246,6 +267,10 @@ class GameRoom:
                 task.per_player_progress.pop(player_id)
                 if not task.per_player_progress and task.status == "in_progress":
                     task.status = "available"
+        # Tier 3.1: drop any active mini-game — state is not preserved across
+        # reconnects (the player resumes outside the modal).
+        if player_id in self.active_mini_games:
+            self._cancel_mini_game(player_id, "disconnected")
         # Reset their input.
         player.input_state = InputState()
         # Host transfer if they were host. If no candidate exists (solo
@@ -475,6 +500,10 @@ class GameRoom:
         if self.phase is not Phase.PLAYING:
             return
         for player in self.players.values():
+            # Tier 3.1: a player inside a mini-game is locked in place — their
+            # WASD inputs are ignored until the session ends.
+            if player.id in self.active_mini_games:
+                continue
             dx = int(player.input_state.right) - int(player.input_state.left)
             dy = int(player.input_state.down) - int(player.input_state.up)
             if dx or dy:
@@ -572,6 +601,8 @@ class GameRoom:
         self.phase = Phase.ENDED
         self.winner = winner
         self.win_reason = reason
+        # Tier 3.1: end any active mini-games — no reward for in-flight sessions.
+        self._cancel_all_mini_games("round_ended")
 
     # --- speed helpers -----------------------------------------------------
 
@@ -612,16 +643,146 @@ class GameRoom:
             raise GameRoomError(code="TASK_ON_COOLDOWN", message="Task in cooldown.")
         if not self._task_in_range(player_id, task):
             raise GameRoomError(code="TASK_TOO_FAR", message="Too far from task.")
+        # Tier 3.1: when the task has an associated mini-game, switch into the
+        # mini-game flow instead of starting hold-E progress. Hold-E remains
+        # the default for tasks without mini_game set.
+        if task.definition.mini_game:
+            if player_id in self.active_mini_games:
+                raise GameRoomError(
+                    code="MINI_GAME_ALREADY_ACTIVE",
+                    message="Finish the current mini-game first.",
+                )
+            self._start_mini_game(player_id, task_id, task.definition.mini_game)
+            return
         task.status = "in_progress"
         task.per_player_progress.setdefault(player_id, 0.0)
 
     def apply_task_hold_stop(self, player_id: str, task_id: str) -> None:
+        # Tier 3.1: a stop on a mini-game-bearing task cancels the mini-game.
+        if player_id in self.active_mini_games:
+            session = self.active_mini_games[player_id]
+            if session.task_id == task_id:
+                self._cancel_mini_game(player_id, "cancelled")
+                return
         task = self.tasks.get(task_id)
         if task is None:
             return
         task.per_player_progress.pop(player_id, None)
         if not task.per_player_progress and task.status == "in_progress":
             task.status = "available"
+
+    # --- mini-game framework (Tier 3.1) -----------------------------------
+
+    def _start_mini_game(self, player_id: str, task_id: str, mini_game_id: str) -> None:
+        """Internal: open a mini-game session for ``player_id`` on ``task_id``.
+
+        Called from apply_task_hold_start when the task carries a mini_game
+        field. Emits a 'started' event for the WS layer.
+        """
+        if not mini_game_is_known(mini_game_id):
+            raise GameRoomError(
+                code="UNKNOWN_MINI_GAME", message=f"Unknown mini-game {mini_game_id!r}."
+            )
+        plugin = get_mini_game_plugin(mini_game_id)
+        seed = random.getrandbits(31)
+        state = plugin.init_state(seed)
+        session = MiniGameSession(plugin_id=mini_game_id, task_id=task_id, state=state)
+        self.active_mini_games[player_id] = session
+        # Mark the task as in_progress so other players see "Sven is at the
+        # task" through the same UI affordances as hold-E.
+        task = self.tasks.get(task_id)
+        if task is not None and task.status == "available":
+            task.status = "in_progress"
+        self.pending_mini_game_events.append(
+            (
+                player_id,
+                "started",
+                {
+                    "taskId": task_id,
+                    "miniGameId": mini_game_id,
+                    "title": plugin.title,
+                    "view": plugin.public_view(state),
+                },
+            )
+        )
+
+    def apply_mini_game_input(self, player_id: str, action: str, params: dict) -> None:
+        """WS-facing entry point for a player's mini-game action."""
+        session = self.active_mini_games.get(player_id)
+        if session is None:
+            raise GameRoomError(
+                code="NO_ACTIVE_MINI_GAME", message="No mini-game running for this player."
+            )
+        plugin = get_mini_game_plugin(session.plugin_id)
+        try:
+            session.state = plugin.handle_input(session.state, action, params)
+        except MiniGamePluginError as exc:
+            # Translate plugin-level cheat/format errors to GameRoomError so
+            # the WS layer surfaces them consistently with other guards.
+            raise GameRoomError(code=exc.code, message=exc.message) from exc
+        # Echo the new public view back to the player.
+        self.pending_mini_game_events.append(
+            (
+                player_id,
+                "state",
+                {"taskId": session.task_id, "view": plugin.public_view(session.state)},
+            )
+        )
+        # Completion check.
+        if plugin.is_complete(session.state):
+            self._complete_mini_game(player_id)
+
+    def _complete_mini_game(self, player_id: str) -> None:
+        session = self.active_mini_games.pop(player_id, None)
+        if session is None:
+            return
+        # Apply the same reward + cooldown the hold-E path uses.
+        task = self.tasks.get(session.task_id)
+        if task is not None:
+            self._apply_task_reward(task.definition)
+            self.completed_tasks_by_player[player_id] = (
+                self.completed_tasks_by_player.get(player_id, 0) + 1
+            )
+            task.per_player_progress.clear()
+            task.status = "cooldown"
+            task.cooldown_remaining = TASK_RESPAWN_COOLDOWN
+        self.pending_mini_game_events.append(
+            (
+                player_id,
+                "completed",
+                {"taskId": session.task_id, "success": True, "reason": "solved"},
+            )
+        )
+
+    def _cancel_mini_game(self, player_id: str, reason: str) -> None:
+        """Drop a player's active mini-game without applying the reward."""
+        session = self.active_mini_games.pop(player_id, None)
+        if session is None:
+            return
+        # Release the task back to "available" — kein Cooldown bei Cancel.
+        task = self.tasks.get(session.task_id)
+        if task is not None and task.status == "in_progress":
+            task.per_player_progress.pop(player_id, None)
+            if not task.per_player_progress:
+                task.status = "available"
+        self.pending_mini_game_events.append(
+            (
+                player_id,
+                "completed",
+                {"taskId": session.task_id, "success": False, "reason": reason},
+            )
+        )
+
+    def _cancel_all_mini_games(self, reason: str) -> None:
+        """Used on round end / meeting start / reset to drop every session."""
+        for pid in list(self.active_mini_games.keys()):
+            self._cancel_mini_game(pid, reason)
+
+    def drain_pending_mini_game_events(self) -> list[tuple[str, str, dict]]:
+        """WS layer pulls events here once per tick / after each input."""
+        events = self.pending_mini_game_events
+        self.pending_mini_game_events = []
+        return events
 
     def _apply_incidents_delta(self, delta: int) -> None:
         """Clamp incidents into 0..100 after applying delta. Internal use only."""
@@ -933,6 +1094,10 @@ class GameRoom:
                 task.per_player_progress.pop(target_id)
                 if not task.per_player_progress and task.status == "in_progress":
                     task.status = "available"
+        # Tier 3.1: a take-down victim drops their mini-game (and the modal
+        # snaps shut on the client when the framework forwards 'killed').
+        if target_id in self.active_mini_games:
+            self._cancel_mini_game(target_id, "killed")
         self.bodies[body.id] = body
         self.takedown_cooldowns[killer_id] = TAKEDOWN_COOLDOWN
         return body
@@ -977,6 +1142,9 @@ class GameRoom:
             task.per_player_progress = {}
             if task.status == "in_progress":
                 task.status = "available"
+        # Tier 3.1: end any active mini-games — modals snap shut as players
+        # are pulled into the meeting overlay.
+        self._cancel_all_mini_games("meeting_started")
 
     def private_state_for(self, player_id: str) -> dict:
         cd = self.takedown_cooldowns.get(player_id, 0.0)
@@ -1026,6 +1194,8 @@ class GameRoom:
             task.per_player_progress = {}
             if task.status == "in_progress":
                 task.status = "available"
+        # Tier 3.1: end any active mini-games when the round flips to MEETING.
+        self._cancel_all_mini_games("meeting_started")
 
     def cast_vote(self, voter_id: str, target_id: str) -> None:
         if self.phase is not Phase.MEETING:
@@ -1325,6 +1495,9 @@ class GameRoom:
         self._next_event_seq = 1
         self.bodies = {}
         self.takedown_cooldowns = {}
+        # Tier 3.1: clear mini-game state across rounds.
+        self.active_mini_games = {}
+        self.pending_mini_game_events = []
         for player in self.players.values():
             player.role = None
             player.team = None

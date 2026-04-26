@@ -217,6 +217,18 @@ class UseVent(BaseModel):
     payload: UseVentPayload
 
 
+class MiniGameInputPayload(BaseModel):
+    model_config = _camel_config()
+    action: str
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class MiniGameInput(BaseModel):
+    model_config = _camel_config()
+    type: Literal["mini_game_input"]
+    payload: MiniGameInputPayload
+
+
 IncomingMessage = Annotated[
     JoinRoom
     | Rejoin
@@ -235,7 +247,8 @@ IncomingMessage = Annotated[
     | LeaveRoom
     | AbortRound
     | RepairSabotage
-    | UseVent,
+    | UseVent
+    | MiniGameInput,
     Discriminator("type"),
 ]
 
@@ -322,6 +335,27 @@ class VotingResultMsg(BaseModel):
     was_chaos_agent: bool = False
     tie: bool = False
     skipped: bool = False
+
+
+class MiniGameStartedMsg(BaseModel):
+    model_config = _camel_config()
+    task_id: str
+    mini_game_id: str
+    title: str
+    view: dict[str, Any]
+
+
+class MiniGameStateMsg(BaseModel):
+    model_config = _camel_config()
+    task_id: str
+    view: dict[str, Any]
+
+
+class MiniGameCompletedMsg(BaseModel):
+    model_config = _camel_config()
+    task_id: str
+    success: bool
+    reason: str = ""
 
 
 def envelope(type_: str, payload: BaseModel) -> dict[str, Any]:

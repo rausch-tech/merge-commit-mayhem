@@ -16,6 +16,7 @@ import { EventFeed } from "./eventfeed.js";
 import { TakedownButton } from "./takedown.js";
 import { ReportButton } from "./report.js";
 import { InGameMenu } from "./menu.js";
+import { MiniGameModal } from "./minigames/base.js";
 
 const SESSION_KEY = "mcm.session";
 
@@ -121,6 +122,12 @@ const votingResultToast = new VotingResultToast(document.getElementById("voting-
 const emergencyBtn = new EmergencyMeetingBtn(document.getElementById("emergency-meeting-btn"), ws);
 const takedownBtn = new TakedownButton(document.getElementById("takedown-btn"), ws);
 const reportBtn = new ReportButton(document.getElementById("report-btn"), ws);
+
+const miniGameModal = new MiniGameModal(document.getElementById("mini-game-modal"), ws);
+
+ws.on("mini_game_started", (payload) => miniGameModal.onStarted(payload));
+ws.on("mini_game_state", (payload) => miniGameModal.onState(payload));
+ws.on("mini_game_completed", (payload) => miniGameModal.onCompleted(payload));
 
 const menu = new InGameMenu(
   document.getElementById("in-game-menu"),
@@ -424,7 +431,7 @@ if (els.mapDropdown) {
 }
 
 attachInput(ws);
-attachTaskInteraction(ws, renderer);
+attachTaskInteraction(ws, renderer, () => miniGameModal.isOpen());
 attachRepairInteraction(ws, renderer);
 attachVentInteraction(ws, renderer);
 ws.onOpen(() => {

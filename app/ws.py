@@ -29,6 +29,12 @@ class ConnectionManager:
     def sessions_in_room(self, room_code: str) -> list[_Session]:
         return [s for s in self._by_ws.values() if s.room_code == room_code]
 
+    def ws_for_player(self, room_code: str, player_id: str) -> WebSocket | None:
+        for session in self.sessions_in_room(room_code):
+            if session.player_id == player_id:
+                return session.ws
+        return None
+
     async def send_to(self, ws: WebSocket, message: dict) -> None:
         await ws.send_json(message)
 

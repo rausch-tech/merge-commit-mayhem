@@ -1,0 +1,22 @@
+"""Tier 3.1 — Plugin registry.
+
+A new mini-game plugin is registered by adding an entry here. The id must
+match ``MiniGamePlugin.id`` and the value used in TaskDefinition.mini_game.
+"""
+
+from app.game.minigames.base import MiniGamePlugin
+from app.game.minigames.test_suite_repair import TestSuiteRepair
+
+MINI_GAME_PLUGINS: dict[str, MiniGamePlugin] = {
+    "test_suite_repair": TestSuiteRepair(),
+}
+
+
+def get_plugin(mini_game_id: str) -> MiniGamePlugin:
+    """Resolve a mini-game plugin by id. Raises KeyError if unknown so the
+    caller can translate into a domain-appropriate error."""
+    return MINI_GAME_PLUGINS[mini_game_id]
+
+
+def is_known(mini_game_id: str) -> bool:
+    return mini_game_id in MINI_GAME_PLUGINS

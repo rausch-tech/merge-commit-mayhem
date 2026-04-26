@@ -113,10 +113,10 @@ Naming-Prinzip: nerdig, dev-thematisch, „kill" wird vermieden zugunsten von ha
 
 **Reihenfolge:** kommt **vor** Godot, weil das Mini-Game-API die Godot-Migration prägt. Wird das API in Browser ausgereift festgelegt, spart Tier 4 (Godot) doppelte Arbeit.
 
-| #   | Was                                                                                                                                                               | Aufwand |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| 3.1 | **Mini-Game-Framework** — Server: Task-Schema kriegt `mini_game: str`. WS: `mini_game_start` / `mini_game_input` / `mini_game_complete`. Client: pluggable Modal. | 2 Tage  |
-| 3.2 | **Beispiel: „Test-Suite reparieren"** (für `fix_unit_tests`) — Liste aus 5 fehlerhaften Tests, klick die Bugs in der richtigen Reihenfolge weg.                   | 1 Tag   |
+| #   | Was                                                                                                                                                                                      | Status  |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 3.1 | **Mini-Game-Framework** — Server: Task-Schema kriegt `mini_game: str`. WS: `mini_game_started` / `mini_game_input` / `mini_game_state` / `mini_game_completed`. Client: pluggable Modal. | ✅ done |
+| 3.2 | **Beispiel: „Test-Suite reparieren"** (für `fix_unit_tests`) — Liste aus 5 fehlerhaften Tests, klick die Bugs in der richtigen Reihenfolge weg.                                          | ✅ done |
 
 **Done-Kriterium:** Eine Task läuft komplett über ein Mini-Game (Server-validiert), die anderen 7 bleiben Hold-E. Das Mini-Game-API ist dokumentiert und Live-getestet, sodass weitere Mini-Games als eigene Slices folgen können (Code-Review-Simulator, Logs-Filtern, Coffee-Pour-Timing usw.).
 

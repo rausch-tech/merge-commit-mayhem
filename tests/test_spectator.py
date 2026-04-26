@@ -158,25 +158,25 @@ def test_ghost_can_start_task_hold():
     room, ids = _started_room()
     pid = ids[0]
     room.players[pid].is_alive = False
-    tx, ty = room.task_position("fix_unit_tests")
+    tx, ty = room.task_position("review_pr")
     room.players[pid].x, room.players[pid].y = tx, ty
-    room.apply_task_hold_start(pid, "fix_unit_tests")
-    assert pid in room.tasks["fix_unit_tests"].per_player_progress
+    room.apply_task_hold_start(pid, "review_pr")
+    assert pid in room.tasks["review_pr"].per_player_progress
 
 
 def test_ghost_task_completion_increments_release_progress():
     room, ids = _started_room()
     pid = ids[0]
     room.players[pid].is_alive = False
-    tx, ty = room.task_position("fix_unit_tests")
+    tx, ty = room.task_position("review_pr")
     room.players[pid].x, room.players[pid].y = tx, ty
     pre_progress = room.release_progress
     pre_count = room.completed_tasks_by_player.get(pid, 0)
-    room.apply_task_hold_start(pid, "fix_unit_tests")
+    room.apply_task_hold_start(pid, "review_pr")
     # Tick long enough to finish the 5s task.
     for _ in range(60):
         room.tick(0.1)
-        if room.tasks["fix_unit_tests"].status == "cooldown":
+        if room.tasks["review_pr"].status == "cooldown":
             break
     assert room.release_progress > pre_progress
     assert room.completed_tasks_by_player.get(pid, 0) == pre_count + 1

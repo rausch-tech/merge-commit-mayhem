@@ -272,18 +272,18 @@ def test_disconnect_during_solo_task_hold_releases_task():
     player = room.players[pid]
 
     # Place the player on the task.
-    task_x, task_y = room.task_position("fix_unit_tests")
+    task_x, task_y = room.task_position("review_pr")
     player.x, player.y = task_x, task_y
 
-    room.apply_task_hold_start(pid, "fix_unit_tests")
-    assert room.tasks["fix_unit_tests"].status == "in_progress"
-    assert pid in room.tasks["fix_unit_tests"].per_player_progress
+    room.apply_task_hold_start(pid, "review_pr")
+    assert room.tasks["review_pr"].status == "in_progress"
+    assert pid in room.tasks["review_pr"].per_player_progress
 
     # Disconnect should release.
     room.mark_disconnected(pid)
 
-    assert pid not in room.tasks["fix_unit_tests"].per_player_progress
-    assert room.tasks["fix_unit_tests"].status == "available"
+    assert pid not in room.tasks["review_pr"].per_player_progress
+    assert room.tasks["review_pr"].status == "available"
 
 
 # ---------------------------------------------------------------------------

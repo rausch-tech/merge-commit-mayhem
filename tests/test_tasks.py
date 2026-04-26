@@ -37,7 +37,7 @@ def _place_on(room: GameRoom, player_id: str, x: float, y: float) -> None:
 
 def test_tasks_initialized_on_start():
     room, ids = _room_with_players(2)
-    assert "fix_unit_tests" in room.tasks
+    assert "review_pr" in room.tasks
     for task in room.tasks.values():
         assert task.status == "available"
         assert task.cooldown_remaining == 0.0
@@ -56,7 +56,7 @@ def test_cannot_start_task_outside_playing_phase():
     room = GameRoom(code="ABCD")
     room.add_player("Sven")
     with pytest.raises(GameRoomError) as exc:
-        room.apply_task_hold_start("any", "fix_unit_tests")
+        room.apply_task_hold_start("any", "review_pr")
     assert exc.value.code == "WRONG_PHASE"
 
 
@@ -70,22 +70,22 @@ def test_cannot_start_unknown_task():
 def test_cannot_start_task_when_too_far():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    tx, ty = room.task_position("fix_unit_tests")
+    tx, ty = room.task_position("review_pr")
     # Place player clearly outside radius.
     _place_on(room, pid, tx + TASK_INTERACTION_RADIUS + 5, ty)
     with pytest.raises(GameRoomError) as exc:
-        room.apply_task_hold_start(pid, "fix_unit_tests")
+        room.apply_task_hold_start(pid, "review_pr")
     assert exc.value.code == "TASK_TOO_FAR"
 
 
 def test_start_task_in_range_marks_in_progress():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    tx, ty = room.task_position("fix_unit_tests")
+    tx, ty = room.task_position("review_pr")
     _place_on(room, pid, tx, ty)
-    room.apply_task_hold_start(pid, "fix_unit_tests")
-    assert room.tasks["fix_unit_tests"].status == "in_progress"
-    assert pid in room.tasks["fix_unit_tests"].per_player_progress
+    room.apply_task_hold_start(pid, "review_pr")
+    assert room.tasks["review_pr"].status == "in_progress"
+    assert pid in room.tasks["review_pr"].per_player_progress
 
 
 # --- hold stop -------------------------------------------------------------
@@ -94,12 +94,12 @@ def test_start_task_in_range_marks_in_progress():
 def test_stop_removes_progress_and_flips_back_to_available():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    tx, ty = room.task_position("fix_unit_tests")
+    tx, ty = room.task_position("review_pr")
     _place_on(room, pid, tx, ty)
-    room.apply_task_hold_start(pid, "fix_unit_tests")
-    room.apply_task_hold_stop(pid, "fix_unit_tests")
-    assert room.tasks["fix_unit_tests"].status == "available"
-    assert room.tasks["fix_unit_tests"].per_player_progress == {}
+    room.apply_task_hold_start(pid, "review_pr")
+    room.apply_task_hold_stop(pid, "review_pr")
+    assert room.tasks["review_pr"].status == "available"
+    assert room.tasks["review_pr"].per_player_progress == {}
 
 
 def test_stop_on_unknown_task_is_noop():
@@ -113,41 +113,41 @@ def test_stop_on_unknown_task_is_noop():
 def test_progress_accumulates_each_tick():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    tx, ty = room.task_position("fix_unit_tests")
+    tx, ty = room.task_position("review_pr")
     _place_on(room, pid, tx, ty)
-    room.apply_task_hold_start(pid, "fix_unit_tests")
+    room.apply_task_hold_start(pid, "review_pr")
     room.tick(0.1)
-    assert room.tasks["fix_unit_tests"].per_player_progress[pid] == pytest.approx(0.1)
+    assert room.tasks["review_pr"].per_player_progress[pid] == pytest.approx(0.1)
     room.tick(0.1)
-    assert room.tasks["fix_unit_tests"].per_player_progress[pid] == pytest.approx(0.2)
+    assert room.tasks["review_pr"].per_player_progress[pid] == pytest.approx(0.2)
 
 
 def test_task_completion_applies_reward_and_enters_cooldown():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    tx, ty = room.task_position("fix_unit_tests")
+    tx, ty = room.task_position("review_pr")
     _place_on(room, pid, tx, ty)
     # Freeze player by zeroing their input so movement doesn't push them out of radius.
     room.apply_input(pid, InputState())
-    room.apply_task_hold_start(pid, "fix_unit_tests")
+    room.apply_task_hold_start(pid, "review_pr")
     # Tick past required_seconds.
     for _ in range(60):  # 60 ticks of 0.1s = 6s > required 5s
         room.tick(0.1)
-    task = room.tasks["fix_unit_tests"]
+    task = room.tasks["review_pr"]
     assert task.status == "cooldown"
     assert task.cooldown_remaining > 0
     assert task.per_player_progress == {}
-    assert room.release_progress == 10  # fix_unit_tests reward
+    assert room.release_progress == 8  # review_pr reward
     assert room.completed_tasks_by_player[pid] == 1
 
 
 def test_task_cooldown_returns_to_available():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    tx, ty = room.task_position("fix_unit_tests")
+    tx, ty = room.task_position("review_pr")
     _place_on(room, pid, tx, ty)
     room.apply_input(pid, InputState())
-    room.apply_task_hold_start(pid, "fix_unit_tests")
+    room.apply_task_hold_start(pid, "review_pr")
     for _ in range(60):
         room.tick(0.1)  # completes
 
@@ -155,24 +155,24 @@ def test_task_cooldown_returns_to_available():
     ticks_needed = int(TASK_RESPAWN_COOLDOWN / 0.1) + 2
     for _ in range(ticks_needed):
         room.tick(0.1)
-    assert room.tasks["fix_unit_tests"].status == "available"
-    assert room.tasks["fix_unit_tests"].cooldown_remaining == 0.0
+    assert room.tasks["review_pr"].status == "available"
+    assert room.tasks["review_pr"].cooldown_remaining == 0.0
 
 
 def test_player_leaving_radius_drops_progress():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    tx, ty = room.task_position("fix_unit_tests")
+    tx, ty = room.task_position("review_pr")
     _place_on(room, pid, tx, ty)
     room.apply_input(pid, InputState())
-    room.apply_task_hold_start(pid, "fix_unit_tests")
+    room.apply_task_hold_start(pid, "review_pr")
     room.tick(0.1)
     # Yank the player away; next tick the progress should be dropped.
     _place_on(room, pid, tx + TASK_INTERACTION_RADIUS + 20, ty)
     room.tick(0.1)
-    assert pid not in room.tasks["fix_unit_tests"].per_player_progress
+    assert pid not in room.tasks["review_pr"].per_player_progress
     # No other holder -> status back to available.
-    assert room.tasks["fix_unit_tests"].status == "available"
+    assert room.tasks["review_pr"].status == "available"
 
 
 def test_refill_coffee_sets_coffee_to_100():
@@ -207,21 +207,21 @@ def test_repair_deployment_raises_pipeline_clamped_at_100():
 def test_parallel_workers_first_finisher_wins():
     room, ids = _room_with_players(2)
     a, b = ids[0], ids[1]
-    tx, ty = room.task_position("fix_unit_tests")
+    tx, ty = room.task_position("review_pr")
     _place_on(room, a, tx, ty)
     _place_on(room, b, tx + 5, ty)
     room.apply_input(a, InputState())
     room.apply_input(b, InputState())
-    room.apply_task_hold_start(a, "fix_unit_tests")
+    room.apply_task_hold_start(a, "review_pr")
     # A has a head start of 2s of solo progress.
     for _ in range(20):
         room.tick(0.1)
-    room.apply_task_hold_start(b, "fix_unit_tests")
+    room.apply_task_hold_start(b, "review_pr")
     # Tick until A completes.
     for _ in range(60):
         room.tick(0.1)
     # Reward only counts ONCE (not doubled).
-    assert room.release_progress == 10
+    assert room.release_progress == 8
     # Only A's counter incremented (A started first and finished first).
     assert room.completed_tasks_by_player[a] == 1
     assert room.completed_tasks_by_player[b] == 0
@@ -233,15 +233,15 @@ def test_parallel_workers_first_finisher_wins():
 def test_cannot_start_task_during_cooldown():
     room, ids = _room_with_players(2)
     pid = ids[0]
-    tx, ty = room.task_position("fix_unit_tests")
+    tx, ty = room.task_position("review_pr")
     _place_on(room, pid, tx, ty)
     room.apply_input(pid, InputState())
-    room.apply_task_hold_start(pid, "fix_unit_tests")
+    room.apply_task_hold_start(pid, "review_pr")
     for _ in range(60):
         room.tick(0.1)
-    assert room.tasks["fix_unit_tests"].status == "cooldown"
+    assert room.tasks["review_pr"].status == "cooldown"
     with pytest.raises(GameRoomError) as exc:
-        room.apply_task_hold_start(pid, "fix_unit_tests")
+        room.apply_task_hold_start(pid, "review_pr")
     assert exc.value.code == "TASK_ON_COOLDOWN"
 
 

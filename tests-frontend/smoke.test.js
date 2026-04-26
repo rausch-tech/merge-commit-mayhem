@@ -19,6 +19,9 @@ const modules = [
   "../static/takedown.js",
   "../static/tasks.js",
   "../static/ws.js",
+  "../static/minigames/base.js",
+  "../static/minigames/registry.js",
+  "../static/minigames/test_suite_repair.js",
 ];
 
 describe("static module smoke", () => {

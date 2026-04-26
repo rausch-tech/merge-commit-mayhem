@@ -257,17 +257,17 @@ def test_takedown_drops_target_task_holds():
     target_id = release_ids[0]
     target = room.players[target_id]
     # Place target ON a task and start a hold.
-    tx, ty = room.task_position("fix_unit_tests")
+    tx, ty = room.task_position("review_pr")
     target.x, target.y = tx, ty
-    room.apply_task_hold_start(target_id, "fix_unit_tests")
-    assert target_id in room.tasks["fix_unit_tests"].per_player_progress
+    room.apply_task_hold_start(target_id, "review_pr")
+    assert target_id in room.tasks["review_pr"].per_player_progress
 
     # Place chaos in range and kill.
     room.players[chaos_id].x, room.players[chaos_id].y = tx, ty + 5
     room.apply_takedown(killer_id=chaos_id, target_id=target_id)
 
-    assert target_id not in room.tasks["fix_unit_tests"].per_player_progress
-    assert room.tasks["fix_unit_tests"].status == "available"
+    assert target_id not in room.tasks["review_pr"].per_player_progress
+    assert room.tasks["review_pr"].status == "available"
 
 
 def test_takedown_does_not_emit_event():
