@@ -538,7 +538,11 @@ class GameRoom:
         release_alive = sum(
             1 for p in self.players.values() if p.is_alive and p.team == "release_team"
         )
-        if chaos_alive > 0 and chaos_alive >= release_alive:
+        # Parity only fires if a release team existed in this round at all.
+        # Demo-Mode (1 player forced to chaos) has zero release players from the
+        # start and would otherwise trigger a chaos win on the first tick.
+        total_release = sum(1 for p in self.players.values() if p.team == "release_team")
+        if total_release > 0 and chaos_alive > 0 and chaos_alive >= release_alive:
             self._finish_round("chaos_agents", "Chaos hat die Mehrheit.")
             return
         if self.release_progress >= 100:

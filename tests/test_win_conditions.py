@@ -171,6 +171,22 @@ def test_no_chaos_parity_when_zero_chaos_alive():
     assert room.win_reason == "Alle Chaos-Agenten wurden enttarnt."
 
 
+def test_demo_mode_solo_player_does_not_immediately_win_chaos():
+    """Regression: a solo demo round (1 chaos, 0 release) used to trigger the
+    chaos-parity win on the very first tick because chaos_alive (1) >= release_alive
+    (0). The parity rule must only fire if a release team existed at all."""
+    room = GameRoom(code="DEMO")
+    room.add_player("Solo")
+    host_id = next(iter(room.players))
+    room.start(requesting_player_id=host_id, rng=random.Random(0), demo=True)
+    # Solo demo forces vibe_coder.
+    assert room.players[host_id].team == "chaos_agents"
+    assert sum(1 for p in room.players.values() if p.team == "release_team") == 0
+    room.tick(0.05)
+    assert room.phase is Phase.PLAYING
+    assert room.winner is None
+
+
 # --- reset recovers --------------------------------------------------------
 
 
