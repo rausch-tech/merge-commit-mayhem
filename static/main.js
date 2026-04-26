@@ -88,11 +88,14 @@ const hud = new Hud();
 const renderer = new Renderer(els.canvas);
 renderer.start();
 
-// Initial size + react to window resize.
+// Initial size + react to window resize. The ResizeObserver also catches
+// the display:none → block transition when the game-screen first appears,
+// which window 'resize' events do not fire for. Without this the canvas
+// backbuffer stays at 1×1 from the lobby and renders nothing.
 const resizeRenderer = () => renderer.resize();
 window.addEventListener("resize", resizeRenderer);
-// Run once after first paint when the canvas has a real layout size.
-window.requestAnimationFrame(resizeRenderer);
+const canvasResizeObserver = new ResizeObserver(resizeRenderer);
+canvasResizeObserver.observe(els.canvas);
 
 const sabotagePanelEl = document.getElementById("sabotage-panel");
 const sabotagePanel = new SabotagePanel(sabotagePanelEl, ws);
@@ -210,6 +213,10 @@ ws.on("game_state", (payload) => {
   if (state.phase !== "playing" && payload.phase === "playing") {
     els.lobbyScreen.classList.add("hidden");
     els.gameScreen.classList.remove("hidden");
+    // The canvas was hidden until just now, so its first measurable size
+    // happens here. ResizeObserver alone misses some display:none → block
+    // transitions, so resize explicitly on the phase switch.
+    renderer.resize();
   }
   state.phase = payload.phase;
   state.players = payload.players;
