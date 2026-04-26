@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <title>MCM Map-Editor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/static/editor/editor.css" />
+  </head>
+  <body>
+    <header id="editor-topbar">
+      <div class="topbar-group">
+        <strong>MCM Map-Editor</strong>
+      </div>
+      <div class="topbar-group">
+        <button id="btn-new" type="button">Neu</button>
+        <button id="btn-load" type="button">JSON laden</button>
+        <input id="file-input" type="file" accept=".json,application/json" hidden />
+        <button id="btn-download" type="button">JSON herunterladen</button>
+      </div>
+      <div class="topbar-group">
+        <label>
+          Map-Name
+          <input id="map-name" type="text" autocomplete="off" />
+        </label>
+        <label>
+          War-Room
+          <select id="war-room-select"></select>
+        </label>
+        <label>
+          Map-Breite
+          <input id="map-width" type="number" min="100" step="50" />
+        </label>
+        <label>
+          Map-Höhe
+          <input id="map-height" type="number" min="100" step="50" />
+        </label>
+      </div>
+      <div class="topbar-group" id="dirty-indicator">
+        <span id="dirty-flag" class="hidden">unsaved</span>
+      </div>
+    </header>
+    <main id="editor-main">
+      <aside id="tools-sidebar">
+        <h3>Werkzeuge</h3>
+        <ul class="tool-list">
+          <li>
+            <label>
+              <input type="radio" name="tool" value="select" checked />
+              Auswählen
+            </label>
+          </li>
+          <li>
+            <label>
+              <input type="radio" name="tool" value="room" />
+              Raum
+            </label>
+          </li>
+          <li>
+            <label>
+              <input type="radio" name="tool" value="wall" />
+              Wand
+            </label>
+          </li>
+          <li>
+            <label>
+              <input type="radio" name="tool" value="spawn" />
+              Spawn
+            </label>
+          </li>
+          <li>
+            <label>
+              <input type="radio" name="tool" value="task" />
+              Task-Anker
+            </label>
+          </li>
+        </ul>
+        <p class="hint">
+          Shift halten = Snapping aus.<br />
+          Entf-Taste = Auswahl löschen.
+        </p>
+      </aside>
+      <aside id="props-sidebar">
+        <h3>Eigenschaften</h3>
+        <div id="props-empty" class="props-empty">Nichts ausgewählt.</div>
+        <div id="props-content" class="hidden"></div>
+      </aside>
+      <section id="canvas-area">
+        <canvas id="editor-canvas" width="1200" height="800"></canvas>
+        <div id="status-bar"><span id="cursor-coords">--, --</span></div>
+      </section>
+    </main>
+    <script type="module" src="/static/editor/editor.js"></script>
+  </body>
+</html>

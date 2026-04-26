@@ -5,6 +5,11 @@ interprets. The default map lives at `/maps/default.json`. New maps can be added
 by dropping further JSON files in that directory and (later) selecting them from
 the lobby; for now only the default is loaded.
 
+Maps können auch im Browser-Editor unter `/editor` erstellt werden. Der Editor
+ist ein rein clientseitiges Tool: er erzeugt JSON-Dateien in genau diesem
+Schema, modifiziert keinen Server-State und kann bestehende Maps zur Bearbeitung
+laden.
+
 ## Top-level
 
 ```jsonc

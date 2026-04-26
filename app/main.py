@@ -510,3 +510,13 @@ app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 @app.get("/")
 async def root_index() -> FileResponse:
     return FileResponse(_static_dir / "index.html")
+
+
+@app.get("/editor")
+async def editor_page() -> FileResponse:
+    """Serve the standalone map-editor page.
+
+    The editor is a pure client-side tool — it only consumes/produces JSON
+    files conforming to ``docs/maps.md``. No editor-specific server state.
+    """
+    return FileResponse(_static_dir / "editor" / "editor.html")
