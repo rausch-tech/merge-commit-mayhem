@@ -238,21 +238,23 @@ class GameRoom:
                     task.status = "available"
         # Reset their input.
         player.input_state = InputState()
-        # Host transfer if they were host.
+        # Host transfer if they were host. If no candidate exists (solo
+        # session), leave the bit on the disconnected player so they remain
+        # host on rejoin. The grace-period sweep (remove_player) handles the
+        # transfer if they never come back.
         if player.is_host:
-            player.is_host = False
             living_others = [
                 p for p in self.players.values() if p.id != player_id and p.is_connected
             ]
+            others = [p for p in self.players.values() if p.id != player_id]
+            successor = None
             if living_others:
-                oldest = min(living_others, key=lambda p: p.joined_at)
-                oldest.is_host = True
-            else:
-                # Fall back to any non-self player.
-                others = [p for p in self.players.values() if p.id != player_id]
-                if others:
-                    oldest = min(others, key=lambda p: p.joined_at)
-                    oldest.is_host = True
+                successor = min(living_others, key=lambda p: p.joined_at)
+            elif others:
+                successor = min(others, key=lambda p: p.joined_at)
+            if successor is not None:
+                player.is_host = False
+                successor.is_host = True
 
     def mark_reconnected(self, player_id: str) -> "Player":
         """

@@ -753,3 +753,28 @@ def test_solo_demo_player_disconnect_room_is_empty_after_grace():
         assert registry.get("EC15") is None, (
             "Registry must drop the room once it is empty (EC15 fix)"
         )
+
+
+def test_solo_host_keeps_host_status_across_disconnect_reconnect():
+    """Regression: a solo host who briefly disconnects (e.g. tab refresh
+    during PLAYING) must remain host after reconnect. Previously
+    mark_disconnected demoted them unconditionally and there was nobody to
+    transfer host to, leaving the room without a host on rejoin — which in
+    turn surfaced as ``isHost: false`` in the personalized snapshot the
+    only player ever sees of themselves."""
+    room = GameRoom(code="SOLO")
+    p = room.add_player("Lonely")
+    pid = p.id
+    room.start(requesting_player_id=pid, rng=random.Random(0), demo=True)
+    assert p.is_host is True
+
+    room.mark_disconnected(pid)
+    assert p.is_host is True, (
+        "Solo host must keep is_host=True on disconnect — there is nobody to transfer to"
+    )
+
+    room.mark_reconnected(pid)
+    assert p.is_host is True, "Reconnect must not silently demote the only player"
+
+    snapshot = room.public_state_for(pid)
+    assert snapshot["players"][0]["isHost"] is True
