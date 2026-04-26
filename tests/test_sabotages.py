@@ -170,8 +170,71 @@ def test_public_state_exposes_sabotages_and_tasks():
     room.apply_sabotage(chaos_id, "ci_cd_red")
     state = room.public_state()
     sab_ids = {s["id"] for s in state["sabotages"]}
-    assert sab_ids == {"ci_cd_red", "coffee_outage", "mandatory_meeting"}
+    assert sab_ids == {
+        "ci_cd_red",
+        "coffee_outage",
+        "mandatory_meeting",
+        "merge_conflict_storm",
+        "fake_customer_request",
+        "flaky_tests",
+    }
     ci_cd = next(s for s in state["sabotages"] if s["id"] == "ci_cd_red")
     assert ci_cd["cooldownRemaining"] > 0
     task_ids = {t["id"] for t in state["tasks"]}
     assert "fix_unit_tests" in task_ids
+
+
+# --- Tier 1.4 sabotages ----------------------------------------------------
+
+
+def test_merge_conflict_storm_drops_pipeline_and_raises_incidents():
+    room, chaos_id, _ = _room_with_roles()
+    room.pipeline_stability = 80
+    room.incidents = 10
+    room.apply_sabotage(chaos_id, "merge_conflict_storm")
+    assert room.pipeline_stability == 70
+    assert room.incidents == 35
+    sab = room.sabotages["merge_conflict_storm"]
+    assert sab.cooldown_remaining > 0
+
+
+def test_fake_customer_request_drops_release_progress():
+    room, chaos_id, _ = _room_with_roles()
+    room.release_progress = 50
+    room.apply_sabotage(chaos_id, "fake_customer_request")
+    assert room.release_progress == 35
+    sab = room.sabotages["fake_customer_request"]
+    assert sab.cooldown_remaining > 0
+
+
+def test_fake_customer_request_floors_at_zero():
+    room, chaos_id, _ = _room_with_roles()
+    room.release_progress = 5
+    room.apply_sabotage(chaos_id, "fake_customer_request")
+    assert room.release_progress == 0
+
+
+def test_flaky_tests_only_raises_incidents():
+    room, chaos_id, _ = _room_with_roles()
+    pipe_before = room.pipeline_stability
+    release_before = room.release_progress
+    room.apply_sabotage(chaos_id, "flaky_tests")
+    assert room.pipeline_stability == pipe_before
+    assert room.release_progress == release_before
+    assert room.incidents == 30
+
+
+def test_each_new_sabotage_emits_event():
+    room, chaos_id, _ = _room_with_roles()
+    room.apply_sabotage(chaos_id, "merge_conflict_storm")
+    msgs = [e.message for e in room.events]
+    assert any("Merge-Konflikt" in m for m in msgs)
+    # Reset and try the other two.
+    room.events.clear()
+    room.sabotages["fake_customer_request"].cooldown_remaining = 0
+    room.apply_sabotage(chaos_id, "fake_customer_request")
+    assert any("Scope" in e.message for e in room.events)
+    room.events.clear()
+    room.sabotages["flaky_tests"].cooldown_remaining = 0
+    room.apply_sabotage(chaos_id, "flaky_tests")
+    assert any("Tests" in e.message for e in room.events)

@@ -230,6 +230,9 @@ def test_chaos_sees_available_sabotages_in_private_role():
                     "ci_cd_red",
                     "coffee_outage",
                     "mandatory_meeting",
+                    "merge_conflict_storm",
+                    "fake_customer_request",
+                    "flaky_tests",
                 ]
             else:
                 assert role["payload"]["availableSabotages"] == []
@@ -254,7 +257,14 @@ def test_game_state_carries_stats_and_tasks_and_sabotages():
         task_ids = {t["id"] for t in p["tasks"]}
         assert "fix_unit_tests" in task_ids
         sab_ids = {s["id"] for s in p["sabotages"]}
-        assert sab_ids == {"ci_cd_red", "coffee_outage", "mandatory_meeting"}
+        assert sab_ids == {
+            "ci_cd_red",
+            "coffee_outage",
+            "mandatory_meeting",
+            "merge_conflict_storm",
+            "fake_customer_request",
+            "flaky_tests",
+        }
 
 
 def test_game_ended_broadcast_on_release_win():
@@ -374,6 +384,9 @@ def test_demo_mode_lets_single_player_start_via_ws():
             "ci_cd_red",
             "coffee_outage",
             "mandatory_meeting",
+            "merge_conflict_storm",
+            "fake_customer_request",
+            "flaky_tests",
         ]
         state = _drain_until(ws, "game_state")
         assert state["payload"]["phase"] == "playing"

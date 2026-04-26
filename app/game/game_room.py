@@ -633,6 +633,12 @@ class GameRoom:
             self.coffee_level = 0
         elif sabotage_id == "mandatory_meeting":
             self.meeting_active_for = MEETING_DURATION
+        elif sabotage_id == "merge_conflict_storm":
+            self.pipeline_stability = max(0, self.pipeline_stability - 10)
+        elif sabotage_id == "fake_customer_request":
+            self.release_progress = max(0, self.release_progress - 15)
+        elif sabotage_id == "flaky_tests":
+            pass  # Effect lives entirely in incidents_increase.
         # Future sabotages: add here.
 
         if sab.definition.incidents_increase:
@@ -649,6 +655,12 @@ class GameRoom:
             self._emit_event("warn", "Die Kaffeemaschine ist offline.")
         elif sabotage_id == "mandatory_meeting":
             self._emit_event("warn", "Ein Meeting ohne Agenda wurde gestartet.")
+        elif sabotage_id == "merge_conflict_storm":
+            self._emit_event("danger", "Merge-Konflikt-Apokalypse — die Pipeline ringt um Luft.")
+        elif sabotage_id == "fake_customer_request":
+            self._emit_event("warn", "Eine kleine Kundenänderung. Scope explodiert.")
+        elif sabotage_id == "flaky_tests":
+            self._emit_event("warn", "Die Tests schlagen fehl, aber nur manchmal.")
 
     def _tick_sabotages(self, dt: float) -> None:
         for sab in self.sabotages.values():

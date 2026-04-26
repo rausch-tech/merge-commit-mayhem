@@ -128,10 +128,17 @@ def test_incidents_reducing_tasks_exist():
             assert t.incidents_change == 0, f"{t.id} should not change incidents"
 
 
-def test_sabotage_definition_default_incidents_increase_is_zero():
+def test_incidents_raising_sabotages_exist():
+    """Slice 1.4 added two sabotages that raise incidents on trigger."""
     from app.game.sabotages import SABOTAGE_DEFINITIONS
 
-    assert all(s.incidents_increase == 0 for s in SABOTAGE_DEFINITIONS)
+    by_id = {s.id: s for s in SABOTAGE_DEFINITIONS}
+    assert by_id["merge_conflict_storm"].incidents_increase > 0
+    assert by_id["flaky_tests"].incidents_increase > 0
+    # Other sabotages remain neutral on incidents.
+    for s in SABOTAGE_DEFINITIONS:
+        if s.id not in {"merge_conflict_storm", "flaky_tests"}:
+            assert s.incidents_increase == 0, f"{s.id} should not change incidents"
 
 
 def test_task_with_negative_incidents_change_reduces_incidents():

@@ -23,6 +23,23 @@ SABOTAGE_DEFINITIONS: Final[list[SabotageDefinition]] = [
     SabotageDefinition(id="ci_cd_red", title="CI/CD Rot", cooldown_seconds=60.0),
     SabotageDefinition(id="coffee_outage", title="Kaffee leer", cooldown_seconds=75.0),
     SabotageDefinition(id="mandatory_meeting", title="Mandatory Meeting", cooldown_seconds=90.0),
+    SabotageDefinition(
+        id="merge_conflict_storm",
+        title="Merge Conflict Storm",
+        cooldown_seconds=70.0,
+        incidents_increase=25,
+    ),
+    SabotageDefinition(
+        id="fake_customer_request",
+        title="Fake Customer Request",
+        cooldown_seconds=90.0,
+    ),
+    SabotageDefinition(
+        id="flaky_tests",
+        title="Flaky Tests",
+        cooldown_seconds=60.0,
+        incidents_increase=30,
+    ),
 ]
 
 
