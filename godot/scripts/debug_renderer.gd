@@ -43,29 +43,39 @@ func set_map(map: Dictionary) -> void:
 
 func _fit_camera_to_map() -> void:
 	if not is_inside_tree():
+		print("[fit-camera] not in tree, skip")
 		return
 	var parent_node := get_parent()
 	if parent_node == null:
+		print("[fit-camera] no parent, skip")
 		return
 	var camera_node: Camera2D = parent_node.get_node_or_null("Camera") as Camera2D
 	if camera_node == null:
+		print("[fit-camera] camera node not found under parent ", parent_node.name)
 		return
 	var size_dict: Dictionary = _map.get("size", {})
 	var map_w: float = float(size_dict.get("width", 4800))
 	var map_h: float = float(size_dict.get("height", 3200))
 	if map_w <= 0 or map_h <= 0:
+		print("[fit-camera] invalid map size %sx%s, skip" % [map_w, map_h])
 		return
-	var viewport := get_viewport()
-	if viewport == null:
+	# Use the actual OS window size — under stretch_mode=canvas_items + aspect=expand,
+	# get_viewport_rect() may return the configured base viewport (1280x720) regardless
+	# of how big the actual window is. Fitting to the *window* gives the user-expected
+	# "fill the screen" behaviour.
+	var window_size: Vector2 = Vector2(get_window().size)
+	if window_size.x <= 0 or window_size.y <= 0:
+		print("[fit-camera] window size 0x0, skip")
 		return
-	var viewport_size: Vector2 = viewport.get_visible_rect().size
-	if viewport_size.x <= 0 or viewport_size.y <= 0:
-		return
-	var fit_x: float = viewport_size.x / map_w
-	var fit_y: float = viewport_size.y / map_h
-	var zoom_factor: float = minf(fit_x, fit_y) * 0.95
+	var viewport_rect: Vector2 = get_viewport_rect().size
+	var fit_x: float = window_size.x / map_w
+	var fit_y: float = window_size.y / map_h
+	var zoom_factor: float = minf(fit_x, fit_y) * 0.98
 	camera_node.zoom = Vector2(zoom_factor, zoom_factor)
 	camera_node.position = Vector2(map_w * 0.5, map_h * 0.5)
+	print("[fit-camera] window=%s viewport_rect=%s map=%sx%s zoom=%.4f" % [
+		window_size, viewport_rect, map_w, map_h, zoom_factor
+	])
 
 func set_self_player_id(id: String) -> void:
 	_self_player_id = id
