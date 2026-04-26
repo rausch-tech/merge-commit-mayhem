@@ -26,6 +26,41 @@ def _drain_until(ws, type_: str, max_msgs: int = 10) -> dict:
     raise AssertionError(f"Did not receive {type_!r} within {max_msgs} messages.")
 
 
+def _pad_room_to_min(room_code: str, min_players: int = 4) -> list[str]:
+    """Pad a room with server-side dummy players up to `min_players`.
+
+    Tier 1.5 raised MIN_PLAYERS_TO_START to 4. Many existing WS tests join only
+    2 real WebSocket clients; this helper backfills the remaining slots by
+    poking the registry directly. The dummies have no socket — they sit in the
+    room as if connected. Tests that don't observe these slots are unaffected.
+
+    Returns the list of filler player ids in join order, so meeting/voting
+    tests can pre-cast skip votes on their behalf.
+    """
+    room = registry.get(room_code)
+    assert room is not None, f"Room {room_code!r} not registered yet."
+    filler_ids: list[str] = []
+    while len(room.players) < min_players:
+        idx = len(room.players)
+        p = room.add_player(f"_filler_{idx}")
+        filler_ids.append(p.id)
+    return filler_ids
+
+
+def _skip_vote_for_fillers(room_code: str, filler_ids: list[str]) -> None:
+    """Cast a server-side skip vote for each filler player.
+
+    Only the test client's votes get cast through the WS protocol. To let a
+    meeting resolve immediately when all alive players have voted, dummies
+    must skip too. Safe to call only after MEETING phase has been entered.
+    """
+    room = registry.get(room_code)
+    assert room is not None
+    for fid in filler_ids:
+        if fid in room.players and room.players[fid].is_alive:
+            room.skip_vote(fid)
+
+
 def test_two_clients_can_join_same_room():
     client = TestClient(app)
     with client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
@@ -74,6 +109,7 @@ def test_host_start_gives_private_role_and_game_state():
         ws_a.receive_json()
         ws_b.receive_json()
 
+        _pad_room_to_min("JKLM")
         ws_a.send_json({"type": "start_game", "payload": {}})
 
         # Contract: private_role MUST arrive before game_state on each client.
@@ -88,10 +124,10 @@ def test_host_start_gives_private_role_and_game_state():
 
         assert role_a["payload"]["role"] in {"vibe_coder", "developer"}
         assert role_b["payload"]["role"] in {"vibe_coder", "developer"}
-        # Exactly one is chaos, one is dev.
-        roles = {role_a["payload"]["role"], role_b["payload"]["role"]}
-        assert roles == {"vibe_coder", "developer"}
-
+        # With 4 players (2 real + 2 fillers) we have exactly 1 chaos. Each
+        # role observed by the real clients is one of the legal values; we
+        # don't assert their disjointness because both real clients could be
+        # release_team.
         assert state_a["payload"]["phase"] == "playing"
         # Public state must not leak roles.
         for p in state_a["payload"]["players"]:
@@ -170,6 +206,7 @@ def test_task_hold_too_far_returns_error():
         ws_a.receive_json()
         ws_b.receive_json()
 
+        _pad_room_to_min("TASK")
         ws_a.send_json({"type": "start_game", "payload": {}})
         _drain_until(ws_a, "private_role")
         _drain_until(ws_a, "game_state")
@@ -196,13 +233,21 @@ def test_non_chaos_cannot_trigger_sabotage():
         ws_a.receive_json()
         ws_b.receive_json()
 
+        _pad_room_to_min("SABO")
         ws_a.send_json({"type": "start_game", "payload": {}})
+        # With 2 real clients + 2 fillers the chaos may end up on a filler;
+        # find a real client whose team is not chaos and try the sabotage.
         role_a = _drain_until(ws_a, "private_role")
         _drain_until(ws_a, "game_state")
-        _drain_until(ws_b, "private_role")
+        role_b = _drain_until(ws_b, "private_role")
         _drain_until(ws_b, "game_state")
 
-        non_chaos_ws = ws_a if role_a["payload"]["team"] != "chaos_agents" else ws_b
+        non_chaos_ws = None
+        if role_a["payload"]["team"] != "chaos_agents":
+            non_chaos_ws = ws_a
+        elif role_b["payload"]["team"] != "chaos_agents":
+            non_chaos_ws = ws_b
+        assert non_chaos_ws is not None, "Expected at least one real client to be non-chaos."
         non_chaos_ws.send_json({"type": "trigger_sabotage", "payload": {"sabotageId": "ci_cd_red"}})
         err = non_chaos_ws.receive_json()
         while err["type"] == "game_state":
@@ -220,6 +265,7 @@ def test_chaos_sees_available_sabotages_in_private_role():
         ws_a.receive_json()
         ws_b.receive_json()
 
+        _pad_room_to_min("AVAIL")
         ws_a.send_json({"type": "start_game", "payload": {}})
         role_a = _drain_until(ws_a, "private_role")
         role_b = _drain_until(ws_b, "private_role")
@@ -247,6 +293,7 @@ def test_game_state_carries_stats_and_tasks_and_sabotages():
         ws_a.receive_json()
         ws_b.receive_json()
 
+        _pad_room_to_min("STAT")
         ws_a.send_json({"type": "start_game", "payload": {}})
         _drain_until(ws_a, "private_role")
         state = _drain_until(ws_a, "game_state")
@@ -290,6 +337,7 @@ def test_game_ended_broadcast_on_release_win():
         ws_b.receive_json()
         ws_c.receive_json()
 
+        _pad_room_to_min("ENDR")
         ws_a.send_json({"type": "start_game", "payload": {}})
         for ws in [ws_a, ws_b, ws_c]:
             _drain_until(ws, "private_role")
@@ -340,6 +388,7 @@ def test_return_to_lobby_requires_host_and_ended_phase():
         assert err["payload"]["code"] == "WRONG_PHASE"
 
         # Start round
+        _pad_room_to_min("RESET")
         ws_a.send_json({"type": "start_game", "payload": {}})
         for ws in [ws_a, ws_b, ws_c]:
             _drain_until(ws, "private_role")
@@ -364,9 +413,11 @@ def test_return_to_lobby_requires_host_and_ended_phase():
         lob_a = _drain_until(ws_a, "lobby_state")
         lob_b = _drain_until(ws_b, "lobby_state")
         lob_c = _drain_until(ws_c, "lobby_state")
-        assert len(lob_a["payload"]["players"]) == 3
-        assert len(lob_b["payload"]["players"]) == 3
-        assert len(lob_c["payload"]["players"]) == 3
+        # 3 real WS clients + 1 server-side filler (Tier 1.5 min-players pad)
+        # = 4 players in lobby. Real clients always see all of them.
+        assert len(lob_a["payload"]["players"]) == 4
+        assert len(lob_b["payload"]["players"]) == 4
+        assert len(lob_c["payload"]["players"]) == 4
 
 
 # --- Demo mode (WS) ------------------------------------------------------
@@ -427,6 +478,7 @@ def test_call_emergency_meeting_outside_war_room_returns_error():
         ws_b.receive_json()
         ws_c.receive_json()
 
+        _pad_room_to_min("MEET")
         ws_a.send_json({"type": "start_game", "payload": {}})
         for ws in [ws_a, ws_b, ws_c]:
             _drain_until(ws, "private_role")
@@ -460,6 +512,7 @@ def test_call_meeting_from_war_room_transitions_to_meeting_phase():
         ws_b.receive_json()
         ws_c.receive_json()
 
+        _pad_room_to_min("MEET2")
         ws_a.send_json({"type": "start_game", "payload": {}})
         for ws in [ws_a, ws_b, ws_c]:
             _drain_until(ws, "private_role")
@@ -598,6 +651,7 @@ def test_rejoin_after_disconnect_during_playing():
             _join(ws_b, "RECONN", "Bob")
             ws_a.receive_json()
             ws_b.receive_json()
+            _pad_room_to_min("RECONN")
             ws_a.send_json({"type": "start_game", "payload": {}})
             _drain_until(ws_a, "private_role")
             _drain_until(ws_a, "game_state")
@@ -657,6 +711,7 @@ def test_meeting_resolves_with_skip_when_only_skips_received():
         ws_b.receive_json()
         ws_c.receive_json()
 
+        filler_ids = _pad_room_to_min("VOTSK")
         ws_a.send_json({"type": "start_game", "payload": {}})
         for ws in [ws_a, ws_b, ws_c]:
             _drain_until(ws, "private_role")
@@ -676,6 +731,7 @@ def test_meeting_resolves_with_skip_when_only_skips_received():
         ws_a.send_json({"type": "skip_vote", "payload": {}})
         ws_b.send_json({"type": "skip_vote", "payload": {}})
         ws_c.send_json({"type": "skip_vote", "payload": {}})
+        _skip_vote_for_fillers("VOTSK", filler_ids)
 
         result = _drain_until(ws_a, "voting_result", max_msgs=120)
         assert result["payload"]["removedPlayerId"] == ""

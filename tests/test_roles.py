@@ -2,17 +2,52 @@ import random
 
 import pytest
 
-from app.game.roles import assign
+from app.game.roles import assign, chaos_count_for
 
 
-@pytest.mark.parametrize("n", [2, 3, 4, 5, 6])
-def test_assigns_exactly_one_chaos_agent(n: int):
+@pytest.mark.parametrize(
+    "n,expected_chaos",
+    [
+        (2, 1),
+        (3, 1),
+        (4, 1),
+        (5, 1),
+        (6, 1),
+        (7, 2),
+        (8, 2),
+        (9, 2),
+        (10, 3),
+        (11, 3),
+        (12, 3),
+    ],
+)
+def test_assigns_expected_chaos_count(n: int, expected_chaos: int):
     player_ids = [f"p{i}" for i in range(n)]
     result = assign(player_ids, rng=random.Random(42))
     chaos = [pid for pid, info in result.items() if info.role == "vibe_coder"]
     devs = [pid for pid, info in result.items() if info.role == "developer"]
-    assert len(chaos) == 1
-    assert len(devs) == n - 1
+    assert len(chaos) == expected_chaos
+    assert len(devs) == n - expected_chaos
+
+
+@pytest.mark.parametrize(
+    "n,expected_chaos",
+    [
+        (2, 1),
+        (3, 1),
+        (4, 1),
+        (5, 1),
+        (6, 1),
+        (7, 2),
+        (8, 2),
+        (9, 2),
+        (10, 3),
+        (11, 3),
+        (12, 3),
+    ],
+)
+def test_chaos_count_for_matches_spec(n: int, expected_chaos: int):
+    assert chaos_count_for(n) == expected_chaos
 
 
 def test_roles_have_correct_teams():
@@ -47,7 +82,7 @@ def test_raises_for_too_few_players():
 
 def test_raises_for_too_many_players():
     with pytest.raises(ValueError):
-        assign([f"p{i}" for i in range(7)], rng=random.Random(0))
+        assign([f"p{i}" for i in range(13)], rng=random.Random(0))
 
 
 def test_role_info_exposes_description():

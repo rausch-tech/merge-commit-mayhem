@@ -20,14 +20,16 @@ from app.main import app, registry
 # ---------------------------------------------------------------------------
 
 
-def _make_started_room(player_count: int = 3, seed: int = 0) -> GameRoom:
+def _make_started_room(player_count: int = 4, seed: int = 0) -> GameRoom:
     """Create a started GameRoom with *player_count* players.
 
-    Tier 2.1 chaos-parity: bump 2-player requests to 3 so the new chaos-parity
-    win condition (chaos_alive >= release_alive) does not fire on the first tick.
+    Tier 1.5 raised MIN_PLAYERS_TO_START to 4 — bump any caller-supplied count
+    below 4 silently. Tier 2.1 chaos-parity (chaos_alive >= release_alive) still
+    needs >=3 release; with 4 players (1 chaos + 3 release) parity does not fire
+    on the first tick.
     """
-    if player_count < 3:
-        player_count = 3
+    if player_count < 4:
+        player_count = 4
     room = GameRoom(code="TEST")
     for i in range(player_count):
         room.add_player(f"p{i}")
@@ -46,6 +48,39 @@ def _force_meeting(room: GameRoom, caller_id: str) -> None:
     """Place caller in War Room and call a meeting."""
     _place_in_war_room(room, caller_id)
     room.call_emergency_meeting(requesting_player_id=caller_id, rng=random.Random(0))
+
+
+def _pad_room_to_min(room_code: str, min_players: int = 4) -> list[str]:
+    """Pad a room with server-side dummy players up to `min_players`.
+
+    Tier 1.5 raised MIN_PLAYERS_TO_START to 4. Many existing WS-based edge-case
+    tests join only 2-3 real WebSocket clients; this helper backfills the
+    remaining slots by poking the registry directly. Returns the new filler
+    player ids in join order.
+    """
+    room = registry.get(room_code)
+    assert room is not None, f"Room {room_code!r} not registered yet."
+    filler_ids: list[str] = []
+    while len(room.players) < min_players:
+        idx = len(room.players)
+        p = room.add_player(f"_filler_{idx}")
+        filler_ids.append(p.id)
+    return filler_ids
+
+
+def _drop_fillers(room_code: str, filler_ids: list[str]) -> None:
+    """Remove server-side filler players from the room.
+
+    Use this after start() in tests that go on to assert room cleanup behavior
+    (room becomes empty / drops from registry). Fillers don't have WebSockets,
+    so they would otherwise block "all WS closed -> empty room" assertions.
+    """
+    room = registry.get(room_code)
+    if room is None:
+        return
+    for fid in filler_ids:
+        if fid in room.players:
+            room.remove_player(fid)
 
 
 # ---------------------------------------------------------------------------
@@ -166,6 +201,7 @@ def test_last_player_disconnect_in_ended_phase_drops_room():
             ws_b.receive_json()  # lobby_state broadcast
             ws_c.receive_json()  # lobby_state
 
+            filler_ids = _pad_room_to_min("ECDROP")
             ws_a.send_json({"type": "start_game", "payload": {}})
             for _ in range(4):
                 ws_a.receive_json()
@@ -173,6 +209,10 @@ def test_last_player_disconnect_in_ended_phase_drops_room():
                 ws_b.receive_json()
             for _ in range(2):
                 ws_c.receive_json()
+
+            # Drop server-side fillers so the "all WS clients close -> empty room"
+            # cleanup assertion below holds.
+            _drop_fillers("ECDROP", filler_ids)
 
             # Force ENDED.
             room = registry.get("ECDROP")
@@ -291,6 +331,7 @@ def test_rejoin_during_meeting_can_vote():
             ws_b.receive_json()
             ws_c.receive_json()
 
+            _pad_room_to_min("ECMTG")
             ws_a.send_json({"type": "start_game", "payload": {}})
             for _ in range(2):
                 ws_a.receive_json()
@@ -673,6 +714,7 @@ def test_solo_demo_player_disconnect_room_is_empty_after_grace():
                 ws_b.receive_json()
             ws_c.receive_json()
 
+            filler_ids = _pad_room_to_min("EC15")
             ws_a.send_json({"type": "start_game", "payload": {}})
             for _ in range(2):
                 ws_a.receive_json()  # private_role + initial game_state
@@ -680,6 +722,10 @@ def test_solo_demo_player_disconnect_room_is_empty_after_grace():
                 ws_b.receive_json()
             for _ in range(2):
                 ws_c.receive_json()
+
+            # Drop server-side fillers so the "all WS clients close -> empty room"
+            # sweep below removes everyone.
+            _drop_fillers("EC15", filler_ids)
 
             room = registry.get("EC15")
             assert room is not None

@@ -43,7 +43,7 @@ def test_default_map_has_three_wall_lines():
 
 
 def test_default_map_has_spawn_points():
-    assert len(DEFAULT_MAP.spawn_points) == 6
+    assert len(DEFAULT_MAP.spawn_points) == 12
 
 
 def test_default_map_has_task_anchors():

@@ -68,19 +68,33 @@ def test_unique_colors_assigned():
     assert len(colors) == MAX_PLAYERS
 
 
+def test_max_twelve_players_can_join():
+    """Tier 1.5: cap is 12, every player gets a unique color from the palette."""
+    room = GameRoom(code="ABCD")
+    for i in range(12):
+        room.add_player(f"player_{i}")
+    assert len(room.players) == 12
+    assert len({p.color for p in room.players.values()}) == 12
+    with pytest.raises(GameRoomError) as exc:
+        room.add_player("overflow")
+    assert exc.value.code == "ROOM_FULL"
+
+
 # --- start() ---------------------------------------------------------------
 
 
-def _make_started_room(player_count: int = 3) -> GameRoom:
-    """Spawn a started GameRoom with at least 3 players.
+def _make_started_room(player_count: int = 4) -> GameRoom:
+    """Spawn a started GameRoom with at least MIN_PLAYERS_TO_START players.
 
-    Tier 2.1's chaos-parity win condition fires on tick when chaos_alive >=
-    release_alive. Tests that tick must keep release in the majority, so we
-    bump 2-player requests to 3 silently — the first two ids stay in deterministic
-    join order, so callers indexing into them still get the expected pair.
+    Tier 1.5 raised MIN_PLAYERS_TO_START to 4. Tier 2.1's chaos-parity win
+    condition also fires on tick when chaos_alive >= release_alive — with
+    4 players (1 chaos + 3 release) parity is not triggered at start.
+    Bumps any caller-supplied count below 4 silently up to 4. The first
+    two ids stay in deterministic join order so callers indexing into them
+    still get the expected pair.
     """
-    if player_count < 3:
-        player_count = 3
+    if player_count < 4:
+        player_count = 4
     room = GameRoom(code="ABCD")
     host = room.add_player("Sven")
     for i in range(player_count - 1):
@@ -98,9 +112,20 @@ def test_start_requires_host():
     assert exc.value.code == "NOT_HOST"
 
 
-def test_start_requires_min_two_players():
+def test_start_requires_min_players():
     room = GameRoom(code="ABCD")
     host = room.add_player("Sven")
+    with pytest.raises(GameRoomError) as exc:
+        room.start(requesting_player_id=host.id, rng=random.Random(0))
+    assert exc.value.code == "NOT_ENOUGH_PLAYERS"
+
+
+def test_start_below_min_players_rejected():
+    """Tier 1.5: MIN_PLAYERS_TO_START is 4, so 3 players is not enough."""
+    room = GameRoom(code="ABCD")
+    host = room.add_player("Sven")
+    room.add_player("Max")
+    room.add_player("Lea")
     with pytest.raises(GameRoomError) as exc:
         room.start(requesting_player_id=host.id, rng=random.Random(0))
     assert exc.value.code == "NOT_ENOUGH_PLAYERS"
@@ -115,12 +140,28 @@ def test_start_requires_lobby_phase():
 
 
 def test_start_transitions_to_playing_and_assigns_roles():
-    room = _make_started_room(player_count=3)
+    room = _make_started_room(player_count=4)
     assert room.phase is Phase.PLAYING
     roles = [p.role for p in room.players.values()]
     assert roles.count("vibe_coder") == 1
-    assert roles.count("developer") == 2
+    assert roles.count("developer") == 3
     assert all(p.team in {"release_team", "chaos_agents"} for p in room.players.values())
+
+
+def test_start_with_twelve_players_assigns_three_chaos():
+    """Tier 1.5: 12-player rooms have exactly 3 chaos agents."""
+    room = _make_started_room(player_count=12)
+    roles = [p.role for p in room.players.values()]
+    assert roles.count("vibe_coder") == 3
+    assert roles.count("developer") == 9
+
+
+def test_start_with_seven_players_assigns_two_chaos():
+    """Tier 1.5: 7..9 players -> 2 chaos."""
+    room = _make_started_room(player_count=7)
+    roles = [p.role for p in room.players.values()]
+    assert roles.count("vibe_coder") == 2
+    assert roles.count("developer") == 5
 
 
 def test_start_sets_timer_to_900():
@@ -240,14 +281,14 @@ def test_new_room_has_default_stats():
 
 
 def test_start_initializes_per_player_counters_and_stats():
-    room = _make_started_room(player_count=3)
+    room = _make_started_room(player_count=4)
     assert room.release_progress == 0
     assert room.pipeline_stability == 100
     assert room.coffee_level == 100
-    assert len(room.completed_tasks_by_player) == 3
+    assert len(room.completed_tasks_by_player) == 4
     assert all(v == 0 for v in room.completed_tasks_by_player.values())
     assert set(room.completed_tasks_by_player.keys()) == set(room.players.keys())
-    assert len(room.triggered_sabotages_by_player) == 3
+    assert len(room.triggered_sabotages_by_player) == 4
 
 
 def test_public_state_exposes_stats():

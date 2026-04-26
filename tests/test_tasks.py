@@ -8,15 +8,15 @@ from app.game.tasks import TASK_INTERACTION_RADIUS, TASK_RESPAWN_COOLDOWN
 
 
 def _room_with_players(n: int) -> tuple[GameRoom, list[str]]:
-    """Spawn a started GameRoom with at least 3 players.
+    """Spawn a started GameRoom with at least MIN_PLAYERS_TO_START players.
 
-    Tier 2.1's chaos-parity win condition fires on tick when chaos_alive >=
-    release_alive. Tests that tick must keep release in the majority, so we
-    ensure n >= 3 here. Callers passing n=2 historically just want at least
-    the first two ids; a third filler keeps win conditions inert.
+    Tier 1.5 raised MIN_PLAYERS_TO_START to 4. Callers historically may pass
+    n=2 just to grab the first two ids; we silently bump to 4. Tier 2.1's
+    chaos-parity rule (chaos_alive >= release_alive) is satisfied with
+    4 players (1 chaos + 3 release).
     """
-    if n < 3:
-        n = 3
+    if n < 4:
+        n = 4
     room = GameRoom(code="ABCD")
     ids = []
     for i in range(n):

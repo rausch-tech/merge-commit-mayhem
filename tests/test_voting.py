@@ -63,7 +63,10 @@ def test_all_chaos_eliminated_some_alive():
 # --- meeting lifecycle ----------------------------------------------------
 
 
-def _started_room(player_count: int = 3) -> tuple[GameRoom, list[str]]:
+def _started_room(player_count: int = 4) -> tuple[GameRoom, list[str]]:
+    """Tier 1.5 raised MIN_PLAYERS_TO_START to 4 — bump any caller below 4."""
+    if player_count < 4:
+        player_count = 4
     room = GameRoom(code="VOTE")
     ids = []
     for i in range(player_count):
@@ -128,7 +131,7 @@ def test_cast_vote_outside_meeting_phase_errors():
 
 def test_cast_vote_for_dead_player_errors():
     room, ids = _started_room(3)
-    a, b, c = ids
+    a, c = ids[0], ids[2]
     room.players[a].x, room.players[a].y = 2000.0, 2000.0
     room.call_emergency_meeting(a, rng=random.Random(0))
     room.players[c].is_alive = False
@@ -139,7 +142,7 @@ def test_cast_vote_for_dead_player_errors():
 
 def test_dead_voter_cannot_vote():
     room, ids = _started_room(3)
-    a, b, c = ids
+    a, b, c = ids[0], ids[1], ids[2]
     room.players[a].x, room.players[a].y = 2000.0, 2000.0
     room.call_emergency_meeting(a, rng=random.Random(0))
     room.players[b].is_alive = False
@@ -176,7 +179,7 @@ def test_tied_vote_no_removal():
 
 def test_tick_decrements_meeting_timer_and_auto_resolves():
     room, ids = _started_room(3)
-    a, b, c = ids
+    a = ids[0]
     room.players[a].x, room.players[a].y = 2000.0, 2000.0
     room.call_emergency_meeting(a, rng=random.Random(0))
     # Cast no votes; let the timer expire.
@@ -188,17 +191,19 @@ def test_tick_decrements_meeting_timer_and_auto_resolves():
 
 
 def test_meeting_resolves_early_when_all_alive_voted():
-    room, ids = _started_room(3)
-    a, b, c = ids
+    # Tier 1.5: minimum 4 players. All four cast votes; majority on `b` wins.
+    room, ids = _started_room(4)
+    a, b, c, d = ids
     room.players[a].x, room.players[a].y = 2000.0, 2000.0
     room.call_emergency_meeting(a, rng=random.Random(0))
-    # All three vote at once -> next tick should resolve.
+    # Three vote `b`, one votes `c` -> next tick should resolve.
     room.cast_vote(a, b)
     room.cast_vote(b, c)
     room.cast_vote(c, b)
+    room.cast_vote(d, b)
     room.tick(0.1)
     assert room.phase is Phase.PLAYING
-    # b had majority (2 vs 1), eliminated.
+    # b had majority (3 vs 1), eliminated.
     assert room.players[b].is_alive is False
 
 

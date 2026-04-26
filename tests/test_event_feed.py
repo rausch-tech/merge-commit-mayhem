@@ -13,11 +13,11 @@ from app.game.tasks import TASK_RESPAWN_COOLDOWN, task_by_id
 # --- helpers --------------------------------------------------------------
 
 
-def _started_room(player_count: int = 3, seed: int = 0) -> tuple[GameRoom, list[str]]:
-    # Tier 2.1 chaos-parity: require >=3 players so 1 chaos + 2 release keeps
-    # release in the majority and ticks don't immediately end the round.
-    if player_count < 3:
-        player_count = 3
+def _started_room(player_count: int = 4, seed: int = 0) -> tuple[GameRoom, list[str]]:
+    # Tier 1.5 raised MIN_PLAYERS_TO_START to 4. With 4 players (1 chaos +
+    # 3 release) Tier 2.1's chaos-parity rule still does not fire on tick.
+    if player_count < 4:
+        player_count = 4
     room = GameRoom(code="EVNT")
     ids = []
     for i in range(player_count):
@@ -204,6 +204,8 @@ def test_start_clears_events_and_emits_kickoff():
     room = GameRoom(code="KICK")
     a = room.add_player("Alice")
     room.add_player("Bob")
+    room.add_player("Carol")
+    room.add_player("Dan")
     # Manually inject some bogus events while still in LOBBY.
     room._emit_event("info", "junk 1")
     room._emit_event("warn", "junk 2")

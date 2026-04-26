@@ -30,8 +30,8 @@ from app.game.voting import SKIP_TARGET, all_chaos_eliminated
 from app.game.voting import tally as _tally_votes
 from app.game.walls import resolve_wall_collision
 
-MAX_PLAYERS = 6
-MIN_PLAYERS_TO_START = 2
+MAX_PLAYERS = 12
+MIN_PLAYERS_TO_START = 4
 PLAYER_RADIUS = 12
 ROUND_SECONDS = 900.0
 RECONNECT_GRACE_SECONDS = 30.0
@@ -52,7 +52,8 @@ _MEETING_TITLES = [
     "Wer hat den Coffee Token verbraucht?",
 ]
 
-# Feste 6er-Palette (Doc 07 Farbsystem).
+# Feste 12er-Palette: paarweise distinkt, sechs „klassische" Hues (Doc 07 Farbsystem)
+# plus sechs zusaetzliche, gut unterscheidbare Toene fuer 7..12 Spieler.
 _COLOR_PALETTE = [
     "#4ade80",  # green
     "#60a5fa",  # blue
@@ -60,6 +61,12 @@ _COLOR_PALETTE = [
     "#c084fc",  # purple
     "#facc15",  # yellow
     "#f87171",  # red
+    "#22d3ee",  # cyan
+    "#f472b6",  # pink
+    "#a3e635",  # lime
+    "#fbbf24",  # amber
+    "#94a3b8",  # slate
+    "#e879f9",  # fuchsia
 ]
 
 

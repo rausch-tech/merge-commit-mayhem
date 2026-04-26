@@ -16,7 +16,10 @@ from app.game.sabotages import SabotageDefinition
 from app.game.tasks import TaskDefinition
 
 
-def _started_room(n: int = 3) -> GameRoom:
+def _started_room(n: int = 4) -> GameRoom:
+    """Tier 1.5 raised MIN_PLAYERS_TO_START to 4 — bump any caller below 4."""
+    if n < 4:
+        n = 4
     room = GameRoom(code="ABCD")
     for i in range(n):
         room.add_player(f"p{i}")
@@ -43,6 +46,7 @@ def test_start_resets_incidents_to_zero():
     room.add_player("p0")
     room.add_player("p1")
     room.add_player("p2")
+    room.add_player("p3")
     room.incidents = 50  # pre-start scribble; start() must wipe it
     host_id = next(iter(room.players))
     room.start(requesting_player_id=host_id, rng=random.Random(0))
