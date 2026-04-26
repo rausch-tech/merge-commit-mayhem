@@ -18,6 +18,14 @@ __pycache__/
 # Project inputs
 merge_conflict_mayhem_project.zip
 
+# Asset-Pack-Originale unter merge_conflict_mayhem_project/ — alles ausser den
+# bereits getrackten Markdown-Files ignorieren. Roh-ZIPs (CC0, aber ~140 MB)
+# liegen lokal/Cloud, im Repo nur die tatsaechlich verwendeten Files unter
+# godot/assets/ (kommt mit Tier 4).
+merge_conflict_mayhem_project/*
+!merge_conflict_mayhem_project/MASTER_Merge_Conflict_Mayhem.md
+!merge_conflict_mayhem_project/docs/
+
 # Git worktrees
 .worktrees/
 
