@@ -73,6 +73,44 @@ Diese Punkte sind nicht „Backend-Doku-Lücken", sondern Godot-spezifische Stol
 - **Project-Reload nach Code-Changes:** Godot cached compiled GDScript-Classes hartnäckig. Nach `class_name`-Ergänzungen oder Method-Signatur-Änderungen: **Project → Reload Current Project** oder gar Editor neu starten. Sonst läuft alter Code.
 - **WSL-File-Access via UNC:** Performance ist OK für Spike-Größe, aber bei großen Asset-Importen (Tier 4.0.x mit Sprite-Packs) lieber Repo lokal nach `C:\` clonen. Backend bleibt in WSL — nur Godot-Files müssen schnell zugreifbar sein.
 
+## 8. Headless Godot in WSL (CI + Pre-Commit-Checks)
+
+Zusätzlich zum visuellen Editor auf Windows läuft eine **Headless-Godot-Binary in WSL** für schnelle Parse-/Syntax-Checks ohne F5-Cycle. Catched 80% der Fehler die sonst erst im Editor auftauchen würden (`class_name`-Cache, Type-Mismatches, Method-Signaturen).
+
+### Install (einmalig, ~2 Minuten)
+
+```bash
+mkdir -p ~/godot-headless && cd ~/godot-headless
+curl -L -o godot.zip "https://github.com/godotengine/godot/releases/download/4.6-stable/Godot_v4.6-stable_linux.x86_64.zip"
+unzip -q godot.zip && rm godot.zip
+ln -sf ~/godot-headless/Godot_v4.6-stable_linux.x86_64 ~/.local/bin/godot
+godot --version   # erwartet: 4.6.stable.official.<sha>
+```
+
+`~/.local/bin` muss in `$PATH` sein (Fedora/Ubuntu-Default).
+
+### Helper-Script
+
+`scripts/godot-check.sh` läuft `--check-only` über alle GDScript-Files im Spike:
+
+```bash
+./scripts/godot-check.sh           # silent ok / verbose fail
+./scripts/godot-check.sh -v        # zeigt Engine-Banner pro Datei
+```
+
+Exit-Code 0 = alle OK, 1 = mindestens ein Parse-Error. CI-tauglich.
+
+### Was der Headless-Godot kann
+
+- **Parse-Check** (`--check-only --script foo.gd`): catcht Syntax/Type-Errors, fehlende Methoden, falsche Class-Refs.
+- **Project-Boot-Check** (`--headless --path . --quit`): prüft ob `project.godot` valide ist und alle `class_name`-Globals registriert werden.
+- **Headless-Runs** (für Tier 4): Scenes mit `--quit-after N` starten, Logs greppen — automatisierte Acceptance ohne menschen-im-Loop.
+
+### Was er NICHT kann
+
+- Kein Rendering (kein GPU, kein Display in WSL2 ohne WSLg). Visuelle Tests bleiben Sven-am-Editor.
+- Kein WebSocket-Connect-Test in WSL → Backend (würde gehen, aber overkill für reinen Parse-Check).
+
 ## 6. Test-Plan (für Runtime-Verification mit Godot)
 
 Sobald Godot 4.6 lokal installiert ist, einmal alle vier Akzeptanzpfade durchlaufen und die Marker oben mit gemessenen Werten ersetzen. Voraussetzung: Backend läuft (`uv run uvicorn app.main:app --reload`), Browser-Tab unter `http://localhost:8000/` joint Raum `ABCD` mit Name "Browser".

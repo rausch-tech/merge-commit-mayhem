@@ -75,6 +75,17 @@ Room Code joinen — beide Clients sehen sich gegenseitig.
 - Web-Export-Build
 - Auto-Reconnect (Test 4b in `docs/CLIENT.md` § 6 zeigt manuelles Vorgehen)
 
+## Schnell-Check ohne Editor
+
+Wenn du Code-Änderungen in WSL machst, vor dem F5 in Windows-Godot ein Parse-Check:
+
+```bash
+cd /home/sr/se/mcm/.worktrees/godot-spike
+./scripts/godot-check.sh
+```
+
+Catched Syntax-/Type-Errors in <2 Sekunden. Setup-Anleitung für die WSL-Godot-Binary: `../docs/CLIENT.md §8`.
+
 ## Code-Struktur
 
 - `scenes/main.tscn` — Connect-UI (Entry-Point)
