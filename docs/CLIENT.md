@@ -7,18 +7,19 @@
 > Diese Datei wird durch den Godot-Spike (siehe `superpowers/specs/2026-04-26-godot-spike-design.md`)
 > mit *real gemessenen* Werten gefüllt. Sektionen mit `[VERIFY:Phase-X]` werden im Spike validiert.
 >
-> **Status (Stand 2026-04-26):** Spike-Code ist auf Branch `slice/godot-spike` committet, aber
-> noch nicht in Godot 4.6 Editor live ausgeführt (Sven's Setup: WSL2 = Backend, Windows = Godot). Werte mit
-> `[VERIFY:Phase-X]` sind theoretisch korrekt nach Plan, brauchen aber Runtime-Verification
-> sobald Godot installiert ist — siehe Sektion 6 unten.
+> **Status (Stand 2026-04-27):** Spike-Code auf `slice/godot-spike`, runtime-verifiziert in
+> Godot 4.6 (Sven's Setup: WSL2 = Backend, Windows = Godot). Test 1 (Connect), Test 2
+> (Map-Layout), Test 3 (Movement) sind grün durchgelaufen. Test 4 (Reconnect) noch offen.
+> Werte unten sind real gemessen, nicht mehr theoretisch.
 
 ## 1. Koordinaten- und Skalierungs-Konvention
 
 - **Server-Welt:** 4800×3200 Pixel (`maps/default.json` → `size`).
 - **Origin:** oben-links (0,0). X wächst nach rechts, Y wächst nach unten.
 - **Godot-Default:** identisch — Origin oben-links, Y nach unten. Keine Y-Flip nötig.
-- **Render-Strategie (Spike):** `Camera2D` mit Zoom-Faktor, 1 Server-Pixel = 1 Godot-Pixel. Keine Tilemap.
-- **Default-Zoom-Faktor (Spike, Viewport 1280×720):** `Vector2(0.225, 0.225)` zeigt die Map vollständig zentriert. `[VERIFY:Phase-3]`
+- **Render-Strategie (Spike):** `Camera2D` mit dynamisch berechnetem Zoom, 1 Server-Pixel = 1 Godot-Pixel. Keine Tilemap.
+- **Spike-Viewport:** 1080×720 (1.5:1, gleiche Aspect-Ratio wie Map 4800×3200). Bei 16:9-Viewport entstand 16% Whitespace links/rechts — durch absichtliche Aspect-Anpassung vermieden.
+- **Camera-Fit-Formel:** `zoom = min(viewport_w/map_w, viewport_h/map_h)`. Aktueller Wert: `Vector2(0.225, 0.225)` → Map fillt 100% beider Achsen. Siehe `godot/scripts/debug_renderer.gd::_fit_camera_to_map`.
 - **Player-Kollisions-Radius:** 20 px (siehe `app/game/walls.py:PLAYER_COLLISION_RADIUS`).
 - **Task-Interaction-Radius:** 40 px (siehe `app/game/tasks.py:TASK_INTERACTION_RADIUS`).
 - **Tilemap-Cell-Size:** offen, kommt mit Tier 4.3 (Map-Loader → Tilemap-Layer).
@@ -27,8 +28,8 @@
 
 - **Server-Tick:** 20 Hz → ein `game_state` alle ~50 ms (`app/main.py:TICK_HZ`).
 - **Client-Regel:** Bewegung NICHT simulieren. Server ist autoritativ.
-- **Render-Strategie:** Snapshot-Buffer (letzte 2 Frames) + lerp über die 50-ms-Lücke. `[VERIFY:Phase-5]`
-- **`player_input` Throttle:** max. 20 Hz (alle 50 ms). Senden bei Input-Change ODER spätestens jeden 50-ms-Tick. `[VERIFY:Phase-5]`
+- **Render-Strategie (validiert im Spike):** Snapshot-Buffer (letzte 2 Frames) + lerp zwischen prev und curr mit `alpha = clamp((now - curr_t) / dt + 1.0, 0, 1)`. Bewegung visuell smooth bei 20-Hz-Server-Tick. Siehe `godot/scripts/debug_renderer.gd::_process()`.
+- **`player_input` Throttle (validiert im Spike):** Sende-Bedingung `(input geändert) UND (>= 50 ms seit letztem Send)`. Bei stillem Input kein Spam, bei Input-Change max. 50 ms Latenz. Siehe `godot/scripts/input_sender.gd::SEND_INTERVAL`.
 
 ## 3. Reconnect-Verhalten
 
@@ -57,7 +58,20 @@ Pre-Spike wurden bereits folgende Lücken in `docs/PROTOCOL.md` und `docs/maps.m
 - `private_state`-Message neu dokumentiert (per-Chaos-Take-Down-Cooldown).
 - `REJOIN_NOT_AVAILABLE` in der Error-Code-Tabelle ergänzt.
 
-Weitere Lücken kommen hier rein, sobald der Spike runtime-verifiziert wurde.
+**Während des Runtime-Tests neu entdeckt (2026-04-27):**
+
+- **`localhost` IPv6-Falle bei uvicorn-Default:** Windows resolved `localhost` zu `::1` (IPv6) zuerst. uvicorn bindet per Default nur IPv4 (`127.0.0.1` oder `0.0.0.0`). Godot's WebSocketPeer wartet ~50 s auf TCP-Timeout bevor er auf IPv4-Resolve zurückfällt. **Empfehlung für `docs/PROTOCOL.md §10` (Godot-Implementation):** Clients sollten `127.0.0.1` (oder die WSL-IP) statt `localhost` benutzen, oder uvicorn zusätzlich auf IPv6 binden lassen (`uv run uvicorn app.main:app --host ::`). Spike's Connect-UI hat `ws://127.0.0.1:8000/ws` als Default.
+
+## 7. Godot-Setup-Lessons-Learned (für Tier 4)
+
+Diese Punkte sind nicht „Backend-Doku-Lücken", sondern Godot-spezifische Stolpersteine, die der Spike aufgedeckt hat. Tier 4.1 sollte sie direkt richtig setzen:
+
+- **`display/window/subwindows/embed_subwindows = false`:** Godot 4 default-embedded Run-Window im Editor hebelt `stretch_mode` aus und macht das Spike-Fenster eingeengt. Mit `false` startet das Spiel als separates OS-Window.
+- **`display/window/size/mode = 2` (Maximized):** Spike startet maximiert, gibt der Map maximalen Platz.
+- **`stretch_mode = "viewport"` + matching Aspect-Ratio:** Map ist 4800×3200 (1.5:1). Wenn Viewport-Aspect davon abweicht, gibt's Whitespace. Wir haben `viewport_width=1080, viewport_height=720` (1.5:1) gesetzt. Tier 4 mit Tilemap kann das überdenken (z.B. 16:9-Viewport mit HUD-Overlay rechts neben der Map).
+- **`get_viewport_rect()` vs. `get_window().size`:** Mit `stretch_mode=viewport` ist `get_viewport_rect()` die richtige Größe für Camera-Fit (= konfigurierte Viewport-Größe). Mit `stretch_mode=canvas_items` würde man `get_window().size` nehmen müssen. Wechselwirkung dokumentiert in `godot/scripts/debug_renderer.gd::_fit_camera_to_map`.
+- **Project-Reload nach Code-Changes:** Godot cached compiled GDScript-Classes hartnäckig. Nach `class_name`-Ergänzungen oder Method-Signatur-Änderungen: **Project → Reload Current Project** oder gar Editor neu starten. Sonst läuft alter Code.
+- **WSL-File-Access via UNC:** Performance ist OK für Spike-Größe, aber bei großen Asset-Importen (Tier 4.0.x mit Sprite-Packs) lieber Repo lokal nach `C:\` clonen. Backend bleibt in WSL — nur Godot-Files müssen schnell zugreifbar sein.
 
 ## 6. Test-Plan (für Runtime-Verification mit Godot)
 
