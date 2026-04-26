@@ -30,9 +30,11 @@ und `../docs/CLIENT.md` (inkl. Test-Plan in Sektion 6).
 Backend läuft in WSL, Godot-Editor auf Windows. Path-Mapping und
 Networking:
 
-- **Project öffnen:** im Godot-Project-Manager unter Windows den UNC-Pfad eingeben:
-  `\\wsl.localhost\Ubuntu\home\sr\se\mcm\.worktrees\godot-spike\godot\project.godot`
-  (Distro-Name ggf. ersetzen — `wsl -l` zeigt deine Distros).
+- **Project öffnen:** im Godot-Project-Manager unter Windows den UNC-Pfad eingeben.
+  Sven's Distro heißt `FedoraLinux-43`, also:
+  `\\wsl.localhost\FedoraLinux-43\home\sr\se\mcm\.worktrees\godot-spike\godot\project.godot`
+  (Bei abweichender Distro: PowerShell `wsl -l` zeigt Distros, oder in WSL
+  `echo $WSL_DISTRO_NAME`.)
 - **Backend-Connect:** WSL2 forwarded `localhost:8000` standardmäßig nach
   Windows. Im Connect-UI bleibt `ws://localhost:8000/ws` korrekt.
   Falls das nicht klappt (manche WSL-Konfigurationen blocken inbound):

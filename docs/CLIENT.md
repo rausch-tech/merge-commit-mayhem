@@ -63,7 +63,7 @@ Weitere Lücken kommen hier rein, sobald der Spike runtime-verifiziert wurde.
 
 Sobald Godot 4.6 lokal installiert ist, einmal alle vier Akzeptanzpfade durchlaufen und die Marker oben mit gemessenen Werten ersetzen. Voraussetzung: Backend läuft (`uv run uvicorn app.main:app --reload`), Browser-Tab unter `http://localhost:8000/` joint Raum `ABCD` mit Name "Browser".
 
-**Sven's Setup (Windows + WSL2):** Backend in WSL, Godot-Editor auf Windows. Project-Path im Godot-Project-Manager: `\\wsl.localhost\Ubuntu\home\sr\se\mcm\.worktrees\godot-spike\godot\project.godot`. Connect-URL bleibt `ws://localhost:8000/ws` (WSL2 forwarded localhost). Falls Connect failed: in WSL `ip addr show eth0` → `inet`-IP statt `localhost` verwenden. Details siehe `godot/README.md`.
+**Sven's Setup (Windows + WSL2, Distro `FedoraLinux-43`):** Backend in WSL, Godot-Editor auf Windows. Project-Path im Godot-Project-Manager: `\\wsl.localhost\FedoraLinux-43\home\sr\se\mcm\.worktrees\godot-spike\godot\project.godot`. Connect-URL bleibt `ws://localhost:8000/ws` (WSL2 forwarded localhost). Falls Connect failed: in WSL `ip addr show eth0` → `inet`-IP statt `localhost` verwenden. Details siehe `godot/README.md`.
 
 ### Test 1 — Connect & Lobby (validiert §1, §3 partiell)
 1. Godot-Editor → Project Manager → Import `godot/project.godot`.

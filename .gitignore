@@ -28,6 +28,8 @@ package-lock.json
 # Godot
 godot/.godot/
 godot/exports/
+godot/**/*.import
+godot/**/*.uid
 
 # Playwright MCP scratch dir (per-session screenshots/snapshots)
 .playwright-mcp/

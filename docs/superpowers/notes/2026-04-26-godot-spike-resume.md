@@ -56,8 +56,9 @@ Während der Spike pausierte, wurden auf `main` 14 Commits gemerged:
    uv run uvicorn app.main:app --reload
    ```
 4. **Auf Windows: Godot-Project-Manager → Import →** UNC-Pfad eingeben:
-   `\\wsl.localhost\Ubuntu\home\sr\se\mcm\.worktrees\godot-spike\godot\project.godot`
-   (`wsl -l` in PowerShell zeigt deine Distros, falls "Ubuntu" nicht passt).
+   `\\wsl.localhost\FedoraLinux-43\home\sr\se\mcm\.worktrees\godot-spike\godot\project.godot`
+   (Bei abweichender Distro: PowerShell `wsl -l` listet alle, oder in WSL
+   `echo $WSL_DISTRO_NAME`. Aktueller Stand 2026-04-27: Sven's Distro = `FedoraLinux-43`.)
 5. **Test-Plan abarbeiten:** `docs/CLIENT.md §6` listet vier konkrete Akzeptanzpfade (Connect, Map-Layout, Movement, Reconnect). Die ersten drei sind je < 2 Minuten, Reconnect-Test ca. 5 Minuten.
 
 Erwartetes Ergebnis: alles grün, ggf. ein oder zwei kleinere Bugs (typische Godot-4-Quirks bei der ersten echten Ausführung) plus möglicherweise ein WSL-Networking-Issue (siehe nächste Sektion).
