@@ -1108,12 +1108,135 @@ button:hover {
   font-size: 1.4rem;
 }
 
+/* --- Mobile drawer + compact HUD ----------------------------------------- */
+
+/* Edge-tabs are hidden on desktop and only appear when touch-active. */
+.mobile-edge-tab {
+  display: none;
+}
+
 @media (pointer: coarse) {
   #touch-controls:not(.hidden) {
     display: block;
   }
   /* Hide the floating audio-controls bar on touch — they live in the menu now. */
   body.touch-active #audio-controls {
+    display: none;
+  }
+
+  /* Compact HUD: pills wrap into rows, smaller font, fits a 360px portrait. */
+  body.touch-active #hud {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 6px;
+    justify-content: center;
+  }
+  body.touch-active .hud-pill {
+    min-width: 0;
+    padding: 3px 6px;
+    gap: 4px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    flex: 1 1 auto;
+  }
+  body.touch-active .hud-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.03em;
+  }
+  body.touch-active .hud-value {
+    font-size: 0.78rem;
+  }
+  body.touch-active #hud-role {
+    flex: 1 0 100%;
+    justify-content: center;
+    text-align: center;
+    font-size: 0.72rem;
+  }
+
+  /* Tasks-Sidebar becomes a left off-canvas drawer. */
+  body.touch-active #task-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(82vw, 320px);
+    z-index: 95;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.45);
+    transform: translateX(-100%);
+    transition: transform 220ms ease-out;
+  }
+  body.drawer-tasks-open #task-sidebar {
+    transform: translateX(0);
+  }
+
+  /* Sabotage-Panel becomes a right off-canvas drawer (was already fixed bottom-right). */
+  body.touch-active #sabotage-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: auto;
+    width: min(82vw, 320px);
+    min-width: 0;
+    border-radius: 0;
+    border: none;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.45);
+    overflow-y: auto;
+    z-index: 95;
+    padding: 14px 12px;
+    transform: translateX(100%);
+    transition: transform 220ms ease-out;
+  }
+  body.drawer-sabo-open #sabotage-panel:not(.hidden) {
+    transform: translateX(0);
+  }
+
+  /* Event-feed eats too much portrait width and is non-essential — hide on touch. */
+  body.touch-active #event-feed {
+    display: none;
+  }
+
+  /* Edge-tabs: vertical labels glued to the screen edge. */
+  body.touch-active .mobile-edge-tab {
+    display: block;
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(11, 15, 31, 0.85);
+    color: var(--text);
+    border: 1px solid rgba(96, 165, 250, 0.55);
+    padding: 14px 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    pointer-events: auto;
+    touch-action: manipulation;
+    z-index: 96;
+    user-select: none;
+  }
+  body.touch-active .mobile-edge-tab-left {
+    left: 0;
+    border-left: none;
+    border-radius: 0 8px 8px 0;
+  }
+  body.touch-active .mobile-edge-tab-right {
+    right: 0;
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+  }
+  body.touch-active #mobile-tab-sabo {
+    border-color: rgba(248, 113, 113, 0.6);
+    color: #fca5a5;
+  }
+
+  /* When a drawer is open, the joystick + action buttons would overlap the
+     drawer content — hide them so the user can read/tap freely. */
+  body.drawer-tasks-open #touch-joystick,
+  body.drawer-tasks-open #touch-action-buttons,
+  body.drawer-sabo-open #touch-joystick,
+  body.drawer-sabo-open #touch-action-buttons {
     display: none;
   }
 }

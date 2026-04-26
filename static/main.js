@@ -443,6 +443,39 @@ if (isTouch) {
   document.body.classList.add("touch-active");
   const touchEl = document.getElementById("touch-controls");
   touchEl.classList.remove("hidden");
+
+  // Off-canvas drawer toggles for tasks-sidebar (left) and sabotage-panel (right).
+  // Mutually exclusive — opening one closes the other.
+  const tabTasksEl = document.getElementById("mobile-tab-tasks");
+  const tabSaboEl = document.getElementById("mobile-tab-sabo");
+  const setDrawer = (name) => {
+    const body = document.body;
+    const isOpen = name && body.classList.contains(`drawer-${name}-open`);
+    body.classList.remove("drawer-tasks-open", "drawer-sabo-open");
+    tabTasksEl?.setAttribute("aria-pressed", "false");
+    tabSaboEl?.setAttribute("aria-pressed", "false");
+    if (name && !isOpen) {
+      body.classList.add(`drawer-${name}-open`);
+      const tab = name === "tasks" ? tabTasksEl : tabSaboEl;
+      tab?.setAttribute("aria-pressed", "true");
+    }
+  };
+  tabTasksEl?.addEventListener("click", () => setDrawer("tasks"));
+  tabSaboEl?.addEventListener("click", () => setDrawer("sabo"));
+
+  // Show the sabotage edge-tab only when the player actually has chaos abilities.
+  // We hook into setAvailable so the existing call sites (private_role, lobby
+  // resets) drive the tab visibility automatically.
+  const _origSetAvailable = sabotagePanel.setAvailable.bind(sabotagePanel);
+  sabotagePanel.setAvailable = (ids) => {
+    _origSetAvailable(ids);
+    const has = (ids || []).length > 0;
+    tabSaboEl?.classList.toggle("hidden", !has);
+    if (!has && document.body.classList.contains("drawer-sabo-open")) {
+      setDrawer(null);
+    }
+  };
+
   let lastTaskHoldId = null;
   new TouchControls(touchEl, {
     onMove: (axis) => ws.send("player_input", axis),
