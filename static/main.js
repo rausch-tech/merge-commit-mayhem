@@ -183,11 +183,13 @@ ws.on("game_state", (payload) => {
   state.bodies = payload.bodies || [];
 
   // Detect ghost transition. Server sends personalized state — alive viewers
-  // see only alive players, but a ghost viewer always sees themselves with
-  // isAlive=false. We look up our own entry; if it's missing OR false → dead.
+  // see only alive players (themselves included), so own entry is always
+  // present with isAlive=true. A ghost viewer sees everyone, themselves with
+  // isAlive=false. If our entry is transiently missing (mid-disconnect race),
+  // we keep the previous amDead state on this tick rather than flicker.
   const me = (payload.players || []).find((p) => p.id === state.playerId);
   const wasDead = state.amDead;
-  state.amDead = !!(me && me.isAlive === false);
+  if (me) state.amDead = me.isAlive === false;
   if (state.amDead !== wasDead) {
     els.ghostBanner.classList.toggle("hidden", !state.amDead);
   }

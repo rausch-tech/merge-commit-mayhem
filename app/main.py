@@ -76,14 +76,17 @@ registry = GameRegistry()
 manager = ConnectionManager()
 
 
-def _game_state_msg_for(room: GameRoom, viewer_id: str) -> GameStateMsg:
+def _game_state_msg_for(room: GameRoom, viewer_id: str, base: dict | None = None) -> GameStateMsg:
     """Per-viewer build of GameStateMsg — alive viewers see only alive players.
 
     Spectator-Mode (Tier 2.6): the server is authoritative for hiding ghosts
     from alive players. There's no all-viewers variant in the broadcast path
     anymore; ghosts/unknown viewers receive the full roster as a fallback.
+
+    The tick loop passes a shared `base` to avoid re-serializing tasks/
+    sabotages/events/bodies once per socket per tick.
     """
-    return GameStateMsg.model_validate(room.public_state_for(viewer_id))
+    return GameStateMsg.model_validate(room.public_state_for(viewer_id, base=base))
 
 
 async def _tick_loop() -> None:
@@ -99,11 +102,14 @@ async def _tick_loop() -> None:
                             continue
                         # Per-socket personalized game_state: alive viewers
                         # only see alive players (ghosts are hidden from them).
+                        # The non-player fields are identical across viewers,
+                        # so we serialize them once per tick and reuse.
+                        base = room._public_state_base()
                         for session in manager.sessions_in_room(room.code):
                             await session.ws.send_json(
                                 envelope(
                                     "game_state",
-                                    _game_state_msg_for(room, session.player_id),
+                                    _game_state_msg_for(room, session.player_id, base=base),
                                 )
                             )
                         # Per-chaos-agent private_state with their take-down

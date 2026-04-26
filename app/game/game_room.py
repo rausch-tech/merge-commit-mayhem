@@ -987,14 +987,17 @@ class GameRoom:
         state["players"] = self._all_players_serialized()
         return state
 
-    def public_state_for(self, viewer_id: str) -> dict:
+    def public_state_for(self, viewer_id: str, base: dict | None = None) -> dict:
         """Personalized GameState — alive viewers do NOT see ghosts.
 
         Ghosts (and unknown viewers, defensive fallback) get the full player
         list including dead players. Bodies/tasks/sabotages/events/meeting are
         identical for everyone.
+
+        Pass a pre-computed `base` (from `_public_state_base()`) to amortize
+        the shared serialization across many viewers in the same tick.
         """
-        state = self._public_state_base()
+        state = dict(base) if base is not None else self._public_state_base()
         viewer = self.players.get(viewer_id)
         if viewer is None or not viewer.is_alive:
             state["players"] = self._all_players_serialized()
