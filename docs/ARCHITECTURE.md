@@ -221,10 +221,10 @@ Detail siehe `docs/ROADMAP.md`.
 
 Synthetisches Last-Skript (`scripts/perf_baseline.py`) misst die Server-Hot-Path-Kosten ohne WS-Layer — der relevante Bottleneck (Tick-Compute + Per-Viewer-Payload-Serialisation) ist von Socket-I/O unabhängig. Lokal auf einem Laptop, CPython 3.12, 400 Ticks (~20 s wall):
 
-| Szenario           | Tick p99    | Payload p99 (1 Viewer) | Aggregat / Tick (12 Viewer) | Throughput  | Headroom (50 ms Tick-Budget) |
-| ------------------ | ----------- | ---------------------- | --------------------------- | ----------- | ---------------------------- |
-| 4 Spieler          | 0.16 ms     | 3.4 KB                 | 13.5 KB                     | 263 KB/s    | ~310x                        |
-| 12 Spieler         | 0.60 ms     | 4.5 KB                 | 54 KB                       | 1.06 MB/s   | ~84x                         |
+| Szenario   | Tick p99 | Payload p99 (1 Viewer) | Aggregat / Tick (12 Viewer) | Throughput | Headroom (50 ms Tick-Budget) |
+| ---------- | -------- | ---------------------- | --------------------------- | ---------- | ---------------------------- |
+| 4 Spieler  | 0.16 ms  | 3.4 KB                 | 13.5 KB                     | 263 KB/s   | ~310x                        |
+| 12 Spieler | 0.60 ms  | 4.5 KB                 | 54 KB                       | 1.06 MB/s  | ~84x                         |
 
 Lesart:
 

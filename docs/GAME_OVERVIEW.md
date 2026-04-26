@@ -35,11 +35,13 @@ Spielziel ist **nicht** primaer Tech-Kompetenz beim Brettspielen, sondern **sozi
 ## Rollen + Teams
 
 **Release-Team** (Mehrheit, „Crewmates" in Among-Us-Sprech):
+
 - Macht Tasks, repariert Sabotagen
 - Versucht Chaos-Agenten zu identifizieren und auszuvoten
 - Beispielrollen: `developer`, `qa_lead`, `scrum_master`
 
 **Chaos-Agenten** (1–2 je nach Spielerzahl, „Imposter"):
+
 - Triggert Sabotagen aus einer rollen-spezifischen Auswahl
 - Kann Take-Down (eliminieren) im 40-px-Proximity-Radius mit 25-s-Cooldown
 - Kann Vents nutzen (Teleport-Tunnel zwischen Raeumen, fuer alle anderen unsichtbar)
@@ -110,6 +112,7 @@ Im Meeting (60 s) sehen alle die lebenden Spieler. Jeder lebende kann **EIN** St
 ## Map
 
 **Default-Map**: 4800×3200 px, sechs benannte Raeume:
+
 - Open Space (zentraler Hub)
 - Server Room (Tasks: deployment, logs; Repair-Panel: PagerDuty-Storm)
 - Kitchen (Task: Kaffee)
@@ -137,6 +140,7 @@ Architektur-Nordstern: **Python entscheidet, der Client zeigt nur an.** Nichts a
 ## Aktueller Stand (2026-04-26)
 
 **Was funktioniert auf Live:**
+
 - 4–12 Spieler joinen, Lobby mit Map-Auswahl, Multi-Chaos ab 7 Spielern
 - Komplettes Among-Us-Feature-Set: Movement, Tasks, Sabotagen, Vents, Take-Down, Body-Discovery, Report, Voting, Endscreen mit Rollen-Reveal, Spectator-Mode
 - 5 von 8 Tasks haben Mini-Games (siehe Pattern-Tabelle oben)
@@ -145,6 +149,7 @@ Architektur-Nordstern: **Python entscheidet, der Client zeigt nur an.** Nichts a
 - Map-Editor unter `/editor`
 
 **Was offen ist:**
+
 - 3 Tasks ohne Mini-Game (review_pr, calm_legacy_service, write_release_notes) — bleiben Hold-E
 - **Sabotage-Console-Mechanik** — aktuell kann Chaos Sabotagen von ueberall triggern; sollte wie Among Us an spezifische Sabotage-Console-Punkte gebunden werden
 - **Asset-Pack-Entscheidung** fuer den Godot-Sprint (laeuft beim Team)
@@ -158,28 +163,34 @@ Architektur-Nordstern: **Python entscheidet, der Client zeigt nur an.** Nichts a
 Wenn ihr die Runde durchgespielt habt oder die Doku gelesen, sind das die offenen Achsen mit dem groessten Hebel — bringt Ideen mit:
 
 1. **Neue Tasks und Mini-Games** (groesster Spannungstreiber)
+
    - Welche „Pull Request reviewen", „Logs analysieren", „Sprint-Trim"-Aequivalente fehlen noch im DevOps-Alltag?
    - Mechanik-Patterns: Sequencing, Pairing, Timing, Filter, Subset — gibt es eine sechste Klasse die wir noch nicht haben? (z. B. Memory-Replay, Drag-Reorder, Math-Puzzle?)
 
 2. **Neue Sabotagen** (Chaos-Hebel)
+
    - Welche DevOps-Schmerzen gibt es noch die als 8-Sekunden-Sabotage funktionieren?
    - Ideen: „Production-Hotfix" (alle muessen sofort in Server-Room), „Zoom-Anrufer" (ein zufaelliger Spieler kann 10 s nicht laufen), „Legal-Review" (Tasks brauchen 2x so lang)
    - Welche brauchen Repair-Panel und welche laufen einfach durch?
 
 3. **Erweiterte Rollen** (Asymmetrie statt Standard-Crewmate/Imposter)
+
    - Aus der Roadmap-Liste: Data Wizard, Shadow Admin, Incident Commander, Caffeine Collector, Bug Squasher, Legacy Oracle, Scrum Master mit Spezial-Faehigkeiten
    - Spezial-Aktionen: Auto-Fix-Bot (Release-Team-Helper), Distract (Chaos-Helper), Speed Boost, Coffee Run, Scan Logs, Rollback, etc.
    - Welche Rolle laesst eine ganze Spielsession anders aussehen?
 
 4. **Map-Themen** (neue Maps fuer Variety)
+
    - Default ist generisches Office. Was sollten weitere Maps sein? Konferenz? Hackathon-Garage? Daten-Center? Open-Plan vs. Cubicles?
    - Map-Editor existiert — Beitrag muss kein Code sein
 
 5. **Insider-Gags und Eventtexte**
+
    - Eventfeed-Strings sind kuratierbar — Pool ohne Code-Touch erweiterbar
    - Welche Tech-Memes, welche Branchenwitze, welche „das ist mir mal echt passiert"-Storys?
 
 6. **Mobile-/Cross-Device-Spielflow**
+
    - Aktuell Quick-Hack auf Touch — gibt es Use-Cases fuer Tablet vs. Desktop in der gleichen Lobby?
    - Lobby-Link-Sharing: was wuerde das schnellste Setup ermoeglichen (QR an die Wand, Slack-Bot, etc.)?
 

@@ -84,12 +84,12 @@ LOBBY --(host: start_game)--> PLAYING --(call_emergency_meeting | report_body)--
   +------------------------------+
 ```
 
-| Phase     | Server-Tick                                         | Erlaubte Inputs                                                                                                                                                                                                          |
-| --------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `LOBBY`   | inaktiv                                             | `join_room`, `rejoin`, `select_map` (Host), `start_game` (Host), `leave_room`                                                                                                                                            |
+| Phase     | Server-Tick                                         | Erlaubte Inputs                                                                                                                                                                                                                                    |
+| --------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LOBBY`   | inaktiv                                             | `join_room`, `rejoin`, `select_map` (Host), `start_game` (Host), `leave_room`                                                                                                                                                                      |
 | `PLAYING` | 20 Hz: Movement, Tasks, Sabotagen, Timer, Win-Check | `player_input`, `task_hold_start`, `task_hold_stop`, `trigger_sabotage` (Chaos), `repair_sabotage`, `use_vent` (Chaos), `trigger_takedown` (Chaos), `report_body`, `call_emergency_meeting`, `mini_game_input`, `abort_round` (Host), `leave_room` |
-| `MEETING` | 20 Hz: Meeting-Timer + Auto-Resolve                 | `cast_vote`, `skip_vote` (lebende Spieler), `abort_round` (Host), `leave_room`                                                                                                                                           |
-| `ENDED`   | inaktiv                                             | `return_to_lobby` (Host), `leave_room`                                                                                                                                                                                   |
+| `MEETING` | 20 Hz: Meeting-Timer + Auto-Resolve                 | `cast_vote`, `skip_vote` (lebende Spieler), `abort_round` (Host), `leave_room`                                                                                                                                                                     |
+| `ENDED`   | inaktiv                                             | `return_to_lobby` (Host), `leave_room`                                                                                                                                                                                                             |
 
 ---
 
@@ -432,10 +432,12 @@ Antwort: kein eigener Frame, aber `lobby_state` (Broadcast) reflektiert die Entf
     "players": [{ "id": "abc...", "name": "Sven", "color": "#4ade80", "isHost": true }],
     "availableMaps": [
       { "id": "default", "name": "Default Office" },
-      { "id": "office_v2", "name": "Bigger Office" }
+      { "id": "office_v2", "name": "Bigger Office" },
     ],
     "selectedMapId": "default",
-    "map": { /* GameMap der aktuell selektierten Map */ },
+    "map": {
+      /* GameMap der aktuell selektierten Map */
+    },
   },
 }
 ```
@@ -452,9 +454,14 @@ Wird gesendet bei: jedem Join, jedem Disconnect, `select_map`, `leave_room`, `re
     "team": "chaos_agents",
     "description": "Du bist der Vibe Coder. Sabotiere das Release...",
     "availableSabotages": [
-      "ci_cd_red", "coffee_outage", "mandatory_meeting",
-      "merge_conflict_storm", "fake_customer_request", "flaky_tests",
-      "lights_out", "comms_outage"
+      "ci_cd_red",
+      "coffee_outage",
+      "mandatory_meeting",
+      "merge_conflict_storm",
+      "fake_customer_request",
+      "flaky_tests",
+      "lights_out",
+      "comms_outage",
     ],
   },
 }
@@ -468,7 +475,7 @@ Wird gesendet bei: jedem Join, jedem Disconnect, `select_map`, `leave_room`, `re
 {
   "type": "private_state",
   "payload": {
-    "takedownCooldownRemaining": 18.4
+    "takedownCooldownRemaining": 18.4,
   },
 }
 ```
@@ -498,8 +505,8 @@ Dieser Frame ist **per-Viewer personalisiert** (Spectator-Mode, Tier 2.6): leben
         "color": "#4ade80",
         "isHost": true,
         "isAlive": true,
-        "isConnected": true
-      }
+        "isConnected": true,
+      },
     ],
     "tasks": [
       {
@@ -509,37 +516,42 @@ Dieser Frame ist **per-Viewer personalisiert** (Spectator-Mode, Tier 2.6): leben
         "x": 200.0,
         "y": 200.0,
         "requiredSeconds": 5.0,
-        "status": "available",      // | "in_progress" | "cooldown"
-        "progress": 0.0,             // 0..1, nur sinnvoll wenn in_progress
-        "cooldownRemaining": 0.0
-      }
+        "status": "available", // | "in_progress" | "cooldown"
+        "progress": 0.0, // 0..1, nur sinnvoll wenn in_progress
+        "cooldownRemaining": 0.0,
+      },
     ],
     "sabotages": [
       {
         "id": "ci_cd_red",
         "title": "CI/CD Rot",
         "cooldownRemaining": 0.0,
-        "active": false
-      }
+        "active": false,
+      },
     ],
     "sabotagePanels": [
       { "sabotageId": "lights_out", "x": 1200, "y": 800 },
-      { "sabotageId": "comms_outage", "x": 4200, "y": 240 }
+      { "sabotageId": "comms_outage", "x": 4200, "y": 240 },
     ],
     "vents": [
-      { "id": "vent_kitchen", "x": 600, "y": 1900, "connectedTo": ["vent_office", "vent_basement"] }
+      {
+        "id": "vent_kitchen",
+        "x": 600,
+        "y": 1900,
+        "connectedTo": ["vent_office", "vent_basement"],
+      },
     ],
     "bodies": [
-      { "id": "body_abc...", "x": 1300, "y": 940, "color": "#60a5fa", "victimName": "Carol" }
+      { "id": "body_abc...", "x": 1300, "y": 940, "color": "#60a5fa", "victimName": "Carol" },
     ],
     "events": [
-      { "seq": 1, "severity": "info",   "message": "Release-Fenster offen." },
-      { "seq": 2, "severity": "warn",   "message": "Pipeline instabil." },
-      { "seq": 3, "severity": "danger", "message": "Carol wurde entfernt - war Chaos-Agent." }
+      { "seq": 1, "severity": "info", "message": "Release-Fenster offen." },
+      { "seq": 2, "severity": "warn", "message": "Pipeline instabil." },
+      { "seq": 3, "severity": "danger", "message": "Carol wurde entfernt - war Chaos-Agent." },
     ],
     "lightsOff": false,
     "commsDown": false,
-    "meeting": null  // null ausser in Phase MEETING - siehe unten
+    "meeting": null, // null ausser in Phase MEETING - siehe unten
   },
 }
 ```
@@ -581,11 +593,11 @@ Felder im Detail:
 {
   "type": "voting_result",
   "payload": {
-    "removedPlayerId": "abc...",       // "" wenn niemand entfernt
-    "removedPlayerName": "Carol",      // "" wenn niemand entfernt
-    "wasChaosAgent": true,             // nur sinnvoll wenn removed
-    "tie": false,                      // true bei Stimmengleichheit zwischen named targets
-    "skipped": false                   // true wenn Skip die Mehrheit gewann
+    "removedPlayerId": "abc...", // "" wenn niemand entfernt
+    "removedPlayerName": "Carol", // "" wenn niemand entfernt
+    "wasChaosAgent": true, // nur sinnvoll wenn removed
+    "tie": false, // true bei Stimmengleichheit zwischen named targets
+    "skipped": false, // true wenn Skip die Mehrheit gewann
   },
 }
 ```
@@ -596,18 +608,18 @@ Felder im Detail:
 {
   "type": "game_ended",
   "payload": {
-    "winner": "release_team",          // oder "chaos_agents"
+    "winner": "release_team", // oder "chaos_agents"
     "reason": "Release deployed.",
     "players": [
       {
         "id": "abc...",
         "name": "Sven",
-        "role": "developer",           // ROLLE WIRD HIER OEFFENTLICH
+        "role": "developer", // ROLLE WIRD HIER OEFFENTLICH
         "team": "release_team",
         "completedTasks": 5,
         "triggeredSabotages": 0,
-        "isAlive": true
-      }
+        "isAlive": true,
+      },
     ],
   },
 }
@@ -631,7 +643,9 @@ Folgt unmittelbar einem `task_hold_start` auf einer Task mit `mini_game`. Oeffne
     "taskId": "repair_deployment",
     "miniGameId": "cable_pairing",
     "title": "Server-Racks neu verkabeln",
-    "view": { /* plugin-spezifisch, opaque fuer Framework */ }
+    "view": {
+      /* plugin-spezifisch, opaque fuer Framework */
+    },
   },
 }
 ```
@@ -651,7 +665,9 @@ Echo nach jedem `mini_game_input`. Verkapselt das aktualisierte `view`.
   "type": "mini_game_state",
   "payload": {
     "taskId": "repair_deployment",
-    "view": { /* plugin-spezifisch */ }
+    "view": {
+      /* plugin-spezifisch */
+    },
   },
 }
 ```
@@ -666,7 +682,7 @@ Schliesst die Session — Modal soll schliessen.
   "payload": {
     "taskId": "repair_deployment",
     "success": true,
-    "reason": "solved"     // bei success=false: "cancelled" | "meeting_started" | "round_ended" | "disconnected" | "takedown"
+    "reason": "solved", // bei success=false: "cancelled" | "meeting_started" | "round_ended" | "disconnected" | "takedown"
   },
 }
 ```
@@ -684,75 +700,75 @@ Schliesst die Session — Modal soll schliessen.
 
 ## 6. Vollstaendige Error-Code-Liste
 
-| Code                         | Wo                                                           | Bedeutung                                                                |
-| ---------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| `BAD_MESSAGE`                | jeder Handler                                                | Pydantic-Validation fehlgeschlagen — Payload entspricht nicht dem Schema |
-| `ROOM_FULL`                  | join_room                                                    | Mehr als 12 Spieler im Raum                                              |
-| `NAME_TAKEN`                 | join_room                                                    | Name in diesem Raum bereits vergeben                                     |
-| `REJOIN_NOT_AVAILABLE`       | rejoin                                                       | Raum oder Spieler-ID unbekannt, oder Grace-Period abgelaufen             |
-| `NOT_HOST`                   | start_game, return_to_lobby, abort_round, select_map         | Aktion erfordert Host                                                    |
-| `WRONG_PHASE`                | viele                                                        | Aktion in falscher Phase versucht                                        |
-| `NOT_ENOUGH_PLAYERS`         | start_game                                                   | <2 Spieler ohne `demo`-Flag                                              |
-| `UNKNOWN_MAP`                | select_map                                                   | Map-ID nicht im Registry                                                 |
-| `UNKNOWN_TASK`               | task_hold_start                                              | Task-ID nicht in Map                                                     |
-| `TASK_ON_COOLDOWN`           | task_hold_start                                              | Task aktuell im Cooldown                                                 |
-| `TASK_TOO_FAR`               | task_hold_start                                              | Spieler nicht innerhalb 40 px                                            |
-| `MINI_GAME_ALREADY_ACTIVE`   | task_hold_start                                              | Spieler hat bereits eine Mini-Game-Session offen                         |
-| `UNKNOWN_MINI_GAME`          | task_hold_start                                              | `mini_game`-Feld der Task verweist auf nicht-registrierte ID             |
-| `NO_ACTIVE_MINI_GAME`        | mini_game_input                                              | Spieler hat keine Mini-Game-Session                                      |
-| `UNKNOWN_ACTION`             | mini_game_input (plugin)                                     | Plugin kennt diese Action nicht                                          |
-| `INVALID_PARAMS`             | mini_game_input (plugin)                                     | Plugin-Params fehlen/falsch                                              |
-| `UNKNOWN_TEST`/`_NODE`/...   | mini_game_input (plugin)                                     | plugin-spezifische ID-Fehler                                             |
-| `PLAYER_ELIMINATED`          | task_hold_start, trigger_sabotage, trigger_takedown, ...     | Spieler ist `isAlive=false`                                              |
-| `UNKNOWN_PLAYER`             | trigger_sabotage, trigger_takedown, repair_sabotage, ...     | Spieler-Session nicht gefunden                                           |
-| `NOT_CHAOS_AGENT`            | trigger_sabotage, trigger_takedown, use_vent                 | Spieler ist nicht im Chaos-Team                                          |
-| `UNKNOWN_SABOTAGE`           | trigger_sabotage, repair_sabotage                            | Sabotage-ID unbekannt                                                    |
-| `SABOTAGE_ON_COOLDOWN`       | trigger_sabotage                                             | Sabotage aktuell im Cooldown                                             |
-| `SABOTAGE_NOT_ACTIVE`        | repair_sabotage                                              | Sabotage existiert nicht oder ist nicht broken                           |
-| `NO_PANEL`                   | repair_sabotage                                              | Sabotage hat kein Repair-Panel auf der Map                               |
-| `OUT_OF_RANGE`               | repair_sabotage, report_body                                 | Spieler nicht in Reichweite                                              |
-| `COMMS_DOWN`                 | trigger_sabotage                                             | `comms_outage` blockt andere Sabotagen                                   |
-| `NOT_NEAR_OBJECT`            | trigger_sabotage                                             | Tier 2.7 rework: Chaos nicht in 60-px-Reichweite eines passenden Object-Anchors |
-| `NO_ABILITY`                 | use_ability                                                  | Rolle hat keine aktive Fähigkeit                                         |
-| `ABILITY_ALREADY_USED`       | use_ability                                                  | Tier 3.5: Ability ist 1×/Runde                                           |
-| `NO_VENT_NEARBY`             | use_vent                                                     | Spieler steht an keinem Vent                                             |
-| `UNKNOWN_TARGET`             | use_vent, trigger_takedown                                   | Target-Vent oder -Spieler unbekannt / nicht verbunden                    |
-| `TARGET_ELIMINATED`          | trigger_takedown                                             | Target ist schon tot                                                     |
-| `TOO_FAR`                    | trigger_takedown                                             | Target ausserhalb 40 px                                                  |
-| `TAKEDOWN_ON_COOLDOWN`       | trigger_takedown                                             | Take-Down-Cooldown noch aktiv                                            |
-| `UNKNOWN_BODY`               | report_body                                                  | Body-ID unbekannt                                                        |
-| `NOT_IN_WAR_ROOM`            | call_emergency_meeting                                       | Spieler nicht im War Room                                                |
-| `NO_MEETING_LEFT`            | call_emergency_meeting                                       | Spieler hat sein einziges Meeting verbraucht                             |
-| `CANNOT_VOTE`                | cast_vote, skip_vote                                         | Voter nicht lebend                                                       |
-| `INVALID_TARGET`             | cast_vote                                                    | Target unbekannt oder eliminiert                                         |
-| `NO_COLORS`                  | intern                                                       | sollte nie passieren — Color-Palette < MAX_PLAYERS                       |
-| `NO_ROLE`                    | intern                                                       | `private_role_for` aufgerufen bevor Rollen verteilt waren                |
+| Code                       | Wo                                                       | Bedeutung                                                                       |
+| -------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `BAD_MESSAGE`              | jeder Handler                                            | Pydantic-Validation fehlgeschlagen — Payload entspricht nicht dem Schema        |
+| `ROOM_FULL`                | join_room                                                | Mehr als 12 Spieler im Raum                                                     |
+| `NAME_TAKEN`               | join_room                                                | Name in diesem Raum bereits vergeben                                            |
+| `REJOIN_NOT_AVAILABLE`     | rejoin                                                   | Raum oder Spieler-ID unbekannt, oder Grace-Period abgelaufen                    |
+| `NOT_HOST`                 | start_game, return_to_lobby, abort_round, select_map     | Aktion erfordert Host                                                           |
+| `WRONG_PHASE`              | viele                                                    | Aktion in falscher Phase versucht                                               |
+| `NOT_ENOUGH_PLAYERS`       | start_game                                               | <2 Spieler ohne `demo`-Flag                                                     |
+| `UNKNOWN_MAP`              | select_map                                               | Map-ID nicht im Registry                                                        |
+| `UNKNOWN_TASK`             | task_hold_start                                          | Task-ID nicht in Map                                                            |
+| `TASK_ON_COOLDOWN`         | task_hold_start                                          | Task aktuell im Cooldown                                                        |
+| `TASK_TOO_FAR`             | task_hold_start                                          | Spieler nicht innerhalb 40 px                                                   |
+| `MINI_GAME_ALREADY_ACTIVE` | task_hold_start                                          | Spieler hat bereits eine Mini-Game-Session offen                                |
+| `UNKNOWN_MINI_GAME`        | task_hold_start                                          | `mini_game`-Feld der Task verweist auf nicht-registrierte ID                    |
+| `NO_ACTIVE_MINI_GAME`      | mini_game_input                                          | Spieler hat keine Mini-Game-Session                                             |
+| `UNKNOWN_ACTION`           | mini_game_input (plugin)                                 | Plugin kennt diese Action nicht                                                 |
+| `INVALID_PARAMS`           | mini_game_input (plugin)                                 | Plugin-Params fehlen/falsch                                                     |
+| `UNKNOWN_TEST`/`_NODE`/... | mini_game_input (plugin)                                 | plugin-spezifische ID-Fehler                                                    |
+| `PLAYER_ELIMINATED`        | task_hold_start, trigger_sabotage, trigger_takedown, ... | Spieler ist `isAlive=false`                                                     |
+| `UNKNOWN_PLAYER`           | trigger_sabotage, trigger_takedown, repair_sabotage, ... | Spieler-Session nicht gefunden                                                  |
+| `NOT_CHAOS_AGENT`          | trigger_sabotage, trigger_takedown, use_vent             | Spieler ist nicht im Chaos-Team                                                 |
+| `UNKNOWN_SABOTAGE`         | trigger_sabotage, repair_sabotage                        | Sabotage-ID unbekannt                                                           |
+| `SABOTAGE_ON_COOLDOWN`     | trigger_sabotage                                         | Sabotage aktuell im Cooldown                                                    |
+| `SABOTAGE_NOT_ACTIVE`      | repair_sabotage                                          | Sabotage existiert nicht oder ist nicht broken                                  |
+| `NO_PANEL`                 | repair_sabotage                                          | Sabotage hat kein Repair-Panel auf der Map                                      |
+| `OUT_OF_RANGE`             | repair_sabotage, report_body                             | Spieler nicht in Reichweite                                                     |
+| `COMMS_DOWN`               | trigger_sabotage                                         | `comms_outage` blockt andere Sabotagen                                          |
+| `NOT_NEAR_OBJECT`          | trigger_sabotage                                         | Tier 2.7 rework: Chaos nicht in 60-px-Reichweite eines passenden Object-Anchors |
+| `NO_ABILITY`               | use_ability                                              | Rolle hat keine aktive Fähigkeit                                                |
+| `ABILITY_ALREADY_USED`     | use_ability                                              | Tier 3.5: Ability ist 1×/Runde                                                  |
+| `NO_VENT_NEARBY`           | use_vent                                                 | Spieler steht an keinem Vent                                                    |
+| `UNKNOWN_TARGET`           | use_vent, trigger_takedown                               | Target-Vent oder -Spieler unbekannt / nicht verbunden                           |
+| `TARGET_ELIMINATED`        | trigger_takedown                                         | Target ist schon tot                                                            |
+| `TOO_FAR`                  | trigger_takedown                                         | Target ausserhalb 40 px                                                         |
+| `TAKEDOWN_ON_COOLDOWN`     | trigger_takedown                                         | Take-Down-Cooldown noch aktiv                                                   |
+| `UNKNOWN_BODY`             | report_body                                              | Body-ID unbekannt                                                               |
+| `NOT_IN_WAR_ROOM`          | call_emergency_meeting                                   | Spieler nicht im War Room                                                       |
+| `NO_MEETING_LEFT`          | call_emergency_meeting                                   | Spieler hat sein einziges Meeting verbraucht                                    |
+| `CANNOT_VOTE`              | cast_vote, skip_vote                                     | Voter nicht lebend                                                              |
+| `INVALID_TARGET`           | cast_vote                                                | Target unbekannt oder eliminiert                                                |
+| `NO_COLORS`                | intern                                                   | sollte nie passieren — Color-Palette < MAX_PLAYERS                              |
+| `NO_ROLE`                  | intern                                                   | `private_role_for` aufgerufen bevor Rollen verteilt waren                       |
 
 ---
 
 ## 7. Konstanten und Defaults
 
-| Konstante                                      | Wert            | Wo                                                 |
-| ---------------------------------------------- | --------------- | -------------------------------------------------- |
-| Tick-Frequenz                                  | 20 Hz           | `app/main.py:TICK_HZ`                              |
-| Map-Groesse (Default-Map)                      | 4800 × 3200 px  | `maps/default.json`                                |
-| Player-Speed normal                            | 300 px/s        | `app/game/sabotages.py:NORMAL_SPEED`               |
-| Player-Speed slow (Coffee=0 oder Mandatory)    | herabgesetzt    | `app/game/sabotages.py`                            |
-| Player-Kollisions-Radius                       | 20 px           | `app/game/walls.py:PLAYER_COLLISION_RADIUS`        |
-| Task-Interaction-Radius                        | 40 px           | `app/game/tasks.py:TASK_INTERACTION_RADIUS`        |
-| Sabotage-Panel-Interaction-Radius              | 50 px           | `app/game/tasks.py:SABOTAGE_PANEL_INTERACTION_RADIUS` |
-| Vent-Interaction-Radius                        | 50 px           | `app/game/tasks.py:VENT_INTERACTION_RADIUS`        |
-| Sabotage-Object-Interaction-Radius (Tier 2.7 rework) | 60 px           | `app/game/tasks.py:SABOTAGE_OBJECT_INTERACTION_RADIUS` |
-| Coffee-Energy Decay (Tier 3.5)                 | 1.4/s × Rolle-Modifier | `app/game/game_room.py:_tick_coffee_energy`        |
-| Take-Down-Radius                               | 40 px           | `app/game/game_room.py:TAKEDOWN_RADIUS`            |
-| Take-Down-Cooldown                             | 25 s            | `app/game/game_room.py:TAKEDOWN_COOLDOWN`          |
-| Task-Respawn-Cooldown                          | 8 s             | `app/game/tasks.py:TASK_RESPAWN_COOLDOWN`          |
-| Round-Timer                                    | 900 s           | `app/game/game_room.py:ROUND_SECONDS`              |
-| Meeting-Dauer                                  | 60 s            | `app/game/game_room.py:MEETING_DURATION_SECONDS`   |
-| Mandatory-Meeting-Slow                         | 5 s             | `app/game/sabotages.py:MEETING_DURATION`           |
-| Reconnect-Grace                                | 30 s            | `app/game/game_room.py:RECONNECT_GRACE_SECONDS`    |
-| MAX_PLAYERS                                    | 12              | `app/game/game_room.py:MAX_PLAYERS`                |
-| Multi-Chaos-Schwelle                           | 7 Spieler → 2 Chaos | `app/game/game_room.py` (Rollen-Verteilung)    |
+| Konstante                                            | Wert                   | Wo                                                     |
+| ---------------------------------------------------- | ---------------------- | ------------------------------------------------------ |
+| Tick-Frequenz                                        | 20 Hz                  | `app/main.py:TICK_HZ`                                  |
+| Map-Groesse (Default-Map)                            | 4800 × 3200 px         | `maps/default.json`                                    |
+| Player-Speed normal                                  | 300 px/s               | `app/game/sabotages.py:NORMAL_SPEED`                   |
+| Player-Speed slow (Coffee=0 oder Mandatory)          | herabgesetzt           | `app/game/sabotages.py`                                |
+| Player-Kollisions-Radius                             | 20 px                  | `app/game/walls.py:PLAYER_COLLISION_RADIUS`            |
+| Task-Interaction-Radius                              | 40 px                  | `app/game/tasks.py:TASK_INTERACTION_RADIUS`            |
+| Sabotage-Panel-Interaction-Radius                    | 50 px                  | `app/game/tasks.py:SABOTAGE_PANEL_INTERACTION_RADIUS`  |
+| Vent-Interaction-Radius                              | 50 px                  | `app/game/tasks.py:VENT_INTERACTION_RADIUS`            |
+| Sabotage-Object-Interaction-Radius (Tier 2.7 rework) | 60 px                  | `app/game/tasks.py:SABOTAGE_OBJECT_INTERACTION_RADIUS` |
+| Coffee-Energy Decay (Tier 3.5)                       | 1.4/s × Rolle-Modifier | `app/game/game_room.py:_tick_coffee_energy`            |
+| Take-Down-Radius                                     | 40 px                  | `app/game/game_room.py:TAKEDOWN_RADIUS`                |
+| Take-Down-Cooldown                                   | 25 s                   | `app/game/game_room.py:TAKEDOWN_COOLDOWN`              |
+| Task-Respawn-Cooldown                                | 8 s                    | `app/game/tasks.py:TASK_RESPAWN_COOLDOWN`              |
+| Round-Timer                                          | 900 s                  | `app/game/game_room.py:ROUND_SECONDS`                  |
+| Meeting-Dauer                                        | 60 s                   | `app/game/game_room.py:MEETING_DURATION_SECONDS`       |
+| Mandatory-Meeting-Slow                               | 5 s                    | `app/game/sabotages.py:MEETING_DURATION`               |
+| Reconnect-Grace                                      | 30 s                   | `app/game/game_room.py:RECONNECT_GRACE_SECONDS`        |
+| MAX_PLAYERS                                          | 12                     | `app/game/game_room.py:MAX_PLAYERS`                    |
+| Multi-Chaos-Schwelle                                 | 7 Spieler → 2 Chaos    | `app/game/game_room.py` (Rollen-Verteilung)            |
 
 ---
 
