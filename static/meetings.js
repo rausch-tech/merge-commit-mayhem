@@ -17,6 +17,13 @@ export class MeetingOverlay {
     this.skipBtn = rootEl.querySelector("#meeting-skip-btn");
     this.statusEl = rootEl.querySelector("#meeting-status");
 
+    // Stable per-player row state. We rebuild only when the alive-player set
+    // actually changes — every other update just patches text + disabled in
+    // place. Wiping the DOM each tick (server runs at 20 Hz) was racing the
+    // ~100-300 ms touch click dispatch and silently swallowing votes on phones.
+    this._rows = new Map(); // playerId -> { btn }
+    this._signature = null;
+
     this.skipBtn.addEventListener("click", () => {
       if (this._localHasVoted) return;
       this.ws.send("skip_vote", {});
@@ -26,6 +33,7 @@ export class MeetingOverlay {
   hide() {
     this.root.classList.add("hidden");
     this._localHasVoted = false;
+    this._signature = null;
   }
 
   /**
@@ -47,9 +55,47 @@ export class MeetingOverlay {
     const alreadyVoted = new Set(meeting.alreadyVoted || []);
     this._localHasVoted = alreadyVoted.has(ownPlayerId);
 
-    // Build the vote list from alive players.
-    this.voteListEl.innerHTML = "";
     const alive = (players || []).filter((p) => p.isAlive !== false);
+
+    // Rebuild only when the alive set changes (new meeting, eliminated player
+    // etc.). During a single meeting this is stable.
+    const signature = alive.map((p) => `${p.id}:${p.name}:${p.color}`).join("|");
+    if (signature !== this._signature) {
+      this._buildRows(alive);
+      this._signature = signature;
+    }
+
+    // Patch each row's vote count + disabled flag in place.
+    for (const p of alive) {
+      const entry = this._rows.get(p.id);
+      if (!entry) continue;
+      const count = (meeting.votesCount || {})[p.id] || 0;
+      const wantedText = count > 0 ? `Vote (${count})` : "Vote";
+      if (entry.btn.textContent !== wantedText) entry.btn.textContent = wantedText;
+      if (entry.btn.disabled !== this._localHasVoted) entry.btn.disabled = this._localHasVoted;
+    }
+
+    // Skip count + skip button state.
+    const skipCount = (meeting.votesCount || {})[""] || 0;
+    const skipText =
+      skipCount > 0 ? `Skip — niemand entfernen (${skipCount})` : "Skip — niemand entfernen";
+    if (this.skipBtn.textContent !== skipText) this.skipBtn.textContent = skipText;
+    if (this.skipBtn.disabled !== this._localHasVoted) {
+      this.skipBtn.disabled = this._localHasVoted;
+    }
+
+    // Status line — how many of the alive have voted.
+    const totalAlive = alive.length;
+    const votesCast = (meeting.alreadyVoted || []).length;
+    const statusText = this._localHasVoted
+      ? `Du hast abgestimmt. ${votesCast}/${totalAlive} fertig.`
+      : `${votesCast}/${totalAlive} haben abgestimmt.`;
+    if (this.statusEl.textContent !== statusText) this.statusEl.textContent = statusText;
+  }
+
+  _buildRows(alive) {
+    this.voteListEl.innerHTML = "";
+    this._rows = new Map();
     for (const p of alive) {
       const li = document.createElement("li");
       li.className = "meeting-vote-row";
@@ -62,9 +108,7 @@ export class MeetingOverlay {
       const voteBtn = document.createElement("button");
       voteBtn.type = "button";
       voteBtn.className = "meeting-vote-btn";
-      const count = (meeting.votesCount || {})[p.id] || 0;
-      voteBtn.textContent = count > 0 ? `Vote (${count})` : "Vote";
-      voteBtn.disabled = this._localHasVoted;
+      voteBtn.textContent = "Vote";
       voteBtn.addEventListener("click", () => {
         if (this._localHasVoted) return;
         this.ws.send("cast_vote", { targetPlayerId: p.id });
@@ -73,20 +117,8 @@ export class MeetingOverlay {
       li.appendChild(name);
       li.appendChild(voteBtn);
       this.voteListEl.appendChild(li);
+      this._rows.set(p.id, { btn: voteBtn });
     }
-
-    // Skip count + skip button state.
-    const skipCount = (meeting.votesCount || {})[""] || 0;
-    this.skipBtn.textContent =
-      skipCount > 0 ? `Skip — niemand entfernen (${skipCount})` : "Skip — niemand entfernen";
-    this.skipBtn.disabled = this._localHasVoted;
-
-    // Status line — how many of the alive have voted.
-    const totalAlive = alive.length;
-    const votesCast = (meeting.alreadyVoted || []).length;
-    this.statusEl.textContent = this._localHasVoted
-      ? `Du hast abgestimmt. ${votesCast}/${totalAlive} fertig.`
-      : `${votesCast}/${totalAlive} haben abgestimmt.`;
   }
 }
 
