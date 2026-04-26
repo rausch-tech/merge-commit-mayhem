@@ -83,8 +83,6 @@ document.querySelectorAll('input[name="tool"]').forEach((input) => {
   });
 });
 
-setTool("select");
-
 // --- Canvas: viewport (zoom-to-fit) ---------------------------------------
 
 function fitCanvas() {
@@ -844,6 +842,7 @@ window.addEventListener("beforeunload", (e) => {
 
 // --- Boot ------------------------------------------------------------------
 
+setTool("select");
 syncTopbarFields();
 renderPropsSidebar();
 fitCanvas();
