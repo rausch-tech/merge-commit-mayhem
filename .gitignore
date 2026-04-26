@@ -42,3 +42,7 @@ godot-3d/exports/
 godot-3d/**/*.import
 godot-3d/**/*.uid
 godot-3d/feedback/
+
+# Top-level feedback/ fuer Screenshots aller Spikes — wird nie committet,
+# Sven legt da Screenshots zum Teilen mit Claude rein.
+feedback/

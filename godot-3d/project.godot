@@ -1,10 +1,10 @@
-; Godot 4.6 — 3D Bootstrapping-Spike (Spike-2)
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
 ;
-; Ziel: validieren dass KayKit GLTF-Models + Animations sauber laufen,
-; Camera von schraeg-oben "wie Among Us"-Look gibt, WASD-Movement smooth ist,
-; Web-Export mit Mobile-Renderer praktikabel funktioniert.
-;
-; Kein Backend-Connect — pures lokales Rendering + Movement.
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
 
@@ -26,4 +26,3 @@ window/stretch/mode="viewport"
 [rendering]
 
 renderer/rendering_method="mobile"
-renderer/rendering_method.mobile="mobile"
