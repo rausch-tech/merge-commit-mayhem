@@ -52,6 +52,34 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         required_seconds=4.0,
         coffee_level_set=100,
     ),
+    TaskDefinition(
+        id="analyze_logs",
+        title="Logs analysieren",
+        room="server_room",
+        required_seconds=7.0,
+        incidents_change=-15,
+    ),
+    TaskDefinition(
+        id="calm_legacy_service",
+        title="Legacy-Service beruhigen",
+        room="legacy_basement",
+        required_seconds=8.0,
+        incidents_change=-20,
+    ),
+    TaskDefinition(
+        id="reduce_scope",
+        title="Scope reduzieren",
+        room="meeting_room",
+        required_seconds=5.0,
+        release_progress_reward=12,
+    ),
+    TaskDefinition(
+        id="write_release_notes",
+        title="Release Notes schreiben",
+        room="meeting_room",
+        required_seconds=4.0,
+        release_progress_reward=6,
+    ),
 ]
 
 

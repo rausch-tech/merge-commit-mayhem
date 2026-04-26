@@ -115,11 +115,17 @@ def test_pipeline_zero_wins_over_incidents_full():
 # --- forward-compat hooks -------------------------------------------------
 
 
-def test_task_definition_default_incidents_change_is_zero():
-    """No existing task definition introduces a non-zero incidents_change."""
+def test_incidents_reducing_tasks_exist():
+    """Slice 1.3 added two tasks that reduce incidents on completion."""
     from app.game.tasks import TASK_DEFINITIONS
 
-    assert all(t.incidents_change == 0 for t in TASK_DEFINITIONS)
+    by_id = {t.id: t for t in TASK_DEFINITIONS}
+    assert by_id["analyze_logs"].incidents_change < 0
+    assert by_id["calm_legacy_service"].incidents_change < 0
+    # Other tasks remain neutral on incidents.
+    for t in TASK_DEFINITIONS:
+        if t.id not in {"analyze_logs", "calm_legacy_service"}:
+            assert t.incidents_change == 0, f"{t.id} should not change incidents"
 
 
 def test_sabotage_definition_default_incidents_increase_is_zero():

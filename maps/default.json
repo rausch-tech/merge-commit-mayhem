@@ -19,10 +19,14 @@
     { "x": 400, "y": 800 }, { "x": 800, "y": 800 }, { "x": 1200, "y": 800 }
   ],
   "taskAnchors": [
-    { "taskId": "fix_unit_tests",     "x": 400,  "y": 400 },
-    { "taskId": "review_pr",          "x": 1100, "y": 1200 },
-    { "taskId": "repair_deployment",  "x": 800,  "y": 2400 },
-    { "taskId": "refill_coffee",      "x": 4000, "y": 800 }
+    { "taskId": "fix_unit_tests",       "x": 400,  "y": 400  },
+    { "taskId": "review_pr",            "x": 1100, "y": 1200 },
+    { "taskId": "repair_deployment",    "x": 800,  "y": 2400 },
+    { "taskId": "refill_coffee",        "x": 4000, "y": 800  },
+    { "taskId": "analyze_logs",         "x": 1200, "y": 2800 },
+    { "taskId": "calm_legacy_service",  "x": 4000, "y": 2400 },
+    { "taskId": "reduce_scope",         "x": 2000, "y": 400  },
+    { "taskId": "write_release_notes",  "x": 2800, "y": 1200 }
   ],
   "warRoomId": "war_room"
 }

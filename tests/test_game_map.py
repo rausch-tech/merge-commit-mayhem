@@ -47,7 +47,7 @@ def test_default_map_has_spawn_points():
 
 
 def test_default_map_has_task_anchors():
-    assert len(DEFAULT_MAP.task_anchors) == 4
+    assert len(DEFAULT_MAP.task_anchors) == 8
 
 
 def test_default_map_war_room_id_exists():
@@ -148,9 +148,18 @@ def test_war_room_bounds_raises_if_id_not_found():
 # --- task_position_map -------------------------------------------------------
 
 
-def test_task_position_map_has_all_four_tasks():
+def test_task_position_map_has_all_eight_tasks():
     positions = task_position_map(DEFAULT_MAP)
-    expected = {"fix_unit_tests", "review_pr", "repair_deployment", "refill_coffee"}
+    expected = {
+        "fix_unit_tests",
+        "review_pr",
+        "repair_deployment",
+        "refill_coffee",
+        "analyze_logs",
+        "calm_legacy_service",
+        "reduce_scope",
+        "write_release_notes",
+    }
     assert set(positions.keys()) == expected
 
 
