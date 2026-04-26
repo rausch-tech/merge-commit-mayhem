@@ -37,9 +37,7 @@ def test_correct_color_pair_creates_connection():
     plugin = CablePairing()
     state = plugin.init_state(seed=1)
     src_id, dst_id = _matching_pair(state)
-    state = plugin.handle_input(
-        state, "connect", {"sourceId": src_id, "destinationId": dst_id}
-    )
+    state = plugin.handle_input(state, "connect", {"sourceId": src_id, "destinationId": dst_id})
     assert state["connections"] == {src_id: dst_id}
 
 
@@ -48,9 +46,7 @@ def test_wrong_color_pair_softresets_connections():
     state = plugin.init_state(seed=1)
     # Establish one good connection first.
     good_src, good_dst = _matching_pair(state)
-    state = plugin.handle_input(
-        state, "connect", {"sourceId": good_src, "destinationId": good_dst}
-    )
+    state = plugin.handle_input(state, "connect", {"sourceId": good_src, "destinationId": good_dst})
     assert len(state["connections"]) == 1
     # Now find a mismatching pair (different colors).
     src = next(s for s in state["sources"] if s["id"] != good_src)
@@ -65,13 +61,9 @@ def test_already_used_source_or_destination_is_silently_ignored():
     plugin = CablePairing()
     state = plugin.init_state(seed=1)
     src_id, dst_id = _matching_pair(state)
-    state = plugin.handle_input(
-        state, "connect", {"sourceId": src_id, "destinationId": dst_id}
-    )
+    state = plugin.handle_input(state, "connect", {"sourceId": src_id, "destinationId": dst_id})
     # Re-tap same pair: idempotent, no change.
-    state = plugin.handle_input(
-        state, "connect", {"sourceId": src_id, "destinationId": dst_id}
-    )
+    state = plugin.handle_input(state, "connect", {"sourceId": src_id, "destinationId": dst_id})
     assert state["connections"] == {src_id: dst_id}
 
 
@@ -101,9 +93,7 @@ def test_invalid_params_raise():
     with pytest.raises(MiniGamePluginError):
         plugin.handle_input(state, "connect", {"sourceId": "s0"})  # missing destinationId
     with pytest.raises(MiniGamePluginError):
-        plugin.handle_input(
-            state, "connect", {"sourceId": "nope", "destinationId": "alsono"}
-        )
+        plugin.handle_input(state, "connect", {"sourceId": "nope", "destinationId": "alsono"})
 
 
 def test_public_view_carries_colors_and_progress():

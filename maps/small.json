@@ -18,10 +18,10 @@
     { "x": 600, "y": 600 }
   ],
   "taskAnchors": [
-    { "taskId": "fix_unit_tests",    "x": 300,  "y": 300  },
-    { "taskId": "repair_deployment", "x": 1800, "y": 300  },
-    { "taskId": "refill_coffee",     "x": 300,  "y": 1200 },
-    { "taskId": "analyze_logs",      "x": 1800, "y": 1200 }
+    { "taskId": "fix_unit_tests",    "x": 300,  "y": 300,  "objectType": "qa_terminal" },
+    { "taskId": "repair_deployment", "x": 1800, "y": 300,  "objectType": "ci_console" },
+    { "taskId": "refill_coffee",     "x": 300,  "y": 1200, "objectType": "coffee_machine" },
+    { "taskId": "analyze_logs",      "x": 1800, "y": 1200, "objectType": "monitoring_panel" }
   ],
   "sabotagePanels": [
     { "sabotageId": "lights_out",   "x": 1800, "y": 400  },
@@ -30,10 +30,6 @@
   "vents": [
     { "id": "v_open",    "x": 200,  "y": 200,  "connectedTo": ["v_kitchen"] },
     { "id": "v_kitchen", "x": 200,  "y": 1400, "connectedTo": ["v_open"] }
-  ],
-  "sabotageConsoles": [
-    { "id": "console_a", "x": 900,  "y": 600  },
-    { "id": "console_b", "x": 1800, "y": 600  }
   ],
   "warRoomId": "war_room"
 }

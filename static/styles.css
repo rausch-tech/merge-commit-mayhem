@@ -395,23 +395,27 @@ button:hover {
   box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.4);
 }
 
-/* Tier 2.7: when chaos is not at a Sabotage-Console, the whole panel grays
-   out and a hint appears so the player knows WHY the buttons are dead. */
-#sabotage-panel.sabotage-console-out-of-range::before {
-  content: "Stell dich an eine Sabotage-Konsole.";
-  display: block;
-  margin: 0 0 8px;
-  padding: 6px 8px;
-  background: rgba(251, 191, 36, 0.12);
-  border-left: 3px solid #fbbf24;
-  border-radius: 4px;
-  color: #fbbf24;
-  font-size: 0.78rem;
-  font-weight: 600;
+/* Tier 2.7 rework: per-sabotage object proximity hint. When chaos is not at
+   the matching themed object, the button grays out and a small hint line
+   appears under the label telling them WHERE to go. */
+.sabotage-btn.sabotage-out-of-range {
+  opacity: 0.55;
 }
 
-#sabotage-panel.sabotage-console-out-of-range .sabotage-btn {
-  opacity: 0.55;
+.sabotage-hint {
+  display: block;
+  font-size: 0.66rem;
+  font-weight: 500;
+  color: #fbbf24;
+  margin-top: 2px;
+  line-height: 1.15;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: normal;
+}
+
+.sabotage-btn:not(.sabotage-out-of-range) .sabotage-hint {
+  display: none;
 }
 
 .sabotage-cooldown-fill {
@@ -1517,4 +1521,291 @@ button:hover {
   body.drawer-sabo-open #touch-action-buttons {
     display: none;
   }
+}
+
+/* Tier 3.5: Lobby role picker -------------------------------------------- */
+
+.lobby-role-picker {
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: rgba(15, 23, 42, 0.55);
+  border-radius: 8px;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+}
+
+.lobby-role-picker label {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+.lobby-role-picker select {
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #475569;
+  font-size: 0.95rem;
+}
+
+.lobby-role-hint {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin: 2px 0 0;
+  font-style: italic;
+}
+
+/* Tier 3.5: Personal coffee meter (HUD) ---------------------------------- */
+
+.hud-pill-my-coffee {
+  background: linear-gradient(135deg, #c2410c, #ea580c);
+  border: 1px solid #fdba74;
+  color: #fed7aa;
+  position: relative;
+  overflow: hidden;
+}
+
+.hud-pill-my-coffee.coffee-low {
+  background: linear-gradient(135deg, #7f1d1d, #991b1b);
+  border-color: #ef4444;
+  color: #fecaca;
+  animation: my-coffee-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes my-coffee-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(248, 113, 113, 0);
+  }
+}
+
+/* Tier 3.5: Ability button (Coffee Run / Rollback / Standup) ------------- */
+
+#ability-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 280px;
+  z-index: 50;
+  background: linear-gradient(135deg, #6d28d9, #7c3aed);
+  color: #ede9fe;
+  border: 1px solid #a78bfa;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);
+}
+
+#ability-btn:hover {
+  filter: brightness(1.1);
+}
+#ability-btn:disabled {
+  background: linear-gradient(135deg, #4b5563, #6b7280);
+  border-color: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+/* Tier 3.5: Role-Intro modal --------------------------------------------- */
+
+#role-intro {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  backdrop-filter: blur(6px);
+}
+
+#role-intro.hidden {
+  display: none;
+}
+
+#role-intro-card {
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 24px 28px;
+  max-width: 460px;
+  width: 92%;
+  box-shadow: 0 8px 36px rgba(0, 0, 0, 0.6);
+}
+
+#role-intro-team-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+#role-intro.team-release #role-intro-team-badge {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border: 1px solid #22c55e;
+}
+
+#role-intro.team-chaos #role-intro-team-badge {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid #ef4444;
+}
+
+#role-intro-title {
+  margin: 0 0 4px;
+  font-size: 1.6rem;
+  color: #ffffff;
+}
+
+#role-intro-blurb {
+  margin: 0 0 10px;
+  color: #cbd5e1;
+  font-size: 0.95rem;
+  font-style: italic;
+}
+
+#role-intro-description {
+  margin: 0 0 14px;
+  font-size: 0.9rem;
+  color: #94a3b8;
+  line-height: 1.45;
+}
+
+#role-intro h3 {
+  margin: 14px 0 6px;
+  font-size: 0.85rem;
+  color: #93c5fd;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+#role-intro ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.92rem;
+  color: #e2e8f0;
+}
+
+#role-intro-ability-line {
+  margin: 0;
+  font-size: 0.92rem;
+  color: #c4b5fd;
+}
+
+#role-intro-close {
+  margin-top: 18px;
+  width: 100%;
+  padding: 10px 0;
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+#role-intro-close:hover {
+  filter: brightness(1.1);
+}
+
+/* Tier 3.5: Personal task panel — highlight assigned tasks --------------- */
+
+#task-sidebar .task-row.task-personal {
+  border-left: 3px solid #fbbf24;
+  background: rgba(251, 191, 36, 0.08);
+}
+
+#task-sidebar .task-row.task-personal::before {
+  content: "★";
+  color: #fbbf24;
+  margin-right: 4px;
+}
+
+#task-sidebar .task-row.task-strength {
+  border-left-color: #22c55e;
+}
+
+#task-sidebar .task-row.task-strength::before {
+  content: "⚡";
+  color: #4ade80;
+  margin-right: 4px;
+}
+
+/* Tier 3.6: Meeting context block ---------------------------------------- */
+
+#meeting-context {
+  margin: 8px 0 12px;
+  padding: 10px 14px;
+  background: rgba(15, 23, 42, 0.6);
+  border-left: 3px solid #fbbf24;
+  border-radius: 4px;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+#meeting-context p {
+  margin: 4px 0;
+  color: #cbd5e1;
+}
+
+#meeting-context-events {
+  margin-top: 6px;
+}
+
+#meeting-context-events summary {
+  cursor: pointer;
+  color: #93c5fd;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+#meeting-context-events ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+/* Tier 3.7: Endscreen awards + postmortem -------------------------------- */
+
+#endscreen-awards-block {
+  text-align: left;
+  margin: 14px 0;
+}
+
+#endscreen-awards li {
+  margin: 4px 0;
+  font-size: 0.92rem;
+}
+
+#endscreen-postmortem-block {
+  text-align: left;
+  margin: 14px 0;
+}
+
+#endscreen-postmortem {
+  white-space: pre-wrap;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 12px 14px;
+  color: #cbd5e1;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  max-height: 240px;
+  overflow-y: auto;
 }

@@ -15,27 +15,14 @@ export class SabotagePanel {
   constructor(rootEl, wsClient) {
     this.root = rootEl;
     this.ws = wsClient;
-    this.buttons = new Map(); // sabotage_id -> { btn, cdEl, fillEl }
+    this.buttons = new Map(); // sabotage_id -> { btn, cdEl, fillEl, hintEl }
     this.availableIds = [];
     this.totalCooldowns = {}; // sabotage_id -> total seconds (for ring fraction)
-    this.consoleAvailable = true; // Tier 2.7: defaults true so legacy maps without consoles still work
-  }
-
-  /**
-   * Tier 2.7: when the local chaos player is in reach of a Sabotage-Console
-   * (or the map has none), buttons are tappable. Otherwise we show them
-   * disabled with a hint, so the player doesn't waste time on rejected taps.
-   */
-  updateConsoleAvailability(available) {
-    const next = !!available;
-    if (this.consoleAvailable === next) return;
-    this.consoleAvailable = next;
-    this.root.classList.toggle("sabotage-console-out-of-range", !next);
-    // Force a refresh of all button disabled states from the latest known
-    // sabotage snapshot — we cache it on the entry during update.
-    for (const entry of this.buttons.values()) {
-      this._applyDisabledState(entry);
-    }
+    // Tier 2.7 rework: per-sabotage proximity. Map of sabotage_id → bool.
+    // Defaults true so legacy maps without typed anchors stay tappable.
+    this.objectAvailability = {};
+    // Hint text per sabotage from server payload ("CI-Konsole im Server Room")
+    this.objectHints = {};
   }
 
   /**
@@ -64,7 +51,6 @@ export class SabotagePanel {
       btn.type = "button";
       btn.className = "sabotage-btn sabotage-btn-icon";
       btn.dataset.sabotageId = id;
-      // Sprite icon as a <span> with background-image inside the button.
       const iconEl = document.createElement("span");
       iconEl.className = "sabotage-icon";
       applySprite(iconEl, `sabotage_${id}`);
@@ -76,16 +62,20 @@ export class SabotagePanel {
       const cdEl = document.createElement("span");
       cdEl.className = "sabotage-cooldown";
       cdEl.textContent = "";
+      const hintEl = document.createElement("span");
+      hintEl.className = "sabotage-hint";
+      hintEl.textContent = "";
       btn.appendChild(fillEl);
       btn.appendChild(iconEl);
       btn.appendChild(labelEl);
       btn.appendChild(cdEl);
+      btn.appendChild(hintEl);
       btn.addEventListener("click", () => {
         if (btn.disabled) return;
         this.ws.send("trigger_sabotage", { sabotageId: id });
       });
       grid.appendChild(btn);
-      this.buttons.set(id, { btn, cdEl, fillEl });
+      this.buttons.set(id, { btn, cdEl, fillEl, hintEl });
     }
     this.root.appendChild(grid);
   }
@@ -96,12 +86,21 @@ export class SabotagePanel {
    * (Tier 2.6 spectator-mode), every button is force-disabled regardless of
    * cooldown — ghosts cannot sabotage even if they were chaos. When
    * `disabledByCommsDown` is true (Tier 2.5), every button is also disabled
-   * except `comms_outage` itself, since the server gates other sabotages.
+   * except `comms_outage` itself.
+   *
+   * Tier 2.7 rework: opts.objectAvailability is a {sabotage_id: bool} map of
+   * "is the local chaos in reach of a matching themed object?". Buttons gray
+   * out with a hint when the player is too far.
    */
   updateFromGameState(sabotages, opts = {}) {
     if (!sabotages || this.availableIds.length === 0) return;
     this._lastDisabledByOwnDeath = !!opts.disabledByOwnDeath;
     this._lastDisabledByCommsDown = !!opts.disabledByCommsDown;
+    this.objectAvailability = opts.objectAvailability || {};
+    // Cache hints from payload so we can re-show them on disabled state.
+    for (const sab of sabotages) {
+      if (sab.objectHint) this.objectHints[sab.id] = sab.objectHint;
+    }
     for (const sab of sabotages) {
       const entry = this.buttons.get(sab.id);
       if (!entry) continue;
@@ -111,11 +110,19 @@ export class SabotagePanel {
       entry.lastSabotageId = sab.id;
       this._applyDisabledState(entry);
       entry.cdEl.textContent = cd > 0 ? `${Math.ceil(cd)}s` : "";
-      // Fill height represents ratio of remaining to total cooldown.
       const ratio = total > 0 && cd > 0 ? Math.min(1, cd / total) : 0;
       entry.fillEl.style.height = `${ratio * 100}%`;
-      // Active state visual cue.
       entry.btn.classList.toggle("sabotage-active", !!sab.active);
+      // Hint visible only when out of object range (and not on cooldown).
+      const oa = this.objectAvailability[sab.id];
+      const outOfRange = oa === false;
+      if (outOfRange && cd === 0 && !this._lastDisabledByOwnDeath) {
+        entry.hintEl.textContent = `→ ${this.objectHints[sab.id] || "passendes Terminal"}`;
+        entry.btn.classList.add("sabotage-out-of-range");
+      } else {
+        entry.hintEl.textContent = "";
+        entry.btn.classList.remove("sabotage-out-of-range");
+      }
     }
   }
 
@@ -123,14 +130,14 @@ export class SabotagePanel {
     const cd = entry.lastCooldown || 0;
     const blockedByComms =
       !!this._lastDisabledByCommsDown && entry.lastSabotageId !== "comms_outage";
-    const blockedByConsole = !this.consoleAvailable;
+    const oa = this.objectAvailability[entry.lastSabotageId];
+    // undefined → unknown (e.g. legacy map) → assume available.
+    const blockedByObject = oa === false;
     entry.btn.disabled =
-      cd > 0 || !!this._lastDisabledByOwnDeath || blockedByComms || blockedByConsole;
+      cd > 0 || !!this._lastDisabledByOwnDeath || blockedByComms || blockedByObject;
   }
 
   _cooldownTotal(id, currentCd) {
-    // Server doesn't send the original total. Cache the highest cd we've seen
-    // (which is the moment of trigger) and use that as the ratio denominator.
     if (currentCd > (this.totalCooldowns[id] || 0)) {
       this.totalCooldowns[id] = currentCd;
     }

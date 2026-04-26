@@ -6,17 +6,17 @@ Dieses Dokument ist der **eine** Plan. Es ist die Wahrheit über den Stand und d
 
 ---
 
-## Stand (2026-04-26)
+## Stand (2026-04-27)
 
 |                         |                                                                                                                                                                                                                                                                                                                       |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Repo**                | https://github.com/rausch-tech/merge-commit-mayhem                                                                                                                                                                                                                                                                    |
 | **Live (Test-Server)**  | https://game.prod-is-lava.dev                                                                                                                                                                                                                                                                                         |
-| **Backend-Tests**       | 468 grün (`uv run pytest`)                                                                                                                                                                                                                                                                                            |
+| **Backend-Tests**       | 471 grün (`uv run pytest`)                                                                                                                                                                                                                                                                                            |
 | **Frontend-Tests**      | 37 grün (`npx vitest run`)                                                                                                                                                                                                                                                                                            |
 | **Stack**               | Python 3.12 + FastAPI + Pydantic v2 + WebSockets, Vanilla JS + Canvas, Map als JSON-Daten, Vitest + happy-dom für Frontend-Smoke                                                                                                                                                                                      |
-| **Geshippte Tier 0–3**  | Foundation cleanup, Mechanik-Komplettierung, Among-Us-Features, Mini-Game-Framework — alles auf Live deployt                                                                                                                                                                                                          |
-| **Geshippte Slice-IDs** | lobby-movement → game-loop → scrolling-camera → spritesheets → character-sprites → walls → voting → map-data → eventfeed → incidents → tasks-1.4 → sabotages-1.4 → multi-chaos → audio-mute → map-editor → multi-map → in-game-menu → take-down → spectator → lights-out → vents → comms-outage → minigames-framework → mobile-touch-quickhack → mobile-drawers-minimap → cable-pairing → coffee-pour → log-filter → sprint-trim → protocol-audit → sabotage-console |
+| **Geshippte Tier 0–3.5/3.6/3.7** | Foundation cleanup, Mechanik-Komplettierung, Among-Us-Features, Mini-Game-Framework, Persona-Layer (Rollen + persönliche Tasks + Coffee-Energy), Object-Bound-Sabotage, Endscreen-Story — auf Live deployt                                                                                                |
+| **Geshippte Slice-IDs** | … → mobile-drawers-minimap → cable-pairing → coffee-pour → log-filter → sprint-trim → protocol-audit → sabotage-console (verworfen) → sabotage-object-binding → roles-and-personal-tasks → coffee-energy-and-abilities → meeting-context → endscreen-story → ai-flavor → lobby-role-preference                         |
 
 **Was funktioniert (Live, Stand 2026-04-26):**
 
@@ -115,7 +115,7 @@ Sechs Tier, in der Reihenfolge wie sie gebaut werden sollten. Jedes Tier hat ein
 | 2.4 | **Lights-Sabotage** — Sichtbarkeits-Reduktion: Viewport bekommt Vignette, Spieler sehen nur ~150 px Radius um sich herum. Repariert durch Interact mit „Electrical Panel" (im Server Room).                             | ✅ done | „PagerDuty-Storm" / „Production-Outage"               |
 | 2.5 | **Comms-Sabotage** — Tasks-Sidebar wird leer (kann nicht erfüllt werden), Sabotage-Buttons disabled. Repariert durch Interact mit „Comms Panel" (im War Room).                                                          | ✅ done | „Slack-Down", „Confluence-Outage"                     |
 | 2.6 | **Spectator-Mode für Geister** — Tote Spieler können sich frei durch die Map bewegen, andere Geister sehen, Lebende sehen sie nicht. Tasks erfüllen können sie weiter (helfen Release-Team), aber nicht mehr abstimmen. | ✅ done | „Coredumped"                                          |
-| 2.7 | **Sabotage-Console-Mechanik** — Chaos kann Sabotagen NICHT mehr von ueberall triggern; muss in 50-px-Reichweite einer Sabotage-Konsole stehen (wie Among Us). Map kriegt `sabotageConsoles`-Anchors. UI greyed Buttons mit Hint, Mini-Map zeigt Konsolen + Vents.                                | ✅ done | „Sabotage-Console"                                    |
+| 2.7 | **Sabotagen an Themen-Objekte binden** — jede Sabotage triggert nur in 60-px-Reichweite eines Task-Anchors mit passendem `objectType` (CI-Konsole, Git-Terminal, Kaffeemaschine, Monitoring-Panel etc.). Same Anchor wie Release-Tasks → outsider sehen nicht, ob da gearbeitet oder sabotiert wird. Per-Sabotage Hint + Button-Disable wenn ausser Reichweite. Erste Iteration mit dedizierter Console wurde verworfen (zu offensichtlich).                                | ✅ done | „Sabotage-Object-Binding"                             |
 
 Naming-Prinzip: nerdig, dev-thematisch, „kill" wird vermieden zugunsten von harmlos-witzigen Tech-Bezeichnungen. Final-Naming entscheiden wir bei Implementation jeder Slice.
 
@@ -139,6 +139,61 @@ Naming-Prinzip: nerdig, dev-thematisch, „kill" wird vermieden zugunsten von ha
 | 3.6 | **„Scope reduzieren"** (für `reduce_scope`) — 6 Sprint-Tickets mit Story-Points, entferne Tickets bis Restsumme <= Budget; Priority-Tickets duerfen NICHT entfernt werden (Soft-Reset).   | ✅ done |
 
 **Done-Kriterium:** Eine Task läuft komplett über ein Mini-Game (Server-validiert), die anderen 7 bleiben Hold-E. Das Mini-Game-API ist dokumentiert und Live-getestet, sodass weitere Mini-Games als eigene Slices folgen können (Code-Review-Simulator, Logs-Filtern, Coffee-Pour-Timing usw.). Mit Tier 3.3-3.6 stehen jetzt fuenf Mechanik-Patterns (Sequencing, Pairing, Timing, Filter-by-Criterion, Subset-by-Constraint) als Vorlagen fuer kuenftige Tasks. Stand jetzt: 5 von 8 Tasks haben ein Mini-Game.
+
+### Tier 3.5 — Rollen, persönliche Tasks & Kaffee-Energy (Persona Layer)
+
+**Ziel:** Vom „alle teilen einen Task-Pool, eine Release-Rolle" zum „jeder ist ein Spezialist mit eigenem Backlog und eigener Ressource". Ist der grosse Architektur-Shift, der Social-Deduction-Diskussionen erst trägt: „Warum war der Scrum Master im Server Room?" / „Warum hatte DevOps keinen Kaffee mehr?".
+
+**Quelle der Anforderungen:** `merge_conflict_mayhem_project/merge_conflict_mayhem_gesamtfeedback.md` (Teile A–E, P-Prompt).
+
+**Aufwand:** ~2 Wochen, in einer Rutsch-Session am 2026-04-26 grundgelegt.
+
+| #   | Was                                                                                                                                                                                                                          | Status  |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 3.5.1 | **5 Release-Rollen** — Developer / DevOps Engineer / QA Lead / Scrum Master / Caffeine Collector. Jede mit Stärken (Task-Kategorien × 1.35), Schwächen (× 0.75), eigenem Kaffee-Profil (decay-modifier, max_coffee).            | ✅ done |
+| 3.5.2 | **3 Chaos-Rollen** — Vibe Coder (AI/Code), Rogue Consultant (Process/Scope), Shadow Admin (Infra). Unterschiedliche `available_sabotages` pro Variante.                                                                       | ✅ done |
+| 3.5.3 | **Persönliche Task-Backlogs** — jeder Spieler kriegt 3 Tasks (2 strength-passend + 1 random). Chaos kriegt 3 Fake-Tasks passend zur Tarn-Persona. UI markiert eigene Tasks mit ★ in der Sidebar.                              | ✅ done |
+| 3.5.4 | **Coffee-Energy pro Spieler** — `coffee_energy: 0..max_coffee`. Decay 1.4/s × Rolle-Modifier. <15 = Speed-Penalty, ≥80 = Task-Bonus. Eigene Pille im HUD, pulsiert rot wenn niedrig.                                          | ✅ done |
+| 3.5.5 | **Aktive Fähigkeiten** — `use_ability` 1×/Runde: Rollback (DevOps +18 Pipeline), Coffee Run (CC bufft Nachbarn), Standup (Scrum Master ruft Meeting), Reproduce Bug (QA flagged Recent Action). Button im HUD.               | ✅ done |
+| 3.5.6 | **Lobby-Rollen-Präferenz** — Dropdown in der Lobby, Wunsch wird best-effort respektiert. Singleton-Rollen capped at 1. Chaos-Wunsch wird ignoriert (random).                                                                  | ✅ done |
+| 3.5.7 | **Role-Intro-Modal** — beim Phase-Wechsel lobby→playing zeigt jeder Spieler eine Rollen-Karte: Titel, Blurb, Stärken, Fähigkeit, Aufgaben. Auto-dismiss nach 30 s.                                                            | ✅ done |
+| 3.5.8 | **Task-Speed-Modifier serverseitig** — `task_speed_multiplier(role, category, coffee)` läuft in `_tick_tasks` + `_complete_mini_game`-Reward-Pfad. Movement-Multiplier nur als Penalty bei niedrigem Coffee (Tests bleiben stabil). | ✅ done |
+
+**Done-Kriterium:** Spieler erleben spürbar unterschiedliche Rollen, Persönliche Tasks lenken Bewegung, Kaffee ist eine echte Ressource. Live-Test mit ≥6 Personen.
+
+### Tier 3.6 — Meeting-Kontext, Object-Bound-Sabotage & AI-Flavor
+
+**Ziel:** Diskussionen kriegen Substanz (was war wo? wer war involviert?), Sabotage wird ambig statt offensichtlich (Tier 2.7 rework), AI-Flavor durchzieht Eventfeed + Postmortem.
+
+**Aufwand:** ~1.5 Wochen, ebenfalls am 2026-04-26 in derselben Rutsch-Session.
+
+| #   | Was                                                                                                                                                                                                                          | Status  |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 3.6.1 | **Sabotage-Object-Binding (Tier 2.7 rework)** — dedizierte Console rausgeworfen (zu offensichtlich), stattdessen jede Sabotage an Task-Anchor mit passendem `object_type` gebunden. Same Anchor wie Release-Task → Ambiguität.  | ✅ done |
+| 3.6.2 | **Meeting-Kontext** — `meeting.context = {reporterName, body? {victimName, room}, recentEvents[]}`. Snapshot zum Meeting-Start. UI zeigt Block über Voting-Liste. Hinweise, keine Beweise.                                    | ✅ done |
+| 3.6.3 | **AI-Flavor-Texte** — `app/game/ai_flavor.py` mit reichen LLM-styled Pools für Sabotage-Events („CI hatte einen Hallucinations-Anfall"), Repair, Body-Found, Vote-Kick. Vibe Coder bekommt AI-Sabotage-Themen.                   | ✅ done |
+| 3.6.4 | **Accusation-Tags / Voting-Polish** — Schritt nach hinten: Voting-UI bleibt erstmal wie sie ist, Tags sind ein eigener Slice (bringt mit Voice-Chat den meisten Wert).                                                         | ⏳ open |
+| 3.6.5 | **Voting-Result-Story** — Roll-out kann später mit „last words" Flavor-Line erweitert werden.                                                                                                                                | ⏳ open |
+
+**Done-Kriterium:** Meetings haben Substanz; Saboteure müssen sich physisch ans Object stellen (kein Verrats-Pattern); Eventfeed + Postmortem fühlen sich AI-generiert an.
+
+### Tier 3.7 — Endscreen-Story, Closing Mini-Games & Metriken
+
+**Ziel:** Nach jeder Runde gibt's Diskussionsstoff (Awards, Stats, AI-Postmortem). Verbleibende Hold-E-Tasks bekommen ihre Mini-Games. Server exportiert Metriken für Balancing.
+
+**Aufwand:** ~1.5 Wochen.
+
+| #   | Was                                                                                                                                                                                                                          | Status  |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 3.7.1 | **Endscreen-Story + Per-Player-Stats** — `final_summary` mit Per-Player (Tasks, Sabotagen, Coffee-final, Ability-used), Awards (Pipeline Whisperer, Vibe of the Round, Held der Kaffeemaschine, Most Suspicious Innocent).      | ✅ done |
+| 3.7.2 | **AI-Postmortem-Generator** — `generate_postmortem(summary)` produziert mehrzeiligen LLM-styled Text. Im Endscreen unter `<pre>` gerendert.                                                                                  | ✅ done |
+| 3.7.3 | **`review_pr` Mini-Game** — Diff-Review: 5–8 Code-Zeilen, 2 problematische markieren (hardcoded API key, `catch(Exception){}`, `console.log`, …). Pattern: Spot-the-Bug.                                                       | ⏳ open |
+| 3.7.4 | **`calm_legacy_service` Mini-Game** — Stabilitäts-Balancing: CPU/Memory/Queue in grünem Bereich halten, jede Korrektur drückt einen anderen Wert leicht weg.                                                                  | ⏳ open |
+| 3.7.5 | **`write_release_notes` Mini-Game** — Drag/Click-Sort: Commits in Feature/Bugfix/Breaking-Change/Should-Not-Be-Mentioned-Publicly einordnen.                                                                                  | ⏳ open |
+| 3.7.6 | **Metrik-Export (JSONL)** — pro Runde: Winrate, Rundendauer, Meetings, Force-Reboots, Tasks/Rolle, Sabotagen, Repairs, Coffee-Avg. Datei pro Runde unter `data/playtest/`.                                                    | ⏳ open |
+| 3.7.7 | **Heatmaps (optional, später)** — Movement, Kills, Body-Discovery, Sabotage-Trigger pro Map. Hilft Map-Balancing.                                                                                                            | 🔮 backlog |
+
+**Done-Kriterium:** Endscreen erzählt die Runde, alle 8 Tasks haben Mini-Games, Server logged Balance-Metriken.
 
 ### Tier 4 — Godot-Migration
 

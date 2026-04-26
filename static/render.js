@@ -84,10 +84,11 @@ export class Renderer {
     this.activePanels = []; // [{sabotageId, x, y}] for currently-broken sabotages
     this.lightsOff = false; // toggles the radial vignette (Tier 2.4)
     this.vents = []; // [{id, x, y, connectedTo: [...]}] (Tier 2.3)
-    this.sabotageConsoles = []; // [{id, x, y}] (Tier 2.7)
     this.ownTeam = null; // 'release_team' | 'chaos_agents' | null
     this.localPlayerNearVent = null; // vent object the local chaos player is in reach of, else null
-    this.localPlayerNearConsole = false; // Tier 2.7: chaos in reach of any console
+    // Tier 2.7 rework: per-sabotage proximity. Map of sabotageId → bool, true
+    // when the local chaos player stands in reach of any matching task anchor.
+    this.sabotageObjectAvailability = {};
     this._running = false;
     this.map = null; // populated via setMap()
     this._walls = []; // computed when setMap is called
@@ -114,8 +115,12 @@ export class Renderer {
   setVents(vents) {
     this.vents = vents || [];
   }
-  setSabotageConsoles(consoles) {
-    this.sabotageConsoles = consoles || [];
+  setSabotagesPayload(sabotages) {
+    // Tier 2.7 rework: server tells us which sabotages exist + their allowed
+    // anchor positions. We compute per-sabotage proximity locally each frame
+    // (cheap — handful of distance checks) and feed sabotages.js for button
+    // enable/disable.
+    this._sabotagePayload = sabotages || [];
   }
   setOwnTeam(team) {
     this.ownTeam = team || null;
@@ -361,57 +366,40 @@ export class Renderer {
     }
     this.localPlayerNearVent = nearVent;
 
-    // Sabotage Consoles (Tier 2.7). Visible to everyone — they're physical
-    // map architecture — but only chaos can interact. Visual: amber terminal
-    // with a small screen + indicator LED, distinct from vents (steel grille)
-    // and repair panels (pulsing red diamond).
-    const CONSOLE_INTERACT_RADIUS = 50;
-    let nearConsole = false;
-    for (const console_ of this.sabotageConsoles) {
-      ctx.save();
-      // Body + screen.
-      ctx.fillStyle = "#1f1208";
-      ctx.fillRect(console_.x - 16, console_.y - 14, 32, 28);
-      ctx.strokeStyle = "#fbbf24";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(console_.x - 16, console_.y - 14, 32, 28);
-      // Screen — amber CRT vibe.
-      ctx.fillStyle = "#78350f";
-      ctx.fillRect(console_.x - 12, console_.y - 10, 24, 16);
-      ctx.strokeStyle = "#fbbf24";
-      ctx.lineWidth = 1;
-      // Two scanlines on the screen.
-      ctx.beginPath();
-      ctx.moveTo(console_.x - 10, console_.y - 6);
-      ctx.lineTo(console_.x + 10, console_.y - 6);
-      ctx.moveTo(console_.x - 10, console_.y);
-      ctx.lineTo(console_.x + 10, console_.y);
-      ctx.stroke();
-      // LED that pulses when chaos is nearby (or always on, gently).
-      const ledAlpha =
-        this.ownTeam === "chaos_agents" ? 0.7 + 0.3 * Math.sin(Date.now() / 240) : 0.55;
-      ctx.fillStyle = `rgba(251, 191, 36, ${ledAlpha.toFixed(3)})`;
-      ctx.beginPath();
-      ctx.arc(console_.x + 11, console_.y - 11, 2.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-
-      if (this.ownTeam === "chaos_agents" && local) {
-        const dx = local.x - console_.x;
-        const dy = local.y - console_.y;
-        if (dx * dx + dy * dy <= CONSOLE_INTERACT_RADIUS * CONSOLE_INTERACT_RADIUS) {
-          ctx.beginPath();
-          ctx.arc(console_.x, console_.y, CONSOLE_INTERACT_RADIUS, 0, Math.PI * 2);
-          ctx.strokeStyle = "rgba(251, 191, 36, 0.85)";
-          ctx.lineWidth = 2;
-          ctx.setLineDash([5, 4]);
-          ctx.stroke();
-          ctx.setLineDash([]);
-          nearConsole = true;
+    // Tier 2.7 rework: per-sabotage proximity (no dedicated "console" — chaos
+    // triggers each sabotage at the same anchor that the matching task uses).
+    // Compute one bool per sabotage, exposed via this.sabotageObjectAvailability.
+    const SABOTAGE_OBJECT_RADIUS = 60;
+    const r2 = SABOTAGE_OBJECT_RADIUS * SABOTAGE_OBJECT_RADIUS;
+    const availability = {};
+    if (this.ownTeam === "chaos_agents" && local) {
+      for (const sab of this._sabotagePayload || []) {
+        const anchors = sab.triggerAnchors || [];
+        if (anchors.length === 0) {
+          availability[sab.id] = true; // legacy: no binding
+          continue;
         }
+        let near = false;
+        for (const a of anchors) {
+          const dx = local.x - a.x;
+          const dy = local.y - a.y;
+          if (dx * dx + dy * dy <= r2) {
+            near = true;
+            // Faint dashed reach indicator on the matching anchor.
+            ctx.beginPath();
+            ctx.arc(a.x, a.y, SABOTAGE_OBJECT_RADIUS, 0, Math.PI * 2);
+            ctx.strokeStyle = "rgba(248, 113, 113, 0.6)";
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 4]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            break;
+          }
+        }
+        availability[sab.id] = near;
       }
     }
-    this.localPlayerNearConsole = nearConsole;
+    this.sabotageObjectAvailability = availability;
 
     // Bodies (rendered BEFORE players so live players draw on top).
     for (const body of this.bodies) {
@@ -616,12 +604,16 @@ export class Renderer {
       ctx.fill();
     }
 
-    // Sabotage Consoles — small amber squares, only highlighted for chaos
-    // (release team also sees them since they're visible architecture, but
-    // the cue is more useful to chaos who actually plans routes around them).
-    for (const console_ of this.sabotageConsoles) {
-      ctx.fillStyle = this.ownTeam === "chaos_agents" ? "#fbbf24" : "#a16207";
-      ctx.fillRect(toX(console_.x) - 2.5, toY(console_.y) - 2.5, 5, 5);
+    // Sabotage trigger objects (Tier 2.7 rework). For chaos: amber dot on
+    // each task anchor that has an object_type — reminds them where they can
+    // sabotage from. Release team doesn't need this hint (anchor positions
+    // are already visible as task markers).
+    if (this.ownTeam === "chaos_agents") {
+      for (const t of this.tasks) {
+        if (!t.objectType) continue;
+        ctx.fillStyle = "rgba(251, 191, 36, 0.9)";
+        ctx.fillRect(toX(t.x) - 2, toY(t.y) - 2, 4, 4);
+      }
     }
 
     // Local player — bright dot in the player's color with a white halo so

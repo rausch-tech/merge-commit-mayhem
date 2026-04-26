@@ -2,7 +2,13 @@ import { applySprite } from "./sprites.js";
 
 const ROLE_LABELS = {
   developer: "Developer",
+  devops_engineer: "DevOps Engineer",
+  qa_lead: "QA Lead",
+  scrum_master: "Scrum Master",
+  caffeine_collector: "Caffeine Collector",
   vibe_coder: "Vibe Coder",
+  rogue_consultant: "Rogue Consultant",
+  shadow_admin: "Shadow Admin",
 };
 const TEAM_LABELS = {
   release_team: "Release Team",
@@ -21,10 +27,42 @@ export class EndscreenOverlay {
     this.reasonEl = rootEl.querySelector("#endscreen-reason");
     this.playersEl = rootEl.querySelector("#endscreen-players");
     this.resetBtn = rootEl.querySelector("#endscreen-reset");
+    // Tier 3.7 endscreen extras (awards + AI postmortem text).
+    this.awardsBlock = rootEl.querySelector("#endscreen-awards-block");
+    this.awardsList = rootEl.querySelector("#endscreen-awards");
+    this.postmortemBlock = rootEl.querySelector("#endscreen-postmortem-block");
+    this.postmortemEl = rootEl.querySelector("#endscreen-postmortem");
     this.resetBtn.addEventListener("click", () => {
       this.ws.send("return_to_lobby", {});
-      // Hide will happen via lobby_state -> main.js -> hide()
     });
+  }
+
+  /** Tier 3.7: enrich the endscreen with awards + AI postmortem from the
+   * server-side final_summary blob. Idempotent — passing null clears them. */
+  applyFinalSummary(summary) {
+    if (!summary) {
+      this.awardsBlock?.classList.add("hidden");
+      this.postmortemBlock?.classList.add("hidden");
+      return;
+    }
+    const awards = summary.awards || [];
+    if (awards.length > 0 && this.awardsBlock) {
+      this.awardsList.innerHTML = "";
+      for (const a of awards) {
+        const li = document.createElement("li");
+        li.innerHTML = `<strong>${a.title}</strong> — ${a.playerName}: ${a.reason}`;
+        this.awardsList.appendChild(li);
+      }
+      this.awardsBlock.classList.remove("hidden");
+    } else {
+      this.awardsBlock?.classList.add("hidden");
+    }
+    if (summary.postmortem && this.postmortemBlock) {
+      this.postmortemEl.textContent = summary.postmortem;
+      this.postmortemBlock.classList.remove("hidden");
+    } else {
+      this.postmortemBlock?.classList.add("hidden");
+    }
   }
 
   show(payload, isHost) {

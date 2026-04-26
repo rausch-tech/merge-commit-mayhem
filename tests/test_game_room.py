@@ -141,28 +141,30 @@ def test_start_requires_lobby_phase():
 
 
 def test_start_transitions_to_playing_and_assigns_roles():
+    """Tier 3.5: chaos role can be Vibe Coder / Rogue Consultant / Shadow
+    Admin; release roles can be Developer / DevOps / QA / Scrum / CC."""
     room = _make_started_room(player_count=4)
     assert room.phase is Phase.PLAYING
-    roles = [p.role for p in room.players.values()]
-    assert roles.count("vibe_coder") == 1
-    assert roles.count("developer") == 3
+    teams = [p.team for p in room.players.values()]
+    assert teams.count("chaos_agents") == 1
+    assert teams.count("release_team") == 3
     assert all(p.team in {"release_team", "chaos_agents"} for p in room.players.values())
 
 
 def test_start_with_twelve_players_assigns_three_chaos():
     """Tier 1.5: 12-player rooms have exactly 3 chaos agents."""
     room = _make_started_room(player_count=12)
-    roles = [p.role for p in room.players.values()]
-    assert roles.count("vibe_coder") == 3
-    assert roles.count("developer") == 9
+    teams = [p.team for p in room.players.values()]
+    assert teams.count("chaos_agents") == 3
+    assert teams.count("release_team") == 9
 
 
 def test_start_with_seven_players_assigns_two_chaos():
     """Tier 1.5: 7..9 players -> 2 chaos."""
     room = _make_started_room(player_count=7)
-    roles = [p.role for p in room.players.values()]
-    assert roles.count("vibe_coder") == 2
-    assert roles.count("developer") == 5
+    teams = [p.team for p in room.players.values()]
+    assert teams.count("chaos_agents") == 2
+    assert teams.count("release_team") == 5
 
 
 def test_start_sets_timer_to_900():
@@ -441,12 +443,14 @@ def test_demo_mode_assigns_vibe_coder_to_solo_player():
 
 
 def test_demo_mode_with_two_players_uses_normal_role_assignment():
+    """Tier 3.5: with 2 players, normal assignment kicks in — exactly one
+    chaos (any chaos role variant) and one release (any release role)."""
     room = GameRoom(code="DEMO")
     a = room.add_player("Alice")
     room.add_player("Bob")
     room.start(requesting_player_id=a.id, rng=random.Random(0), demo=True)
-    roles = sorted(p.role for p in room.players.values())
-    assert roles == ["developer", "vibe_coder"]
+    teams = sorted(p.team for p in room.players.values())
+    assert teams == ["chaos_agents", "release_team"]
 
 
 def test_non_demo_still_requires_two_players():

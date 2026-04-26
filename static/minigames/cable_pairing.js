@@ -123,10 +123,7 @@ export class CablePairingRenderer {
     while (this.linesEl.firstChild) this.linesEl.removeChild(this.linesEl.firstChild);
     const boardRect = this.boardEl.getBoundingClientRect();
     if (boardRect.width <= 0) return;
-    this.linesEl.setAttribute(
-      "viewBox",
-      `0 0 ${boardRect.width} ${boardRect.height}`
-    );
+    this.linesEl.setAttribute("viewBox", `0 0 ${boardRect.width} ${boardRect.height}`);
     for (const [sourceId, destId] of Object.entries(conns)) {
       const srcEl = this.sourcesCol.querySelector(`[data-node-id="${sourceId}"]`);
       const dstEl = this.destsCol.querySelector(`[data-node-id="${destId}"]`);

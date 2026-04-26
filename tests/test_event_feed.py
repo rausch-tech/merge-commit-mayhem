@@ -26,13 +26,13 @@ def _started_room(player_count: int = 4, seed: int = 0) -> tuple[GameRoom, list[
     return room, ids
 
 
-def _chaos_id(room: GameRoom) -> str:
+def _chaos_id(room: GameRoom, sabotage_id: str = "ci_cd_red") -> str:
+    """Tier 2.7 rework: snap chaos to the right themed-object anchor for the
+    sabotage they're about to trigger so callers don't need to think about it."""
     cid = next(p.id for p in room.players.values() if p.team == "chaos_agents")
-    # Tier 2.7: sabotages now require the chaos to stand at a console.
-    # Snap on lookup so existing tests don't need to know about the gate.
-    from tests.conftest import snap_to_first_console
+    from tests.conftest import snap_to_object_for_sabotage
 
-    snap_to_first_console(room, cid)
+    snap_to_object_for_sabotage(room, cid, sabotage_id)
     return cid
 
 

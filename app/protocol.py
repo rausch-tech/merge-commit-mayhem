@@ -229,6 +229,32 @@ class MiniGameInput(BaseModel):
     payload: MiniGameInputPayload
 
 
+# --- Tier 3.5: lobby role preference + role ability --------------------------
+
+
+class SetPreferredRolePayload(BaseModel):
+    model_config = _camel_config()
+    # None = "egal", any other value must be a valid release-team role id
+    # (chaos preference is silently ignored server-side anyway).
+    role: str | None = None
+
+
+class SetPreferredRole(BaseModel):
+    model_config = _camel_config()
+    type: Literal["set_preferred_role"]
+    payload: SetPreferredRolePayload
+
+
+class UseAbilityPayload(BaseModel):
+    model_config = _camel_config()
+
+
+class UseAbility(BaseModel):
+    model_config = _camel_config()
+    type: Literal["use_ability"]
+    payload: UseAbilityPayload = Field(default_factory=UseAbilityPayload)
+
+
 IncomingMessage = Annotated[
     JoinRoom
     | Rejoin
@@ -248,7 +274,9 @@ IncomingMessage = Annotated[
     | AbortRound
     | RepairSabotage
     | UseVent
-    | MiniGameInput,
+    | MiniGameInput
+    | SetPreferredRole
+    | UseAbility,
     Discriminator("type"),
 ]
 
@@ -306,11 +334,29 @@ class PrivateRoleMsg(BaseModel):
     team: str
     description: str
     available_sabotages: list[str] = Field(default_factory=list)
+    # Tier 3.5: role-card metadata for the intro modal + HUD.
+    title: str = ""
+    short_blurb: str = ""
+    strength_categories: list[str] = Field(default_factory=list)
+    weak_categories: list[str] = Field(default_factory=list)
+    ability_id: str | None = None
+    ability_label: str = ""
+    ability_hint: str = ""
+    max_coffee: float = 100.0
+    assigned_task_ids: list[str] = Field(default_factory=list)
+    # Display titles + rooms for the assigned tasks (so the role-intro modal
+    # doesn't need a parallel task lookup table).
+    assigned_tasks: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class PrivateStateMsg(BaseModel):
     model_config = _camel_config()
     takedown_cooldown_remaining: float = 0.0
+    # Tier 3.5: own coffee energy + ability gate. Per-viewer only (would
+    # leak strategy if broadcast to all).
+    coffee_energy: float = 100.0
+    coffee_max: float = 100.0
+    ability_used: bool = False
 
 
 class ErrorMsg(BaseModel):

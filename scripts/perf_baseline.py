@@ -134,15 +134,19 @@ def _print_report(r: dict) -> None:
     print(f"Ticks measured:           {r['ticks']} (~{r['ticks'] / 20:.0f} s wall)")
     print()
     print("Tick duration (ms):")
-    print(f"  mean / p50 / p95 / p99 / max: "
-          f"{r['tick_ms_mean']:.2f} / {r['tick_ms_p50']:.2f} / "
-          f"{r['tick_ms_p95']:.2f} / {r['tick_ms_p99']:.2f} / {r['tick_ms_max']:.2f}")
+    print(
+        f"  mean / p50 / p95 / p99 / max: "
+        f"{r['tick_ms_mean']:.2f} / {r['tick_ms_p50']:.2f} / "
+        f"{r['tick_ms_p95']:.2f} / {r['tick_ms_p99']:.2f} / {r['tick_ms_max']:.2f}"
+    )
     print(f"  Tick budget (50 ms @ 20 Hz)   headroom factor at p99: {r['headroom_factor']:.1f}x")
     print()
     print("Per-viewer payload bytes (single game_state JSON):")
-    print(f"  mean / p95 / p99: "
-          f"{r['payload_bytes_mean']:.0f} / "
-          f"{r['payload_bytes_p95']:.0f} / {r['payload_bytes_p99']:.0f}")
+    print(
+        f"  mean / p95 / p99: "
+        f"{r['payload_bytes_mean']:.0f} / "
+        f"{r['payload_bytes_p95']:.0f} / {r['payload_bytes_p99']:.0f}"
+    )
     print()
     print("Total bytes broadcast per tick (sum over all viewers):")
     print(f"  mean / p95: {r['tick_total_bytes_mean']:.0f} / {r['tick_total_bytes_p95']:.0f}")

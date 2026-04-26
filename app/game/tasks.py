@@ -11,7 +11,7 @@ TASK_INTERACTION_RADIUS: Final[float] = 40.0  # px around task center where E wo
 TASK_RESPAWN_COOLDOWN: Final[float] = 8.0  # s until a completed task becomes available again
 SABOTAGE_PANEL_INTERACTION_RADIUS: Final[float] = 50.0  # Tier 2.4: repair-panel reach
 VENT_INTERACTION_RADIUS: Final[float] = 50.0  # Tier 2.3: chaos-only vent reach
-SABOTAGE_CONSOLE_INTERACTION_RADIUS: Final[float] = 50.0  # Tier 2.7: chaos console reach
+SABOTAGE_OBJECT_INTERACTION_RADIUS: Final[float] = 60.0  # Tier 2.7: chaos at themed objects
 
 
 @dataclass(frozen=True)
@@ -25,9 +25,11 @@ class TaskDefinition:
     coffee_level_set: int | None = None  # if set, coffee_level is clamped to this value
     incidents_change: int = 0  # negative reduces incidents on completion
     # Tier 3: when set, task_hold_start opens the named mini-game instead of
-    # starting the hold-E progress bar. ``required_seconds`` is ignored on
-    # this path; the mini-game decides its own duration via plugin logic.
+    # starting the hold-E progress bar.
     mini_game: str | None = None
+    # Tier 3.5: which role-strength category this task belongs to. Used by
+    # roles.task_speed_multiplier() to compute per-player speed.
+    category: str = ""
 
 
 TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
@@ -38,6 +40,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         required_seconds=5.0,
         release_progress_reward=10,
         mini_game="test_suite_repair",
+        category="code",
     ),
     TaskDefinition(
         id="review_pr",
@@ -45,6 +48,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         room="open_space",
         required_seconds=5.0,
         release_progress_reward=8,
+        category="code",
     ),
     TaskDefinition(
         id="repair_deployment",
@@ -53,6 +57,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         required_seconds=6.0,
         pipeline_stability_reward=15,
         mini_game="cable_pairing",
+        category="infra",
     ),
     TaskDefinition(
         id="refill_coffee",
@@ -61,6 +66,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         required_seconds=4.0,
         coffee_level_set=100,
         mini_game="coffee_pour",
+        category="support",
     ),
     TaskDefinition(
         id="analyze_logs",
@@ -69,6 +75,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         required_seconds=7.0,
         incidents_change=-15,
         mini_game="log_filter",
+        category="infra",
     ),
     TaskDefinition(
         id="calm_legacy_service",
@@ -76,6 +83,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         room="legacy_basement",
         required_seconds=8.0,
         incidents_change=-20,
+        category="legacy",
     ),
     TaskDefinition(
         id="reduce_scope",
@@ -84,6 +92,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         required_seconds=5.0,
         release_progress_reward=12,
         mini_game="sprint_trim",
+        category="scope",
     ),
     TaskDefinition(
         id="write_release_notes",
@@ -91,6 +100,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         room="meeting_room",
         required_seconds=4.0,
         release_progress_reward=6,
+        category="code",
     ),
 ]
 

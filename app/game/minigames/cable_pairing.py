@@ -77,9 +77,7 @@ class CablePairing(MiniGamePlugin):
     def public_view(self, state: dict) -> dict:
         return {
             "sources": [{"id": s["id"], "color": s["color"]} for s in state["sources"]],
-            "destinations": [
-                {"id": d["id"], "color": d["color"]} for d in state["destinations"]
-            ],
+            "destinations": [{"id": d["id"], "color": d["color"]} for d in state["destinations"]],
             "connections": dict(state["connections"]),
             "totalPairs": NUM_PAIRS,
         }

@@ -48,6 +48,20 @@
             <label for="map-dropdown">Map:</label>
             <select id="map-dropdown"></select>
           </div>
+          <div id="role-preference" class="lobby-role-picker">
+            <label for="role-dropdown">Wunschrolle (Release-Team):</label>
+            <select id="role-dropdown">
+              <option value="">Egal</option>
+              <option value="developer">Developer — Code &amp; PRs</option>
+              <option value="devops_engineer">DevOps — Pipeline &amp; Deploys</option>
+              <option value="qa_lead">QA Lead — Tests &amp; Logs</option>
+              <option value="scrum_master">Scrum Master — Scope &amp; Standup</option>
+              <option value="caffeine_collector">Caffeine Collector — Coffee Run</option>
+            </select>
+            <p class="lobby-role-hint">
+              Chaos-Rollen werden zufällig vergeben — du kriegst sie nicht durch Wunsch.
+            </p>
+          </div>
           <label id="demo-mode-row" class="hidden">
             <input type="checkbox" id="demo-mode" />
             Demo-Mode (1 Spieler, du bist Chaos)
@@ -73,9 +87,13 @@
             <span class="hud-label">Pipeline</span>
             <span class="hud-value">100%</span>
           </div>
-          <div id="hud-coffee" class="hud-pill hud-pill-coffee" title="Coffee Level">
+          <div id="hud-coffee" class="hud-pill hud-pill-coffee" title="Team-Kaffee">
             <span class="hud-label">Coffee</span>
             <span class="hud-value">100%</span>
+          </div>
+          <div id="hud-my-coffee" class="hud-pill hud-pill-my-coffee" title="Eigene Kaffee-Energy">
+            <span class="hud-label">Du</span>
+            <span class="hud-value">100</span>
           </div>
           <div id="hud-incidents" class="hud-pill hud-pill-incidents" title="Incidents">
             <span class="hud-label">Incidents</span>
@@ -98,6 +116,14 @@
         <div id="endscreen-card">
           <h1 id="endscreen-banner">—</h1>
           <p id="endscreen-reason"></p>
+          <div id="endscreen-awards-block" class="hidden">
+            <h3>Awards</h3>
+            <ul id="endscreen-awards"></ul>
+          </div>
+          <div id="endscreen-postmortem-block" class="hidden">
+            <h3>AI-Postmortem</h3>
+            <pre id="endscreen-postmortem"></pre>
+          </div>
           <h3>Rollen aufgedeckt</h3>
           <ul id="endscreen-players"></ul>
           <button id="endscreen-reset" type="button" class="hidden">Zurück zur Lobby</button>
@@ -107,11 +133,42 @@
       <button id="emergency-meeting-btn" class="hidden" type="button">Emergency Meeting</button>
       <button id="takedown-btn" class="hidden" type="button">Force-Reboot</button>
       <button id="report-btn" class="hidden" type="button">Body melden</button>
+      <button id="ability-btn" class="hidden" type="button">Ability</button>
+
+      <div id="role-intro" class="hidden" role="dialog" aria-modal="true" aria-label="Deine Rolle">
+        <div id="role-intro-card">
+          <div id="role-intro-team-badge"></div>
+          <h1 id="role-intro-title">—</h1>
+          <p id="role-intro-blurb"></p>
+          <p id="role-intro-description"></p>
+          <div id="role-intro-strengths" class="hidden">
+            <h3>Stärken</h3>
+            <ul id="role-intro-strength-list"></ul>
+          </div>
+          <div id="role-intro-ability" class="hidden">
+            <h3>Fähigkeit</h3>
+            <p id="role-intro-ability-line">—</p>
+          </div>
+          <div id="role-intro-tasks">
+            <h3 id="role-intro-tasks-heading">Deine Aufgaben</h3>
+            <ul id="role-intro-task-list"></ul>
+          </div>
+          <button id="role-intro-close" type="button">Los geht's</button>
+        </div>
+      </div>
 
       <div id="meeting-overlay" class="hidden">
         <div id="meeting-card">
           <h1 id="meeting-title">Emergency Meeting</h1>
           <p id="meeting-countdown" class="meeting-countdown">--</p>
+          <div id="meeting-context" class="hidden">
+            <p id="meeting-context-reporter"></p>
+            <p id="meeting-context-body" class="hidden"></p>
+            <details id="meeting-context-events" class="meeting-context-events">
+              <summary>Letzte Events</summary>
+              <ul id="meeting-context-event-list"></ul>
+            </details>
+          </div>
           <h3>Wer war's?</h3>
           <ul id="meeting-vote-list"></ul>
           <button id="meeting-skip-btn" type="button">Skip — niemand entfernen</button>

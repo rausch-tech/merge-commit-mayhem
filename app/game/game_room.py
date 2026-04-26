@@ -3,6 +3,7 @@ import random
 import uuid
 from dataclasses import dataclass, field
 
+from app.game.ai_flavor import generate_postmortem
 from app.game.game_map import (
     DEFAULT_MAP,
     DEFAULT_MAP_ID,
@@ -15,8 +16,16 @@ from app.game.minigames.base import MiniGamePluginError
 from app.game.minigames.registry import get_plugin as get_mini_game_plugin
 from app.game.minigames.registry import is_known as mini_game_is_known
 from app.game.models import InputState, Phase, Player
-from app.game.roles import RoleInfo, description_for
+from app.game.roles import (
+    RoleInfo,
+    movement_speed_multiplier,
+    role_by_id,
+    task_speed_multiplier,
+)
 from app.game.roles import assign as assign_roles
+from app.game.roles import (
+    info_for as role_info_for,
+)
 from app.game.sabotages import (
     COFFEE_SLOW_SPEED,
     MEETING_DURATION,
@@ -25,7 +34,7 @@ from app.game.sabotages import (
     SabotageDefinition,
 )
 from app.game.tasks import (
-    SABOTAGE_CONSOLE_INTERACTION_RADIUS,
+    SABOTAGE_OBJECT_INTERACTION_RADIUS,
     SABOTAGE_PANEL_INTERACTION_RADIUS,
     TASK_DEFINITIONS,
     TASK_INTERACTION_RADIUS,
@@ -188,6 +197,11 @@ class GameRoom:
         self.votes: dict[str, str] = {}  # voter_id -> target_id (or SKIP_TARGET)
         self.players_with_meeting_left: dict[str, bool] = {}  # player_id -> True if can still call
         self.last_voting_result: dict | None = None
+        # Tier 3.6: meeting context snapshot taken when the round flips to
+        # MEETING. Lets the overlay show body location, recent events, etc.
+        self.meeting_context: dict | None = None
+        # Tier 3.7: per-round endscreen summary (Awards + AI postmortem text).
+        self.final_summary: dict | None = None
 
         # Rolling event feed (server-authoritative). Empty in LOBBY.
         self.events: collections.deque[EventEntry] = collections.deque(maxlen=20)
@@ -427,10 +441,20 @@ class GameRoom:
             self.players[only_pid].role = "vibe_coder"
             self.players[only_pid].team = "chaos_agents"
         else:
-            role_map = assign_roles(list(self.players.keys()), rng=rng)
+            prefs = {pid: p.preferred_role for pid, p in self.players.items()}
+            role_map = assign_roles(list(self.players.keys()), rng=rng, preferences=prefs)
             for pid, info in role_map.items():
                 self.players[pid].role = info.role
                 self.players[pid].team = info.team
+
+        # Tier 3.5: per-player coffee + ability state. Done after roles are
+        # assigned so we can read max_coffee from the role definition.
+        for player in self.players.values():
+            rd = role_by_id(player.role)
+            player.max_coffee = rd.max_coffee
+            player.coffee_energy = rd.max_coffee
+            player.ability_used = False
+            player.assigned_task_ids = []
 
         spawn_positions = [(s.x, s.y) for s in self.map.spawn_points]
         for (pos_x, pos_y), player in zip(spawn_positions, self.players.values(), strict=False):
@@ -459,6 +483,15 @@ class GameRoom:
             )
             for t in TASK_DEFINITIONS
         }
+
+        # Tier 3.5: each player gets 3 personal tasks. Release players see
+        # them in the sidebar; chaos players see them as plausible "fake
+        # tasks" matching their cover persona. Both lists are stored on the
+        # Player.assigned_task_ids field — server uses them only to highlight
+        # the per-player task panel client-side; it does NOT block other
+        # players from doing tasks (no hard sackgassen — see feedback doc
+        # 14.1). Same field for both teams keeps the wire shape identical.
+        self._allocate_personal_tasks(rng or random.SystemRandom())
 
         self.sabotages = {s.id: SabotageRuntime(definition=s) for s in SABOTAGE_DEFINITIONS}
 
@@ -554,9 +587,28 @@ class GameRoom:
         self._tick_tasks(dt)
         self._tick_sabotages(dt)
         self._tick_takedown_cooldowns(dt)
+        self._tick_coffee_energy(dt)
         self.remaining_seconds = max(0.0, self.remaining_seconds - dt)
         self._sweep_disconnected()
         self._check_win_conditions()
+
+    # --- coffee energy (Tier 3.5) -----------------------------------------
+
+    def _tick_coffee_energy(self, dt: float) -> None:
+        """Each alive player's personal coffee_energy decays over time. Decay
+        rate scales with the role's coffee_decay_modifier (DevOps drains fast,
+        Caffeine Collector / QA Lead sip slowly). Ghosts don't decay — they
+        no longer interact with the team economy."""
+        if dt <= 0:
+            return
+        base_decay = 1.4  # points per second at modifier=1.0
+        for player in self.players.values():
+            if not player.is_alive:
+                continue
+            rd = role_by_id(player.role)
+            decay = base_decay * rd.coffee_decay_modifier * dt
+            new_energy = max(0.0, player.coffee_energy - decay)
+            player.coffee_energy = new_energy
 
     # --- win conditions ----------------------------------------------------
 
@@ -604,18 +656,58 @@ class GameRoom:
         self.win_reason = reason
         # Tier 3.1: end any active mini-games — no reward for in-flight sessions.
         self._cancel_all_mini_games("round_ended")
+        # Tier 3.7: build the per-round summary + AI-styled postmortem so the
+        # endscreen has something to show beyond just the winner.
+        try:
+            self.final_summary = self._build_final_summary()
+        except Exception:  # noqa: BLE001 — endscreen flavor must never crash a round
+            self.final_summary = None
 
     # --- speed helpers -----------------------------------------------------
 
     def _current_speed_for(self, player_id: str) -> float:
-        """
-        Returns the effective movement speed in px/s for a player this tick.
-        Effects (coffee outage + mandatory meeting) do not stack -- floor is
-        COFFEE_SLOW_SPEED, normal is NORMAL_SPEED.
-        """
+        """Effective movement speed in px/s for this player this tick.
+
+        Floor is COFFEE_SLOW_SPEED (set by global coffee_outage / mandatory
+        meeting), otherwise NORMAL_SPEED scaled by the player's role + own
+        coffee_energy (Tier 3.5)."""
         if self.coffee_level == 0 or self.meeting_active_for > 0:
             return COFFEE_SLOW_SPEED
-        return NORMAL_SPEED
+        player = self.players.get(player_id)
+        if player is None:
+            return NORMAL_SPEED
+        return NORMAL_SPEED * movement_speed_multiplier(player.role, player.coffee_energy)
+
+    # --- personal-task allocation (Tier 3.5) -------------------------------
+
+    def _allocate_personal_tasks(self, rng: random.Random) -> None:
+        """Pick 3 task ids per player. Release players favour their role's
+        strength categories; chaos players get a plausible cover-persona
+        list. Stored on Player.assigned_task_ids for the wire."""
+        all_task_ids = [t.id for t in TASK_DEFINITIONS]
+        for player in self.players.values():
+            rd = role_by_id(player.role)
+            strong_pool = [t.id for t in TASK_DEFINITIONS if t.category in rd.strength_categories]
+            other_pool = [t.id for t in TASK_DEFINITIONS if t.id not in strong_pool]
+            picks: list[str] = []
+            shuffled_strong = list(strong_pool)
+            rng.shuffle(shuffled_strong)
+            shuffled_other = list(other_pool)
+            rng.shuffle(shuffled_other)
+            # Two from strengths if possible, then fill with others. Chaos
+            # roles have empty strength_categories → falls through to random.
+            for tid in shuffled_strong[:2]:
+                picks.append(tid)
+            for tid in shuffled_other:
+                if len(picks) >= 3:
+                    break
+                if tid not in picks:
+                    picks.append(tid)
+            # Defensive: if a role somehow has zero strengths AND zero others
+            # (impossible today), fall back to all_task_ids.
+            if not picks:
+                picks = list(all_task_ids[:3])
+            player.assigned_task_ids = picks[:3]
 
     # --- tasks -------------------------------------------------------------
 
@@ -740,7 +832,7 @@ class GameRoom:
         # Apply the same reward + cooldown the hold-E path uses.
         task = self.tasks.get(session.task_id)
         if task is not None:
-            self._apply_task_reward(task.definition)
+            self._apply_task_reward(task.definition, completed_by=player_id)
             self.completed_tasks_by_player[player_id] = (
                 self.completed_tasks_by_player.get(player_id, 0) + 1
             )
@@ -789,7 +881,9 @@ class GameRoom:
         """Clamp incidents into 0..100 after applying delta. Internal use only."""
         self.incidents = max(0, min(100, self.incidents + delta))
 
-    def _apply_task_reward(self, definition: TaskDefinition) -> None:
+    def _apply_task_reward(
+        self, definition: TaskDefinition, completed_by: str | None = None
+    ) -> None:
         if definition.release_progress_reward:
             self.release_progress = min(
                 100, self.release_progress + definition.release_progress_reward
@@ -800,8 +894,31 @@ class GameRoom:
             )
         if definition.coffee_level_set is not None:
             self.coffee_level = definition.coffee_level_set
+            # Tier 3.5: refilling the team coffee also tops up the player's
+            # own coffee_energy fully (and a small splash to nearby teammates).
+            if completed_by and completed_by in self.players:
+                p = self.players[completed_by]
+                p.coffee_energy = p.max_coffee
+                self._splash_coffee_to_neighbours(completed_by, amount=15.0, radius=180.0)
         if definition.incidents_change:
             self._apply_incidents_delta(definition.incidents_change)
+
+    def _splash_coffee_to_neighbours(
+        self, source_player_id: str, amount: float, radius: float
+    ) -> None:
+        """Tier 3.5: small per-task coffee splash to nearby teammates so the
+        kitchen is a real social hub. Used by refill_coffee + Coffee-Run."""
+        source = self.players.get(source_player_id)
+        if source is None:
+            return
+        r2 = radius * radius
+        for pid, p in self.players.items():
+            if pid == source_player_id or not p.is_alive:
+                continue
+            dx = p.x - source.x
+            dy = p.y - source.y
+            if dx * dx + dy * dy <= r2:
+                p.coffee_energy = min(p.max_coffee, p.coffee_energy + amount)
 
     def _tick_tasks(self, dt: float) -> None:
         for task in self.tasks.values():
@@ -816,7 +933,15 @@ class GameRoom:
                 for pid, progress in task.per_player_progress.items():
                     if not self._task_in_range(pid, task):
                         continue  # player left the radius; drop their progress
-                    new_progress = progress + dt
+                    # Tier 3.5: role + coffee speed up / slow down task work.
+                    player = self.players.get(pid)
+                    if player is not None:
+                        mult = task_speed_multiplier(
+                            player.role, task.definition.category, player.coffee_energy
+                        )
+                    else:
+                        mult = 1.0
+                    new_progress = progress + dt * mult
                     if new_progress >= task.definition.required_seconds:
                         finishers.append(pid)
                     else:
@@ -824,7 +949,7 @@ class GameRoom:
                 if finishers:
                     # Deterministic tiebreak: lexicographically smallest player id.
                     winner_pid = sorted(finishers)[0]
-                    self._apply_task_reward(task.definition)
+                    self._apply_task_reward(task.definition, completed_by=winner_pid)
                     self.completed_tasks_by_player[winner_pid] = (
                         self.completed_tasks_by_player.get(winner_pid, 0) + 1
                     )
@@ -866,13 +991,18 @@ class GameRoom:
             raise GameRoomError(
                 code="COMMS_DOWN", message="Slack ist down — keine weitere Sabotage."
             )
-        # Tier 2.7: chaos must stand at a Sabotage-Console. Maps without any
-        # console fall back to the legacy "trigger from anywhere" behaviour so
-        # editor maps don't break silently — author opts in by adding consoles.
-        if self.map.sabotage_consoles and not self._near_any_sabotage_console(player):
+        # Tier 2.7 (rework): chaos must stand at a task anchor whose
+        # ``object_type`` matches the sabotage's ``trigger_object_types``. Same
+        # physical spot as the matching release task → observers can't tell
+        # sabotage from work. Maps with zero typed anchors fall back to the
+        # legacy "trigger from anywhere" path so editor maps don't break.
+        if self._map_has_typed_anchors() and not self._near_object_for_sabotage(
+            player, sab.definition
+        ):
+            hint = sab.definition.object_hint or "passendes Terminal"
             raise GameRoomError(
-                code="NOT_NEAR_CONSOLE",
-                message="Stell dich an eine Sabotage-Konsole, um zu sabotieren.",
+                code="NOT_NEAR_OBJECT",
+                message=f"Stell dich an {hint}, um zu sabotieren.",
             )
 
         # Apply the effect.
@@ -880,6 +1010,9 @@ class GameRoom:
             self.pipeline_stability = max(0, self.pipeline_stability - 20)
         elif sabotage_id == "coffee_outage":
             self.coffee_level = 0
+            # Tier 3.5: outage also halves every player's personal energy.
+            for p in self.players.values():
+                p.coffee_energy = min(p.coffee_energy, p.max_coffee * 0.4)
         elif sabotage_id == "mandatory_meeting":
             self.meeting_active_for = MEETING_DURATION
         elif sabotage_id == "merge_conflict_storm":
@@ -1154,27 +1287,161 @@ class GameRoom:
         # Tier 3.1: end any active mini-games — modals snap shut as players
         # are pulled into the meeting overlay.
         self._cancel_all_mini_games("meeting_started")
+        # Tier 3.6: snapshot meeting context (reporter, body location, recent
+        # events) so the UI can give people something concrete to discuss.
+        self._snapshot_meeting_context(reporter_id=reporter_id, body=body)
 
     def private_state_for(self, player_id: str) -> dict:
+        """Per-viewer private state (Tier 3.5 expanded). Includes own coffee
+        energy and ability cooldown — these are visible only to the player
+        themselves, since exposing teammates' coffee would leak strategic info."""
         cd = self.takedown_cooldowns.get(player_id, 0.0)
-        return {"takedownCooldownRemaining": round(cd, 2)}
+        p = self.players.get(player_id)
+        coffee_now = float(p.coffee_energy) if p else 100.0
+        coffee_max = float(p.max_coffee) if p else 100.0
+        ability_used = bool(p.ability_used) if p else False
+        return {
+            "takedownCooldownRemaining": round(cd, 2),
+            "coffeeEnergy": round(coffee_now, 1),
+            "coffeeMax": round(coffee_max, 1),
+            "abilityUsed": ability_used,
+        }
 
     # --- meeting + voting -------------------------------------------------
 
-    def _near_any_sabotage_console(self, player) -> bool:
-        """Tier 2.7: returns True iff the player is within reach of any
-        Sabotage-Console on the current map."""
-        r2 = SABOTAGE_CONSOLE_INTERACTION_RADIUS * SABOTAGE_CONSOLE_INTERACTION_RADIUS
-        for c in self.map.sabotage_consoles:
-            dx = player.x - c.x
-            dy = player.y - c.y
-            if dx * dx + dy * dy <= r2:
-                return True
+    def _map_has_typed_anchors(self) -> bool:
+        """True if the loaded map has at least one task_anchor with object_type.
+        Used as the gate for Tier 2.7's themed-object sabotage binding — maps
+        that haven't been ported yet fall back to the legacy "from anywhere"
+        path so editor maps stay playable."""
+        return any(a.object_type for a in self.map.task_anchors)
+
+    def _near_object_for_sabotage(self, player, sab_def: SabotageDefinition) -> bool:
+        """Tier 2.7 rework: True iff the player stands within reach of any task
+        anchor whose object_type matches one of the sabotage's allowed trigger
+        types. Same anchor as the corresponding release task — sabotage looks
+        like normal terminal work to outsiders."""
+        if not sab_def.trigger_object_types:
+            return True  # legacy sabotages without binding (defensive default)
+        allowed = set(sab_def.trigger_object_types)
+        r2 = SABOTAGE_OBJECT_INTERACTION_RADIUS * SABOTAGE_OBJECT_INTERACTION_RADIUS
+        for a in self.map.task_anchors:
+            if a.object_type and a.object_type in allowed:
+                dx = player.x - a.x
+                dy = player.y - a.y
+                if dx * dx + dy * dy <= r2:
+                    return True
         return False
+
+    def _object_type_for_task(self, task_id: str) -> str | None:
+        for a in self.map.task_anchors:
+            if a.task_id == task_id:
+                return a.object_type
+        return None
+
+    def _object_anchors_for(self, sab_def: SabotageDefinition) -> list[tuple[float, float]]:
+        """Position list (x, y) of every anchor matching this sabotage's allowed
+        types — used by client-facing public state so the UI can show hints and
+        decide button availability without needing the sabotages module."""
+        if not sab_def.trigger_object_types:
+            return []
+        allowed = set(sab_def.trigger_object_types)
+        return [
+            (a.x, a.y) for a in self.map.task_anchors if a.object_type and a.object_type in allowed
+        ]
 
     def _is_in_war_room(self, player) -> bool:
         x_min, y_min, x_max, y_max = self._war_room_bounds
         return x_min <= player.x <= x_max and y_min <= player.y <= y_max
+
+    # --- abilities (Tier 3.5) -----------------------------------------------
+
+    def apply_use_ability(
+        self,
+        player_id: str,
+        rng: random.Random | None = None,
+    ) -> dict:
+        """Trigger the active player's role ability. One use per round.
+
+        Returns a dict with action results so the WS layer can echo a friendly
+        response. Currently:
+        - rollback (DevOps): +18 pipeline_stability.
+        - coffee_run (Caffeine Collector): +35 coffee to nearby teammates.
+        - standup (Scrum Master): immediate emergency meeting (anywhere on
+          the map; the war-room rule is waived for this ability).
+        - reproduce_bug (QA Lead): emits a flavor event flagging "audit done".
+
+        Raises GameRoomError with NO_ABILITY / ABILITY_ALREADY_USED /
+        WRONG_PHASE / PLAYER_ELIMINATED on failure.
+        """
+        if self.phase is not Phase.PLAYING:
+            raise GameRoomError(code="WRONG_PHASE", message="Abilities only during playing.")
+        player = self.players.get(player_id)
+        if player is None:
+            raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
+        if not player.is_alive:
+            raise GameRoomError(
+                code="PLAYER_ELIMINATED", message="Eliminated players cannot use abilities."
+            )
+        rd = role_by_id(player.role)
+        if not rd.ability_id:
+            raise GameRoomError(code="NO_ABILITY", message="Your role has no active ability.")
+        if player.ability_used:
+            raise GameRoomError(
+                code="ABILITY_ALREADY_USED",
+                message="You already used your ability this round.",
+            )
+
+        ability = rd.ability_id
+        result: dict = {"abilityId": ability, "playerId": player_id}
+
+        if ability == "rollback":
+            before = self.pipeline_stability
+            self.pipeline_stability = min(100, self.pipeline_stability + 18)
+            self._emit_event(
+                "info",
+                f"{player.name} hat einen Rollback ausgerollt — Pipeline +{self.pipeline_stability - before}.",
+            )
+            result["pipelineDelta"] = self.pipeline_stability - before
+
+        elif ability == "coffee_run":
+            self._splash_coffee_to_neighbours(player_id, amount=35.0, radius=220.0)
+            player.coffee_energy = player.max_coffee
+            self._emit_event(
+                "info", f"{player.name} hat eine Coffee-Run-Runde gemacht. Team gebufft."
+            )
+
+        elif ability == "standup":
+            # Like emergency meeting but waives the war-room location rule and
+            # doesn't consume the player's normal meeting allowance.
+            self.meeting_caller_id = player_id
+            self.meeting_remaining_seconds = MEETING_DURATION_SECONDS
+            self.votes = {}
+            self.meeting_title = "STANDUP — Scrum Master called it"
+            self.phase = Phase.MEETING
+            for task in self.tasks.values():
+                task.per_player_progress = {}
+                if task.status == "in_progress":
+                    task.status = "available"
+            self._cancel_all_mini_games("meeting_started")
+            self._emit_event("warn", f"{player.name} ruft ein Standup ein. Alle in den Slack-Call.")
+            self._snapshot_meeting_context(reporter_id=player_id, body=None)
+
+        elif ability == "reproduce_bug":
+            # Flavor / placeholder hook for now — emits an event and consumes
+            # the ability. Real "verdächtig?"-tag-system is its own slice.
+            recent = ", ".join(e.message for e in list(self.events)[-3:]) or "nichts auffälliges"
+            self._emit_event(
+                "info",
+                f"{player.name} (QA) reproduziert: {recent}",
+            )
+            result["analysis"] = recent
+
+        else:
+            raise GameRoomError(code="NO_ABILITY", message="Unknown ability.")
+
+        player.ability_used = True
+        return result
 
     def call_emergency_meeting(
         self,
@@ -1216,6 +1483,145 @@ class GameRoom:
                 task.status = "available"
         # Tier 3.1: end any active mini-games when the round flips to MEETING.
         self._cancel_all_mini_games("meeting_started")
+        # Tier 3.6: meeting context snapshot.
+        self._snapshot_meeting_context(reporter_id=requesting_player_id, body=None)
+
+    # --- endscreen + summary (Tier 3.7) ------------------------------------
+
+    def _build_final_summary(self) -> dict:
+        """Produce the endscreen blob: per-player stats, awards, AI-styled
+        postmortem text. Pure function over current room state — no side
+        effects beyond reading."""
+        per_player = []
+        for pid, p in self.players.items():
+            per_player.append(
+                {
+                    "playerId": pid,
+                    "name": p.name,
+                    "color": p.color,
+                    "role": p.role or "",
+                    "team": p.team or "",
+                    "tasksCompleted": int(self.completed_tasks_by_player.get(pid, 0)),
+                    "sabotagesTriggered": int(self.triggered_sabotages_by_player.get(pid, 0)),
+                    "coffeeFinal": round(p.coffee_energy, 1),
+                    "abilityUsed": bool(p.ability_used),
+                    "alive": bool(p.is_alive),
+                }
+            )
+
+        awards = self._compute_awards(per_player)
+
+        summary: dict = {
+            "winner": self.winner,
+            "reason": self.win_reason,
+            "releaseProgress": int(self.release_progress),
+            "pipelineStability": int(self.pipeline_stability),
+            "incidents": int(self.incidents),
+            "sabotagesTriggered": sum(self.triggered_sabotages_by_player.values()),
+            "repairsCompleted": sum(1 for sab in self.sabotages.values() if not sab.active),
+            "kills": sum(1 for p in self.players.values() if not p.is_alive),
+            "perPlayer": per_player,
+            "awards": awards,
+            "roundNumber": 1,
+        }
+        # Postmortem text last — uses the rest of the dict.
+        try:
+            summary["postmortem"] = generate_postmortem(summary)
+        except Exception:  # noqa: BLE001
+            summary["postmortem"] = ""
+        return summary
+
+    def _compute_awards(self, per_player: list[dict]) -> list[dict]:
+        """Pick fun awards from per-player stats. Each award is a dict with
+        title + playerName + reason — the client renders them verbatim."""
+        if not per_player:
+            return []
+        awards: list[dict] = []
+
+        # Most tasks completed.
+        top_tasks = max(per_player, key=lambda p: p["tasksCompleted"])
+        if top_tasks["tasksCompleted"] > 0:
+            awards.append(
+                {
+                    "title": "Pipeline Whisperer",
+                    "playerName": top_tasks["name"],
+                    "reason": f"hat {top_tasks['tasksCompleted']} Tasks fertig gemacht",
+                }
+            )
+
+        # Most sabotages triggered (chaos award).
+        top_sabs = max(per_player, key=lambda p: p["sabotagesTriggered"])
+        if top_sabs["sabotagesTriggered"] > 0:
+            awards.append(
+                {
+                    "title": "Vibe of the Round",
+                    "playerName": top_sabs["name"],
+                    "reason": f"{top_sabs['sabotagesTriggered']} Sabotagen, ohne sich zu schaemen",
+                }
+            )
+
+        # Held der Kaffeemaschine — highest final coffee.
+        top_coffee = max(per_player, key=lambda p: p["coffeeFinal"])
+        if top_coffee["coffeeFinal"] >= 60:
+            awards.append(
+                {
+                    "title": "Held der Kaffeemaschine",
+                    "playerName": top_coffee["name"],
+                    "reason": f"hat das Spiel mit {int(top_coffee['coffeeFinal'])} Coffee beendet",
+                }
+            )
+
+        # Most suspicious innocent — release-team player who got voted out.
+        eliminated = [p for p in per_player if not p["alive"] and p["team"] == "release_team"]
+        if eliminated:
+            sus = eliminated[0]
+            awards.append(
+                {
+                    "title": "Most Suspicious Innocent",
+                    "playerName": sus["name"],
+                    "reason": "war keine Sabotage. Trotzdem geforce-rebooted",
+                }
+            )
+
+        return awards
+
+    def _snapshot_meeting_context(self, reporter_id: str | None, body: "Body | None") -> None:
+        """Tier 3.6: capture context for the meeting overlay. Hints, never
+        proofs — list of recent events, body location, reporter name,
+        approximate death window. The client renders this verbatim."""
+        reporter_name = ""
+        if reporter_id and reporter_id in self.players:
+            reporter_name = self.players[reporter_id].name
+
+        recent = [
+            {"severity": e.severity, "message": e.message, "seq": e.seq}
+            for e in list(self.events)[-6:]
+        ]
+
+        body_block: dict | None = None
+        if body is not None:
+            body_block = {
+                "victimName": body.victim_name,
+                "x": round(body.x, 1),
+                "y": round(body.y, 1),
+                "room": self._room_label_for(body.x, body.y),
+            }
+
+        self.meeting_context = {
+            "reporterName": reporter_name,
+            "body": body_block,
+            "recentEvents": recent,
+            "alive": [{"id": p.id, "name": p.name} for p in self.players.values() if p.is_alive],
+        }
+
+    def _room_label_for(self, x: float, y: float) -> str:
+        """Best-effort lookup of which room a coordinate falls in. Used by
+        meeting context so the body's location is human-friendly ('Server
+        Room' instead of '(800, 2400)')."""
+        for room in self.map.rooms:
+            if room.x <= x <= room.x + room.width and room.y <= y <= room.y + room.height:
+                return room.title
+        return "irgendwo"
 
     def cast_vote(self, voter_id: str, target_id: str) -> None:
         if self.phase is not Phase.MEETING:
@@ -1341,6 +1747,8 @@ class GameRoom:
                     "room": t.definition.room,
                     "x": t.x,
                     "y": t.y,
+                    "objectType": self._object_type_for_task(t.definition.id),
+                    "category": t.definition.category,
                     "requiredSeconds": t.definition.required_seconds,
                     "status": t.status,
                     "progress": (
@@ -1358,6 +1766,11 @@ class GameRoom:
                     "title": s.definition.title,
                     "cooldownRemaining": round(s.cooldown_remaining, 2),
                     "active": s.active,
+                    "triggerObjectTypes": list(s.definition.trigger_object_types),
+                    "objectHint": s.definition.object_hint,
+                    "triggerAnchors": [
+                        {"x": ax, "y": ay} for (ax, ay) in self._object_anchors_for(s.definition)
+                    ],
                 }
                 for s in self.sabotages.values()
             ],
@@ -1368,10 +1781,15 @@ class GameRoom:
                     "remainingSeconds": int(self.meeting_remaining_seconds),
                     "votesCount": self._aggregate_vote_counts(),
                     "alreadyVoted": list(self.votes.keys()),
+                    # Tier 3.6: discussion fuel — reporter, body location,
+                    # recent events. Hints, never proofs.
+                    "context": self.meeting_context,
                 }
                 if self.phase is Phase.MEETING
                 else None
             ),
+            # Tier 3.7: end-of-round summary (None until ENDED).
+            "finalSummary": self.final_summary,
             "events": [
                 {"seq": e.seq, "severity": e.severity, "message": e.message} for e in self.events
             ],
@@ -1393,9 +1811,6 @@ class GameRoom:
             "vents": [
                 {"id": v.id, "x": v.x, "y": v.y, "connectedTo": list(v.connected_to)}
                 for v in self.map.vents
-            ],
-            "sabotageConsoles": [
-                {"id": c.id, "x": c.x, "y": c.y} for c in self.map.sabotage_consoles
             ],
         }
 
@@ -1467,10 +1882,32 @@ class GameRoom:
         return {
             "roomCode": self.code,
             "players": [
-                {"id": p.id, "name": p.name, "color": p.color, "isHost": p.is_host}
+                {
+                    "id": p.id,
+                    "name": p.name,
+                    "color": p.color,
+                    "isHost": p.is_host,
+                    "preferredRole": p.preferred_role,
+                }
                 for p in self.players.values()
             ],
         }
+
+    def set_preferred_role(self, player_id: str, role: str | None) -> None:
+        """Tier 3.5: store a lobby preference. Validation is light — unknown
+        ids and chaos roles are silently nulled (chaos must stay random)."""
+        from app.game.roles import RELEASE_ROLES
+
+        p = self.players.get(player_id)
+        if p is None:
+            return
+        if role is None or role == "":
+            p.preferred_role = None
+            return
+        if role in RELEASE_ROLES:
+            p.preferred_role = role
+        else:
+            p.preferred_role = None
 
     def private_role_for(self, player_id: str) -> RoleInfo:
         p = self.players[player_id]
@@ -1479,11 +1916,50 @@ class GameRoom:
                 code="NO_ROLE",
                 message="Player has no role assigned yet.",
             )
+        info = role_info_for(p.role)
+        # Tier 3.5: replace the bare RoleInfo with the role-card-rich variant
+        # and stitch in this player's personal task ids.
         return RoleInfo(
-            role=p.role,
-            team=p.team,
-            description=description_for(p.role),
+            role=info.role,
+            team=info.team,
+            description=info.description,
+            title=info.title,
+            short_blurb=info.short_blurb,
+            strength_categories=info.strength_categories,
+            weak_categories=info.weak_categories,
+            ability_id=info.ability_id,
+            ability_label=info.ability_label,
+            ability_hint=info.ability_hint,
+            max_coffee=info.max_coffee,
+            available_sabotages=info.available_sabotages,
         )
+
+    def assigned_tasks_for(self, player_id: str) -> list[dict]:
+        """Return [{taskId, title, room, category, isFake}] for the player.
+        For chaos players the same shape is used but isFake=True so the UI
+        can render them with a 'Cover' badge."""
+        p = self.players.get(player_id)
+        if p is None or not p.assigned_task_ids:
+            return []
+        is_chaos = p.team == "chaos_agents"
+        out = []
+        from app.game.tasks import TASK_DEFINITIONS as _TD
+
+        by_id = {t.id: t for t in _TD}
+        for tid in p.assigned_task_ids:
+            td = by_id.get(tid)
+            if td is None:
+                continue
+            out.append(
+                {
+                    "taskId": tid,
+                    "title": td.title,
+                    "room": td.room,
+                    "category": td.category,
+                    "isFake": is_chaos,
+                }
+            )
+        return out
 
     def reset_for_new_round(self) -> None:
         """
@@ -1514,6 +1990,8 @@ class GameRoom:
         self.votes = {}
         self.players_with_meeting_left = {}
         self.last_voting_result = None
+        self.meeting_context = None
+        self.final_summary = None
         self.events.clear()
         self._next_event_seq = 1
         self.bodies = {}

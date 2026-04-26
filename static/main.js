@@ -18,6 +18,7 @@ import { ReportButton } from "./report.js";
 import { InGameMenu } from "./menu.js";
 import { MiniGameModal } from "./minigames/base.js";
 import { TouchControls } from "./touch-controls.js";
+import { RoleIntroModal } from "./role_intro.js";
 
 const SESSION_KEY = "mcm.session";
 
@@ -110,6 +111,25 @@ const sabotagePanelEl = document.getElementById("sabotage-panel");
 const sabotagePanel = new SabotagePanel(sabotagePanelEl, ws);
 
 const endscreen = new EndscreenOverlay(document.getElementById("endscreen"), ws);
+const roleIntro = new RoleIntroModal(document.getElementById("role-intro"));
+
+// Tier 3.5: Ability button (Coffee Run / Rollback / Standup / Reproduce Bug).
+const abilityBtnEl = document.getElementById("ability-btn");
+if (abilityBtnEl) {
+  abilityBtnEl.addEventListener("click", () => {
+    if (abilityBtnEl.disabled) return;
+    ws.send("use_ability", {});
+  });
+}
+
+// Tier 3.5: lobby role-preference dropdown.
+const roleDropdownEl = document.getElementById("role-dropdown");
+if (roleDropdownEl) {
+  roleDropdownEl.addEventListener("change", () => {
+    const v = roleDropdownEl.value || null;
+    ws.send("set_preferred_role", { role: v });
+  });
+}
 
 function warRoomBoundsFromMap(map) {
   if (!map) return null;
@@ -192,7 +212,20 @@ function renderLobby() {
     dot.style.background = p.color;
     li.appendChild(dot);
     const text = document.createElement("span");
-    text.textContent = p.name + (p.isHost ? "  (Host)" : "");
+    let suffix = "";
+    if (p.isHost) suffix += "  (Host)";
+    if (p.preferredRole) {
+      const niceRole =
+        {
+          developer: "Developer",
+          devops_engineer: "DevOps",
+          qa_lead: "QA",
+          scrum_master: "Scrum",
+          caffeine_collector: "Caffeine",
+        }[p.preferredRole] || p.preferredRole;
+      suffix += `  · will: ${niceRole}`;
+    }
+    text.textContent = p.name + suffix;
     li.appendChild(text);
     els.lobbyPlayerList.appendChild(li);
   }
@@ -267,15 +300,41 @@ ws.on("lobby_state", (payload) => {
 
 ws.on("game_ended", (payload) => {
   endscreen.show(payload, state.isHost);
+  // Tier 3.7: finalSummary travels via game_state. Stash + apply if present
+  // (game_state usually arrives just after game_ended on the same tick).
+  if (state._lastFinalSummary) {
+    endscreen.applyFinalSummary(state._lastFinalSummary);
+  }
+  // Reset the role-intro dedupe so the next round shows the modal again.
+  roleIntro.reset();
 });
 
 ws.on("private_role", (payload) => {
   state.ownRole = payload;
-  hud.setRole(payload.role, payload.team);
+  hud.setRole(payload.title || payload.role, payload.team);
   sabotagePanel.setAvailable(payload.availableSabotages || []);
   renderer.setOwnTeam(payload.team || null);
+  // Tier 3.5: highlight personal tasks in the sidebar + strength categories.
+  taskList.setPersonal(payload.assignedTaskIds || [], payload.strengthCategories || []);
   _refreshMenu();
+  // Tier 3.5: Role-Intro modal (auto-deduped within a round).
+  roleIntro.show(payload);
+  // Tier 3.5: ability button visibility.
+  _updateAbilityButton();
 });
+
+function _updateAbilityButton() {
+  if (!abilityBtnEl) return;
+  const role = state.ownRole;
+  if (!role || !role.abilityId || state.amDead || state.phase !== "playing") {
+    abilityBtnEl.classList.add("hidden");
+    return;
+  }
+  abilityBtnEl.classList.remove("hidden");
+  abilityBtnEl.textContent = role.abilityLabel || "Ability";
+  abilityBtnEl.disabled = !!state.abilityUsed;
+  abilityBtnEl.title = role.abilityHint || "";
+}
 
 ws.on("game_state", (payload) => {
   if (state.phase !== "playing" && payload.phase === "playing") {
@@ -289,6 +348,11 @@ ws.on("game_state", (payload) => {
   state.phase = payload.phase;
   state.players = payload.players;
   state.bodies = payload.bodies || [];
+  // Tier 3.7: stash the final summary so game_ended can pick it up.
+  state._lastFinalSummary = payload.finalSummary || null;
+  if (payload.phase === "ended" && payload.finalSummary) {
+    endscreen.applyFinalSummary(payload.finalSummary);
+  }
 
   // Detect ghost transition. Server sends personalized state — alive viewers
   // see only alive players (themselves included), so own entry is always
@@ -316,14 +380,9 @@ ws.on("game_state", (payload) => {
   // Tier 2.3: vents are part of the static map snapshot but the server now
   // re-broadcasts them in every game_state for client-side simplicity.
   renderer.setVents(payload.vents || []);
-  // Tier 2.7: chaos has to stand at one of these to trigger sabotages.
-  // Maps without consoles fall back to "trigger from anywhere" — mirror the
-  // server's legacy-compatibility branch on the client.
-  const consoles = payload.sabotageConsoles || [];
-  renderer.setSabotageConsoles(consoles);
-  sabotagePanel.updateConsoleAvailability(
-    consoles.length === 0 ? true : renderer.localPlayerNearConsole
-  );
+  // Tier 2.7 rework: per-sabotage proximity. Each sabotage carries its
+  // allowed anchors; renderer computes per-sabotage availability locally.
+  renderer.setSabotagesPayload(payload.sabotages || []);
   // Tier 2.5: Slack-Down — clear the task sidebar visually and flag the
   // sabotage panel so chaos buttons gray out.
   state.commsDown = !!payload.commsDown;
@@ -348,6 +407,7 @@ ws.on("game_state", (payload) => {
   sabotagePanel.updateFromGameState(payload.sabotages || [], {
     disabledByOwnDeath: state.amDead,
     disabledByCommsDown: !!payload.commsDown,
+    objectAvailability: renderer.sabotageObjectAvailability,
   });
   eventFeed.render(payload.events || []);
 
@@ -386,7 +446,12 @@ ws.on("game_state", (payload) => {
 
 ws.on("private_state", (payload) => {
   state.takedownCooldown = payload.takedownCooldownRemaining || 0;
-  // Refresh take-down button immediately so the cooldown text updates.
+  // Tier 3.5: per-viewer coffee energy + ability used.
+  state.coffeeEnergy = payload.coffeeEnergy ?? 100;
+  state.coffeeMax = payload.coffeeMax ?? 100;
+  state.abilityUsed = !!payload.abilityUsed;
+  hud.setMyCoffee(state.coffeeEnergy, state.coffeeMax);
+  _updateAbilityButton();
   takedownBtn.update({
     phase: state.phase,
     players: state.players,

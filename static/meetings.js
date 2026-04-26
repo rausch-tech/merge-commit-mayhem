@@ -16,6 +16,11 @@ export class MeetingOverlay {
     this.voteListEl = rootEl.querySelector("#meeting-vote-list");
     this.skipBtn = rootEl.querySelector("#meeting-skip-btn");
     this.statusEl = rootEl.querySelector("#meeting-status");
+    // Tier 3.6: meeting context block (reporter, body, recent events).
+    this.contextBlock = rootEl.querySelector("#meeting-context");
+    this.contextReporter = rootEl.querySelector("#meeting-context-reporter");
+    this.contextBody = rootEl.querySelector("#meeting-context-body");
+    this.contextEventList = rootEl.querySelector("#meeting-context-event-list");
 
     // Stable per-player row state. We rebuild only when the alive-player set
     // actually changes — every other update just patches text + disabled in
@@ -51,6 +56,31 @@ export class MeetingOverlay {
     this.titleEl.textContent = meeting.title || "Emergency Meeting";
     const sec = Math.max(0, Math.floor(meeting.remainingSeconds || 0));
     this.countdownEl.textContent = `${sec} s`;
+
+    // Tier 3.6: render context block (reporter / body / recent events).
+    const ctx = meeting.context;
+    if (ctx && this.contextBlock) {
+      this.contextBlock.classList.remove("hidden");
+      const reporter = ctx.reporterName || "?";
+      this.contextReporter.textContent = `Gemeldet von: ${reporter}`;
+      if (ctx.body && this.contextBody) {
+        this.contextBody.textContent = `Body von ${ctx.body.victimName} im ${ctx.body.room}`;
+        this.contextBody.classList.remove("hidden");
+      } else {
+        this.contextBody?.classList.add("hidden");
+      }
+      // Recent events list — re-render every meeting (small, infrequent).
+      if (this.contextEventList) {
+        this.contextEventList.innerHTML = "";
+        for (const e of (ctx.recentEvents || []).slice(-6)) {
+          const li = document.createElement("li");
+          li.textContent = e.message;
+          this.contextEventList.appendChild(li);
+        }
+      }
+    } else if (this.contextBlock) {
+      this.contextBlock.classList.add("hidden");
+    }
 
     const alreadyVoted = new Set(meeting.alreadyVoted || []);
     this._localHasVoted = alreadyVoted.has(ownPlayerId);

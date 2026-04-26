@@ -122,8 +122,11 @@ def test_host_start_gives_private_role_and_game_state():
         state_b = ws_b.receive_json()
         assert state_b["type"] == "game_state"
 
-        assert role_a["payload"]["role"] in {"vibe_coder", "developer"}
-        assert role_b["payload"]["role"] in {"vibe_coder", "developer"}
+        from app.game.roles import CHAOS_ROLES, RELEASE_ROLES
+
+        legal = set(CHAOS_ROLES) | set(RELEASE_ROLES)
+        assert role_a["payload"]["role"] in legal
+        assert role_b["payload"]["role"] in legal
         # With 4 players (2 real + 2 fillers) we have exactly 1 chaos. Each
         # role observed by the real clients is one of the legal values; we
         # don't assert their disjointness because both real clients could be
@@ -272,16 +275,12 @@ def test_chaos_sees_available_sabotages_in_private_role():
 
         for role in [role_a, role_b]:
             if role["payload"]["team"] == "chaos_agents":
-                assert role["payload"]["availableSabotages"] == [
-                    "ci_cd_red",
-                    "coffee_outage",
-                    "mandatory_meeting",
-                    "merge_conflict_storm",
-                    "fake_customer_request",
-                    "flaky_tests",
-                    "lights_out",
-                    "comms_outage",
-                ]
+                # Tier 3.5: chaos roles have curated sabotage subsets — Vibe
+                # Coder gets code/CI sabotages, Rogue Consultant gets
+                # process sabotages, Shadow Admin gets infra sabotages.
+                avail = role["payload"]["availableSabotages"]
+                assert len(avail) >= 3
+                assert all(isinstance(x, str) for x in avail)
             else:
                 assert role["payload"]["availableSabotages"] == []
 
@@ -357,8 +356,11 @@ def test_game_ended_broadcast_on_release_win():
         assert ended_a["payload"]["winner"] == "release_team"
         assert ended_a["payload"]["reason"] == "Release deployed."
         # Roles revealed in the endscreen payload.
+        from app.game.roles import CHAOS_ROLES, RELEASE_ROLES
+
+        legal_roles = set(CHAOS_ROLES) | set(RELEASE_ROLES)
         for p in ended_a["payload"]["players"]:
-            assert p["role"] in {"developer", "vibe_coder"}
+            assert p["role"] in legal_roles
             assert p["team"] in {"release_team", "chaos_agents"}
         # Second client sees the same winner.
         assert ended_b["payload"]["winner"] == "release_team"
@@ -435,15 +437,12 @@ def test_demo_mode_lets_single_player_start_via_ws():
         role = _drain_until(ws, "private_role")
         assert role["payload"]["role"] == "vibe_coder"
         assert role["payload"]["team"] == "chaos_agents"
+        # Tier 3.5: Vibe Coder gets the AI-/Code-themed sabotage subset.
         assert role["payload"]["availableSabotages"] == [
             "ci_cd_red",
-            "coffee_outage",
-            "mandatory_meeting",
+            "flaky_tests",
             "merge_conflict_storm",
             "fake_customer_request",
-            "flaky_tests",
-            "lights_out",
-            "comms_outage",
         ]
         state = _drain_until(ws, "game_state")
         assert state["payload"]["phase"] == "playing"

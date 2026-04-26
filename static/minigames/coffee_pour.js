@@ -107,7 +107,7 @@ export class CoffeePourRenderer {
   _renderFill() {
     if (!this.fillEl) return;
     const elapsed = Date.now() / 1000 - this.localT0;
-    const fill = ((elapsed / this.cycleSeconds) % 1.0 + 1.0) % 1.0; // safe modulo
+    const fill = (((elapsed / this.cycleSeconds) % 1.0) + 1.0) % 1.0; // safe modulo
     this.fillEl.style.height = `${fill * 100}%`;
     // Tint the fill green inside the sweet zone for instant feedback.
     if (fill >= this.sweetMin && fill <= this.sweetMax) {

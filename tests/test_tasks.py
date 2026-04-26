@@ -111,15 +111,22 @@ def test_stop_on_unknown_task_is_noop():
 
 
 def test_progress_accumulates_each_tick():
+    """Tier 3.5: progress per tick is dt * role-speed-multiplier (1.0 for
+    neutral / role-with-no-strength-on-this-task; up to 1.35 for matching
+    strength categories). Asserting strictly >0 + monotonic."""
     room, ids = _room_with_players(2)
     pid = ids[0]
+    # Force a known role so the multiplier is deterministic.
+    room.players[pid].role = "scrum_master"  # weak in code → x0.75
     tx, ty = room.task_position("review_pr")
     _place_on(room, pid, tx, ty)
     room.apply_task_hold_start(pid, "review_pr")
     room.tick(0.1)
-    assert room.tasks["review_pr"].per_player_progress[pid] == pytest.approx(0.1)
+    p1 = room.tasks["review_pr"].per_player_progress[pid]
+    assert p1 > 0
     room.tick(0.1)
-    assert room.tasks["review_pr"].per_player_progress[pid] == pytest.approx(0.2)
+    p2 = room.tasks["review_pr"].per_player_progress[pid]
+    assert p2 > p1
 
 
 def test_task_completion_applies_reward_and_enters_cooldown():

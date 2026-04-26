@@ -120,12 +120,12 @@ def test_private_role_serializes_as_expected():
         description="Sabotier das Release.",
     )
     dumped = msg.model_dump(by_alias=True)
-    assert dumped == {
-        "role": "vibe_coder",
-        "team": "chaos_agents",
-        "description": "Sabotier das Release.",
-        "availableSabotages": [],
-    }
+    # Tier 3.5: PrivateRoleMsg now carries role-card metadata too. Asserting
+    # the core 4 fields keeps the contract test focused on what's wired.
+    assert dumped["role"] == "vibe_coder"
+    assert dumped["team"] == "chaos_agents"
+    assert dumped["description"] == "Sabotier das Release."
+    assert dumped["availableSabotages"] == []
 
 
 def test_error_msg_serializes_correctly():
@@ -283,13 +283,19 @@ def test_parse_report_body_camel_case():
 def test_private_state_msg_serializes_camel_case():
     msg = PrivateStateMsg(takedown_cooldown_remaining=12.5)
     dumped = msg.model_dump(by_alias=True)
-    assert dumped == {"takedownCooldownRemaining": 12.5}
+    assert dumped["takedownCooldownRemaining"] == 12.5
+    # Tier 3.5: per-viewer coffee + ability gating.
+    assert "coffeeEnergy" in dumped
+    assert "coffeeMax" in dumped
+    assert "abilityUsed" in dumped
 
 
 def test_private_state_msg_default_zero():
     msg = PrivateStateMsg()
     dumped = msg.model_dump(by_alias=True)
-    assert dumped == {"takedownCooldownRemaining": 0.0}
+    assert dumped["takedownCooldownRemaining"] == 0.0
+    assert dumped["coffeeEnergy"] == 100.0
+    assert dumped["abilityUsed"] is False
 
 
 def test_game_state_msg_bodies_default_empty_and_round_trip():

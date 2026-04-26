@@ -65,7 +65,7 @@ class SprintTrim(MiniGamePlugin):
             # Reassign the two priority tickets the lowest-point templates
             # to guarantee solvability while keeping titles intact.
             low_points = sorted(p for p in _POINT_POOL)[:2]
-            for j, t in enumerate(tickets):
+            for t in tickets:
                 if t["priority"]:
                     t["points"] = low_points.pop(0)
         return {

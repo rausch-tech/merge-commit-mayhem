@@ -35,12 +35,14 @@ from app.protocol import (
     ReturnToLobby,
     RoomJoinedMsg,
     SelectMap,
+    SetPreferredRole,
     SkipVote,
     StartGame,
     TaskHoldStart,
     TaskHoldStop,
     TriggerSabotage,
     TriggerTakedown,
+    UseAbility,
     UseVent,
     VotingResultMsg,
     envelope,
@@ -103,6 +105,34 @@ def _lobby_state_msg(room: GameRoom) -> LobbyStateMsg:
         available_maps=_available_maps_payload(),
         selected_map_id=room.map_id,
         map=room.map.model_dump(by_alias=True),
+    )
+
+
+def _private_role_msg(room: GameRoom, player_id: str) -> PrivateRoleMsg:
+    """Tier 3.5: build a rich private_role payload — role-card metadata,
+    available sabotages (chaos), assigned task ids + display blobs."""
+    info = room.private_role_for(player_id)
+    if info.team == "chaos_agents":
+        # Chaos uses the role's curated sabotage list, not the global "all" set.
+        available = list(info.available_sabotages) or [s.id for s in SABOTAGE_DEFINITIONS]
+    else:
+        available = []
+    assigned = room.assigned_tasks_for(player_id)
+    return PrivateRoleMsg(
+        role=info.role,
+        team=info.team,
+        description=info.description,
+        available_sabotages=available,
+        title=info.title,
+        short_blurb=info.short_blurb,
+        strength_categories=list(info.strength_categories),
+        weak_categories=list(info.weak_categories),
+        ability_id=info.ability_id,
+        ability_label=info.ability_label,
+        ability_hint=info.ability_hint,
+        max_coffee=info.max_coffee,
+        assigned_task_ids=[t["taskId"] for t in assigned],
+        assigned_tasks=assigned,
     )
 
 
@@ -243,6 +273,10 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 await _handle_use_vent(ws, msg)
             elif isinstance(msg, MiniGameInput):
                 await _handle_mini_game_input(ws, msg)
+            elif isinstance(msg, SetPreferredRole):
+                await _handle_set_preferred_role(ws, msg)
+            elif isinstance(msg, UseAbility):
+                await _handle_use_ability(ws)
     except WebSocketDisconnect:
         pass
     finally:
@@ -289,8 +323,6 @@ async def _handle_rejoin(ws: WebSocket, msg: Rejoin) -> None:
         await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
         return
     manager.register(ws, player.id, code)
-    # Send the same trio a fresh join would receive.
-    all_sabotage_ids = [s.id for s in SABOTAGE_DEFINITIONS]
     await ws.send_json(
         envelope(
             "room_joined",
@@ -304,19 +336,7 @@ async def _handle_rejoin(ws: WebSocket, msg: Rejoin) -> None:
     )
     # If they have a role (mid-round), resend it.
     if player.role and player.team:
-        info = room.private_role_for(player.id)
-        available = all_sabotage_ids if info.team == "chaos_agents" else []
-        await ws.send_json(
-            envelope(
-                "private_role",
-                PrivateRoleMsg(
-                    role=info.role,
-                    team=info.team,
-                    description=info.description,
-                    available_sabotages=available,
-                ),
-            )
-        )
+        await ws.send_json(envelope("private_role", _private_role_msg(room, player.id)))
     # Send fresh state — phase-appropriate.
     if room.phase is Phase.LOBBY:
         await ws.send_json(envelope("lobby_state", _lobby_state_msg(room)))
@@ -337,22 +357,11 @@ async def _handle_start(ws: WebSocket, msg: StartGame) -> None:
         await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
         return
     # Send private role to each player.
-    all_sabotage_ids = [s.id for s in SABOTAGE_DEFINITIONS]
     for player_id in list(room.players.keys()):
-        info = room.private_role_for(player_id)
-        available = all_sabotage_ids if info.team == "chaos_agents" else []
         await manager.send_to_player(
             room.code,
             player_id,
-            envelope(
-                "private_role",
-                PrivateRoleMsg(
-                    role=info.role,
-                    team=info.team,
-                    description=info.description,
-                    available_sabotages=available,
-                ),
-            ),
+            envelope("private_role", _private_role_msg(room, player_id)),
         )
     # Immediate public state so clients switch to the game view.
     for s in manager.sessions_in_room(room.code):
@@ -439,6 +448,34 @@ async def _handle_use_vent(ws: WebSocket, msg: UseVent) -> None:
         return
     try:
         room.use_vent(session.player_id, msg.payload.target_vent_id)
+    except GameRoomError as exc:
+        await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+
+
+async def _handle_set_preferred_role(ws: WebSocket, msg: SetPreferredRole) -> None:
+    """Tier 3.5: lobby preference. Stored on the player; respected when the
+    next round starts. Broadcast lobby_state so other clients see the choice."""
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    room.set_preferred_role(session.player_id, msg.payload.role)
+    await manager.broadcast(room.code, envelope("lobby_state", _lobby_state_msg(room)))
+
+
+async def _handle_use_ability(ws: WebSocket) -> None:
+    """Tier 3.5: trigger the player's role ability (Coffee Run / Rollback /
+    Standup / Reproduce Bug). Errors are sent back as ErrorMsg."""
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    try:
+        room.apply_use_ability(session.player_id)
     except GameRoomError as exc:
         await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
 
