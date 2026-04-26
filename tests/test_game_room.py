@@ -4,6 +4,7 @@ import pytest
 
 from app.game.game_room import MAX_PLAYERS, GameRoom, GameRoomError
 from app.game.models import InputState, Phase
+from app.game.sabotages import NORMAL_SPEED
 
 
 def test_first_player_becomes_host():
@@ -191,8 +192,8 @@ def test_tick_moves_player_right():
     p = next(iter(room.players.values()))
     p.x = 100.0
     room.apply_input(p.id, InputState(right=True))
-    room.tick(0.1)  # 15 px bei 150 px/s
-    assert p.x == pytest.approx(115.0)
+    room.tick(0.1)  # NORMAL_SPEED * dt
+    assert p.x == pytest.approx(100.0 + NORMAL_SPEED * 0.1)
 
 
 def test_tick_clamps_at_map_borders():
@@ -200,7 +201,7 @@ def test_tick_clamps_at_map_borders():
     p = next(iter(room.players.values()))
     p.x = 4795.0
     room.apply_input(p.id, InputState(right=True))
-    room.tick(1.0)  # Versucht 150 px rechts → wird auf 4800 geclampt.
+    room.tick(1.0)  # tries NORMAL_SPEED px right → clamps at map edge 4800.
     assert p.x == 4800.0
 
     p.y = 5.0
@@ -218,7 +219,7 @@ def test_tick_diagonal_is_not_faster_than_axis():
     room.tick(0.1)
     dx, dy = p.x - 400.0, p.y - 100.0
     speed = (dx**2 + dy**2) ** 0.5
-    assert speed == pytest.approx(15.0, abs=0.01)
+    assert speed == pytest.approx(NORMAL_SPEED * 0.1, abs=0.01)
 
 
 def test_tick_decrements_timer():
@@ -412,12 +413,13 @@ def test_tick_movement_respects_slow_speed():
 
     room = _make_started_room(player_count=2)
     p = next(iter(room.players.values()))
+    from app.game.sabotages import COFFEE_SLOW_SPEED
+
     p.x, p.y = 400.0, 100.0
     room.apply_input(p.id, InputState(right=True))
     room.coffee_level = 0  # slow
     room.tick(0.1)
-    # 80 px/s * 0.1 s = 8 px, not 15 px.
-    assert p.x == pytest.approx(408.0)
+    assert p.x == pytest.approx(400.0 + COFFEE_SLOW_SPEED * 0.1)
 
 
 # --- Demo mode -----------------------------------------------------------
@@ -480,12 +482,12 @@ def test_mark_disconnected_releases_task_holds():
     pid = next(iter(room.players))
     p = room.players[pid]
     # Move player onto the task so hold_start succeeds.
-    task_x, task_y = room.task_position("fix_unit_tests")
+    task_x, task_y = room.task_position("review_pr")
     p.x, p.y = task_x, task_y
-    room.apply_task_hold_start(pid, "fix_unit_tests")
-    assert pid in room.tasks["fix_unit_tests"].per_player_progress
+    room.apply_task_hold_start(pid, "review_pr")
+    assert pid in room.tasks["review_pr"].per_player_progress
     room.mark_disconnected(pid)
-    assert pid not in room.tasks["fix_unit_tests"].per_player_progress
+    assert pid not in room.tasks["review_pr"].per_player_progress
 
 
 def test_mark_disconnected_transfers_host():

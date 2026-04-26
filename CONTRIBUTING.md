@@ -98,6 +98,16 @@ tests/                      # pytest, currently 207 tests
 docs/                       # Documentation — start with docs/ROADMAP.md
 ```
 
+## Lizenz für Beiträge
+
+By contributing to this project, you agree that your contributions are licensed
+under the same license as the part of the project you contribute to:
+
+- **Code contributions** are licensed under the MIT License (see [`LICENSE`](LICENSE)).
+- **Asset contributions** (artwork, sprites, audio, branding) are subject to the
+  Asset License (see [`ASSET_LICENSE.md`](ASSET_LICENSE.md)) unless otherwise
+  agreed in writing.
+
 ## Fragen?
 
 GitHub Issue mit Label `question` aufmachen, oder direkt Sven (sr@rausch.se) kontaktieren.

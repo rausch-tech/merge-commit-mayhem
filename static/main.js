@@ -1,5 +1,10 @@
 import { WsClient } from "./ws.js";
-import { attachInput, attachTaskInteraction } from "./input.js";
+import {
+  attachInput,
+  attachRepairInteraction,
+  attachTaskInteraction,
+  attachVentInteraction,
+} from "./input.js";
 import { Renderer } from "./render.js";
 import { Hud } from "./hud.js";
 import { TaskList } from "./tasks.js";
@@ -10,6 +15,8 @@ import { MeetingOverlay, VotingResultToast, EmergencyMeetingBtn } from "./meetin
 import { EventFeed } from "./eventfeed.js";
 import { TakedownButton } from "./takedown.js";
 import { ReportButton } from "./report.js";
+import { InGameMenu } from "./menu.js";
+import { MiniGameModal } from "./minigames/base.js";
 
 const SESSION_KEY = "mcm.session";
 
@@ -52,6 +59,7 @@ const state = {
   amDead: false,
   availableMaps: [],
   selectedMapId: "",
+  commsDown: false,
 };
 
 const previousTaskStatus = {}; // taskId -> last seen status
@@ -88,11 +96,14 @@ const hud = new Hud();
 const renderer = new Renderer(els.canvas);
 renderer.start();
 
-// Initial size + react to window resize.
+// Initial size + react to window resize. The ResizeObserver also catches
+// the display:none → block transition when the game-screen first appears,
+// which window 'resize' events do not fire for. Without this the canvas
+// backbuffer stays at 1×1 from the lobby and renders nothing.
 const resizeRenderer = () => renderer.resize();
 window.addEventListener("resize", resizeRenderer);
-// Run once after first paint when the canvas has a real layout size.
-window.requestAnimationFrame(resizeRenderer);
+const canvasResizeObserver = new ResizeObserver(resizeRenderer);
+canvasResizeObserver.observe(els.canvas);
 
 const sabotagePanelEl = document.getElementById("sabotage-panel");
 const sabotagePanel = new SabotagePanel(sabotagePanelEl, ws);
@@ -111,6 +122,59 @@ const votingResultToast = new VotingResultToast(document.getElementById("voting-
 const emergencyBtn = new EmergencyMeetingBtn(document.getElementById("emergency-meeting-btn"), ws);
 const takedownBtn = new TakedownButton(document.getElementById("takedown-btn"), ws);
 const reportBtn = new ReportButton(document.getElementById("report-btn"), ws);
+
+const miniGameModal = new MiniGameModal(document.getElementById("mini-game-modal"), ws);
+
+ws.on("mini_game_started", (payload) => miniGameModal.onStarted(payload));
+ws.on("mini_game_state", (payload) => miniGameModal.onState(payload));
+ws.on("mini_game_completed", (payload) => miniGameModal.onCompleted(payload));
+
+const menu = new InGameMenu(
+  document.getElementById("in-game-menu"),
+  document.getElementById("audio-controls"),
+  {
+    onLeave: () => {
+      ws.send("leave_room", {});
+      clearSession();
+      // Reset client state and bring the join form back. The server has
+      // already removed our player record; staying connected on the WS is
+      // fine — the next join_room creates a fresh identity.
+      state.playerId = null;
+      state.isHost = false;
+      state.roomCode = null;
+      state.phase = "lobby";
+      state.players = [];
+      state.ownRole = null;
+      state.map = null;
+      state.bodies = [];
+      state.amDead = false;
+      renderer.setOwnPlayerId(null);
+      renderer.setMap(null);
+      renderer.setPlayers([]);
+      els.gameScreen.classList.add("hidden");
+      els.lobbyScreen.classList.remove("hidden");
+      els.lobbyWaiting.classList.add("hidden");
+      els.joinForm.classList.remove("hidden");
+      els.ghostBanner.classList.add("hidden");
+      endscreen.hide();
+      meetingOverlay.hide();
+      sabotagePanel.setAvailable([]);
+    },
+    onAbort: () => {
+      ws.send("abort_round", {});
+    },
+  }
+);
+
+function _refreshMenu(tasks) {
+  menu.update({
+    inRoom: !!state.playerId,
+    isHost: state.isHost,
+    phase: state.phase,
+    ownRole: state.ownRole,
+    tasks: tasks || [],
+  });
+}
 
 function showError(msg) {
   els.errorBanner.textContent = msg;
@@ -170,6 +234,7 @@ ws.on("room_joined", (payload) => {
   els.joinForm.classList.add("hidden");
   els.lobbyWaiting.classList.remove("hidden");
   els.lobbyRoomCode.textContent = payload.roomCode;
+  _refreshMenu();
 });
 
 ws.on("lobby_state", (payload) => {
@@ -193,7 +258,10 @@ ws.on("lobby_state", (payload) => {
   els.lobbyWaiting.classList.remove("hidden");
   // Also make sure sabotage panel hides until next start.
   sabotagePanel.setAvailable([]);
+  // Reset role recap; a new round assigns a fresh role.
+  state.ownRole = null;
   renderLobby();
+  _refreshMenu();
 });
 
 ws.on("game_ended", (payload) => {
@@ -204,12 +272,18 @@ ws.on("private_role", (payload) => {
   state.ownRole = payload;
   hud.setRole(payload.role, payload.team);
   sabotagePanel.setAvailable(payload.availableSabotages || []);
+  renderer.setOwnTeam(payload.team || null);
+  _refreshMenu();
 });
 
 ws.on("game_state", (payload) => {
   if (state.phase !== "playing" && payload.phase === "playing") {
     els.lobbyScreen.classList.add("hidden");
     els.gameScreen.classList.remove("hidden");
+    // The canvas was hidden until just now, so its first measurable size
+    // happens here. ResizeObserver alone misses some display:none → block
+    // transitions, so resize explicitly on the phase switch.
+    renderer.resize();
   }
   state.phase = payload.phase;
   state.players = payload.players;
@@ -229,7 +303,25 @@ ws.on("game_state", (payload) => {
   renderer.setPlayers(payload.players);
   renderer.setTasks(payload.tasks || []);
   renderer.setBodies(state.bodies);
-  taskList.render(payload.tasks || []);
+  // Tier 2.4: lights-out vignette + visible repair panels for active sabotages.
+  const activeSabotageIds = new Set(
+    (payload.sabotages || []).filter((s) => s.active).map((s) => s.id)
+  );
+  const activePanels = (payload.sabotagePanels || []).filter((p) =>
+    activeSabotageIds.has(p.sabotageId)
+  );
+  renderer.setActivePanels(activePanels);
+  renderer.setLightsOff(!!payload.lightsOff);
+  // Tier 2.3: vents are part of the static map snapshot but the server now
+  // re-broadcasts them in every game_state for client-side simplicity.
+  renderer.setVents(payload.vents || []);
+  // Tier 2.5: Slack-Down — clear the task sidebar visually and flag the
+  // sabotage panel so chaos buttons gray out.
+  state.commsDown = !!payload.commsDown;
+  // Tier 2.5: when comms are down the release team can't see their tasks.
+  // The list still exists server-side; we just hide it client-side until
+  // someone repairs the comms panel.
+  taskList.render(payload.commsDown ? [] : payload.tasks || []);
   for (const t of payload.tasks || []) {
     const prev = previousTaskStatus[t.id];
     if (prev === "in_progress" && t.status === "cooldown") {
@@ -246,6 +338,7 @@ ws.on("game_state", (payload) => {
   });
   sabotagePanel.updateFromGameState(payload.sabotages || [], {
     disabledByOwnDeath: state.amDead,
+    disabledByCommsDown: !!payload.commsDown,
   });
   eventFeed.render(payload.events || []);
 
@@ -278,6 +371,8 @@ ws.on("game_state", (payload) => {
     ownPlayerId: state.playerId,
     bodies: state.bodies,
   });
+
+  _refreshMenu(payload.tasks);
 });
 
 ws.on("private_state", (payload) => {
@@ -336,7 +431,9 @@ if (els.mapDropdown) {
 }
 
 attachInput(ws);
-attachTaskInteraction(ws, renderer);
+attachTaskInteraction(ws, renderer, () => miniGameModal.isOpen());
+attachRepairInteraction(ws, renderer);
+attachVentInteraction(ws, renderer);
 ws.onOpen(() => {
   const session = loadSession();
   if (session && session.roomCode && session.playerId) {

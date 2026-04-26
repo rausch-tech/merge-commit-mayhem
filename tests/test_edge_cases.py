@@ -272,18 +272,18 @@ def test_disconnect_during_solo_task_hold_releases_task():
     player = room.players[pid]
 
     # Place the player on the task.
-    task_x, task_y = room.task_position("fix_unit_tests")
+    task_x, task_y = room.task_position("review_pr")
     player.x, player.y = task_x, task_y
 
-    room.apply_task_hold_start(pid, "fix_unit_tests")
-    assert room.tasks["fix_unit_tests"].status == "in_progress"
-    assert pid in room.tasks["fix_unit_tests"].per_player_progress
+    room.apply_task_hold_start(pid, "review_pr")
+    assert room.tasks["review_pr"].status == "in_progress"
+    assert pid in room.tasks["review_pr"].per_player_progress
 
     # Disconnect should release.
     room.mark_disconnected(pid)
 
-    assert pid not in room.tasks["fix_unit_tests"].per_player_progress
-    assert room.tasks["fix_unit_tests"].status == "available"
+    assert pid not in room.tasks["review_pr"].per_player_progress
+    assert room.tasks["review_pr"].status == "available"
 
 
 # ---------------------------------------------------------------------------
@@ -437,7 +437,7 @@ def test_many_rounds_in_a_row_no_collection_growth():
         assert len(room.triggered_sabotages_by_player) == n_players
         assert len(room.players_with_meeting_left) == n_players
         assert len(room.players) == n_players
-        assert len(room.sabotages) == 6  # six sabotage definitions (3 base + 3 from 1.4)
+        assert len(room.sabotages) == 8  # 3 base + 3 (1.4) + 1 (2.4 lights) + 1 (2.5 comms)
 
         room._finish_round("chaos_agents", "test")
         room.reset_for_new_round()

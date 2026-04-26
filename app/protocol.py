@@ -175,6 +175,60 @@ class SelectMap(BaseModel):
     payload: SelectMapPayload
 
 
+class LeaveRoomPayload(BaseModel):
+    model_config = _camel_config()
+
+
+class LeaveRoom(BaseModel):
+    model_config = _camel_config()
+    type: Literal["leave_room"]
+    payload: LeaveRoomPayload = Field(default_factory=LeaveRoomPayload)
+
+
+class AbortRoundPayload(BaseModel):
+    model_config = _camel_config()
+
+
+class AbortRound(BaseModel):
+    model_config = _camel_config()
+    type: Literal["abort_round"]
+    payload: AbortRoundPayload = Field(default_factory=AbortRoundPayload)
+
+
+class RepairSabotagePayload(BaseModel):
+    model_config = _camel_config()
+    sabotage_id: str
+
+
+class RepairSabotage(BaseModel):
+    model_config = _camel_config()
+    type: Literal["repair_sabotage"]
+    payload: RepairSabotagePayload
+
+
+class UseVentPayload(BaseModel):
+    model_config = _camel_config()
+    target_vent_id: str
+
+
+class UseVent(BaseModel):
+    model_config = _camel_config()
+    type: Literal["use_vent"]
+    payload: UseVentPayload
+
+
+class MiniGameInputPayload(BaseModel):
+    model_config = _camel_config()
+    action: str
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class MiniGameInput(BaseModel):
+    model_config = _camel_config()
+    type: Literal["mini_game_input"]
+    payload: MiniGameInputPayload
+
+
 IncomingMessage = Annotated[
     JoinRoom
     | Rejoin
@@ -189,7 +243,12 @@ IncomingMessage = Annotated[
     | SkipVote
     | TriggerTakedown
     | ReportBody
-    | SelectMap,
+    | SelectMap
+    | LeaveRoom
+    | AbortRound
+    | RepairSabotage
+    | UseVent
+    | MiniGameInput,
     Discriminator("type"),
 ]
 
@@ -276,6 +335,27 @@ class VotingResultMsg(BaseModel):
     was_chaos_agent: bool = False
     tie: bool = False
     skipped: bool = False
+
+
+class MiniGameStartedMsg(BaseModel):
+    model_config = _camel_config()
+    task_id: str
+    mini_game_id: str
+    title: str
+    view: dict[str, Any]
+
+
+class MiniGameStateMsg(BaseModel):
+    model_config = _camel_config()
+    task_id: str
+    view: dict[str, Any]
+
+
+class MiniGameCompletedMsg(BaseModel):
+    model_config = _camel_config()
+    task_id: str
+    success: bool
+    reason: str = ""
 
 
 def envelope(type_: str, payload: BaseModel) -> dict[str, Any]:

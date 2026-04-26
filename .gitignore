@@ -21,10 +21,13 @@ merge_conflict_mayhem_project.zip
 # Git worktrees
 .worktrees/
 
-# Frontend tooling (only used for prettier, no runtime deps)
+# Frontend tooling (only used for prettier + vitest, no runtime deps)
 node_modules/
 package-lock.json
 
 # Godot
 godot/.godot/
 godot/exports/
+
+# Playwright MCP scratch dir (per-session screenshots/snapshots)
+.playwright-mcp/

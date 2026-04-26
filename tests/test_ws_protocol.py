@@ -279,6 +279,8 @@ def test_chaos_sees_available_sabotages_in_private_role():
                     "merge_conflict_storm",
                     "fake_customer_request",
                     "flaky_tests",
+                    "lights_out",
+                    "comms_outage",
                 ]
             else:
                 assert role["payload"]["availableSabotages"] == []
@@ -311,6 +313,8 @@ def test_game_state_carries_stats_and_tasks_and_sabotages():
             "merge_conflict_storm",
             "fake_customer_request",
             "flaky_tests",
+            "lights_out",
+            "comms_outage",
         }
 
 
@@ -438,6 +442,8 @@ def test_demo_mode_lets_single_player_start_via_ws():
             "merge_conflict_storm",
             "fake_customer_request",
             "flaky_tests",
+            "lights_out",
+            "comms_outage",
         ]
         state = _drain_until(ws, "game_state")
         assert state["payload"]["phase"] == "playing"
@@ -798,3 +804,105 @@ def test_non_host_select_map_returns_not_host_error():
         while msg["type"] != "error":
             msg = ws_b.receive_json()
         assert msg["payload"]["code"] == "NOT_HOST"
+
+
+# --- Tier 1.9: in-game menu — leave_room / abort_round -----------------
+
+
+def test_leave_room_in_lobby_removes_player_and_broadcasts():
+    """Any player can leave from the lobby; remaining players see updated list."""
+    with (
+        TestClient(app) as client,
+        client.websocket_connect("/ws") as ws_a,
+        client.websocket_connect("/ws") as ws_b,
+    ):
+        _join(ws_a, "LEAV", "Alice")
+        ws_a.receive_json()  # initial lobby_state
+        _join(ws_b, "LEAV", "Bob")
+        ws_a.receive_json()  # lobby_state after Bob joined
+        ws_b.receive_json()  # lobby_state for Bob
+
+        ws_b.send_json({"type": "leave_room", "payload": {}})
+        lob = _drain_until(ws_a, "lobby_state")
+        names = {p["name"] for p in lob["payload"]["players"]}
+        assert names == {"Alice"}
+        # Room still exists with Alice as host.
+        assert registry.get("LEAV") is not None
+        assert any(p.is_host for p in registry.get("LEAV").players.values())
+
+
+def test_leave_room_during_playing_removes_player_and_broadcasts_game_state():
+    """Leaving mid-round must be intentional — remaining players see them gone
+    on the next game_state, not a 'disconnected' grace-period entry."""
+    with (
+        TestClient(app) as client,
+        client.websocket_connect("/ws") as ws_a,
+        client.websocket_connect("/ws") as ws_b,
+    ):
+        _join(ws_a, "LMID", "Alice")
+        ws_a.receive_json()
+        _join(ws_b, "LMID", "Bob")
+        ws_a.receive_json()
+        ws_b.receive_json()
+        _pad_room_to_min("LMID")
+
+        ws_a.send_json({"type": "start_game", "payload": {}})
+        for ws in [ws_a, ws_b]:
+            _drain_until(ws, "private_role")
+            _drain_until(ws, "game_state")
+
+        ws_b.send_json({"type": "leave_room", "payload": {}})
+        # Alice's next game_state must not list Bob anymore.
+        gs = _drain_until(ws_a, "game_state", max_msgs=40)
+        names = {p["name"] for p in gs["payload"]["players"]}
+        assert "Bob" not in names
+
+
+def test_leave_room_when_last_player_drops_room():
+    """A solo player leaving cleans the room out of the registry."""
+    with TestClient(app) as client, client.websocket_connect("/ws") as ws:
+        _join(ws, "SOLOX", "Alice")
+        ws.receive_json()
+        ws.send_json({"type": "leave_room", "payload": {}})
+        # No more frames are guaranteed; the room should be gone.
+        assert registry.get("SOLOX") is None
+
+
+def test_abort_round_requires_host_and_running_round():
+    """Non-host gets NOT_HOST; host before-start gets WRONG_PHASE; host during
+    PLAYING aborts and everyone falls back to lobby_state."""
+    with (
+        TestClient(app) as client,
+        client.websocket_connect("/ws") as ws_a,
+        client.websocket_connect("/ws") as ws_b,
+    ):
+        _join(ws_a, "ABRT", "Alice")
+        ws_a.receive_json()
+        _join(ws_b, "ABRT", "Bob")
+        ws_a.receive_json()
+        ws_b.receive_json()
+
+        # Host before start → WRONG_PHASE.
+        ws_a.send_json({"type": "abort_round", "payload": {}})
+        err = _drain_until(ws_a, "error")
+        assert err["payload"]["code"] == "WRONG_PHASE"
+
+        _pad_room_to_min("ABRT")
+        ws_a.send_json({"type": "start_game", "payload": {}})
+        for ws in [ws_a, ws_b]:
+            _drain_until(ws, "private_role")
+            _drain_until(ws, "game_state")
+
+        # Non-host abort → NOT_HOST.
+        ws_b.send_json({"type": "abort_round", "payload": {}})
+        err = _drain_until(ws_b, "error", max_msgs=40)
+        assert err["payload"]["code"] == "NOT_HOST"
+
+        # Host abort during PLAYING → both clients receive lobby_state.
+        ws_a.send_json({"type": "abort_round", "payload": {}})
+        lob_a = _drain_until(ws_a, "lobby_state", max_msgs=40)
+        lob_b = _drain_until(ws_b, "lobby_state", max_msgs=40)
+        assert lob_a["payload"]["roomCode"] == "ABRT"
+        assert lob_b["payload"]["roomCode"] == "ABRT"
+        # Phase reset puts the room back into lobby.
+        assert registry.get("ABRT").phase.value == "lobby"

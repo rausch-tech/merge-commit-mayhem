@@ -5,6 +5,7 @@ import pytest
 from app.game.game_map import DEFAULT_MAP, compute_walls
 from app.game.game_room import GameRoom
 from app.game.models import InputState
+from app.game.sabotages import NORMAL_SPEED
 from app.game.walls import (
     DOOR_WIDTH_DEFAULT,
     PLAYER_COLLISION_RADIUS,
@@ -78,24 +79,25 @@ def test_player_slides_along_wall_when_moving_diagonally():
     """
     room, pid = _started_room_with_player(1570.0, 100.0)
     room.apply_input(pid, InputState(right=True, down=True))
-    room.tick(0.5)  # 75 px requested in each axis
+    # Tick at the server's real cadence (20 Hz) for 0.5 s so the per-step
+    # displacement stays smaller than the wall+radius margin (no tunneling).
+    for _ in range(10):
+        room.tick(0.05)
     p = room.players[pid]
     # x is blocked at the wall: 1600 - 8 - 20 = 1572.
     assert p.x == pytest.approx(1572.0, abs=0.5)
-    # y advanced by 75/sqrt(2) ≈ 53 px (since input was diagonal but y was free).
-    # Actually with axis-by-axis: x first (blocked), y next (free) — y gets the
-    # full diagonal y-component which is 53 px.
-    assert p.y > 100.0 + 30.0  # advanced clearly forward
+    # y advances diagonally — clearly forward of the start.
+    assert p.y > 100.0 + 30.0
 
 
 def test_player_walks_through_door():
     """Player at y=800 (center of door) walks freely past the wall."""
     room, pid = _started_room_with_player(1570.0, 800.0)
     room.apply_input(pid, InputState(right=True))
-    room.tick(0.5)  # 75 px attempted
+    room.tick(0.5)
     p = room.players[pid]
-    # Door allows passage. Player should be at 1570 + 75 = 1645.
-    assert p.x == pytest.approx(1645.0, abs=1.0)
+    # Door allows passage. Player advances by NORMAL_SPEED * 0.5.
+    assert p.x == pytest.approx(1570.0 + NORMAL_SPEED * 0.5, abs=1.0)
 
 
 def test_player_blocked_by_wall_cannot_cross():
@@ -115,8 +117,8 @@ def test_walls_dont_break_existing_movement_in_open_space():
     room.apply_input(pid, InputState(right=True))
     room.tick(0.1)
     p = room.players[pid]
-    # 0.1 s × 150 px/s = 15 px right, no walls in the way.
-    assert p.x == pytest.approx(215.0, abs=0.5)
+    # NORMAL_SPEED * 0.1 px right, no walls in the way.
+    assert p.x == pytest.approx(200.0 + NORMAL_SPEED * 0.1, abs=0.5)
 
 
 def test_wall_segment_count_matches_design():

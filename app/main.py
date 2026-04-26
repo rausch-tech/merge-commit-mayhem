@@ -13,17 +13,24 @@ from app.game.game_room import GameRoom, GameRoomError
 from app.game.models import InputState, Phase
 from app.game.sabotages import SABOTAGE_DEFINITIONS
 from app.protocol import (
+    AbortRound,
     CallEmergencyMeeting,
     CastVote,
     ErrorMsg,
     GameEndedMsg,
     GameStateMsg,
     JoinRoom,
+    LeaveRoom,
     LobbyStateMsg,
+    MiniGameCompletedMsg,
+    MiniGameInput,
+    MiniGameStartedMsg,
+    MiniGameStateMsg,
     PlayerInput,
     PrivateRoleMsg,
     PrivateStateMsg,
     Rejoin,
+    RepairSabotage,
     ReportBody,
     ReturnToLobby,
     RoomJoinedMsg,
@@ -34,6 +41,7 @@ from app.protocol import (
     TaskHoldStop,
     TriggerSabotage,
     TriggerTakedown,
+    UseVent,
     VotingResultMsg,
     envelope,
     parse_incoming,
@@ -159,6 +167,9 @@ async def _tick_loop() -> None:
                             envelope("game_ended", GameEndedMsg(**room.ended_snapshot())),
                         )
                         room.has_broadcast_end = True
+                    # Tier 3.1: forward any mini-game lifecycle events the
+                    # tick produced (cancel via take-down, meeting, or finish).
+                    await _drain_mini_game_events(room)
                 except Exception:
                     log.exception("tick failed for room %s", room.code)
     except asyncio.CancelledError:
@@ -222,6 +233,16 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 await _handle_select_map(ws, msg)
             elif isinstance(msg, ReturnToLobby):
                 await _handle_return_to_lobby(ws)
+            elif isinstance(msg, LeaveRoom):
+                await _handle_leave_room(ws)
+            elif isinstance(msg, AbortRound):
+                await _handle_abort_round(ws)
+            elif isinstance(msg, RepairSabotage):
+                await _handle_repair_sabotage(ws, msg)
+            elif isinstance(msg, UseVent):
+                await _handle_use_vent(ws, msg)
+            elif isinstance(msg, MiniGameInput):
+                await _handle_mini_game_input(ws, msg)
     except WebSocketDisconnect:
         pass
     finally:
@@ -367,6 +388,7 @@ async def _handle_task_hold_start(ws: WebSocket, msg: TaskHoldStart) -> None:
         room.apply_task_hold_start(session.player_id, msg.payload.task_id)
     except GameRoomError as exc:
         await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+    await _drain_mini_game_events(room)
 
 
 async def _handle_task_hold_stop(ws: WebSocket, msg: TaskHoldStop) -> None:
@@ -377,6 +399,7 @@ async def _handle_task_hold_stop(ws: WebSocket, msg: TaskHoldStop) -> None:
     if room is None:
         return
     room.apply_task_hold_stop(session.player_id, msg.payload.task_id)
+    await _drain_mini_game_events(room)
 
 
 async def _handle_trigger_sabotage(ws: WebSocket, msg: TriggerSabotage) -> None:
@@ -392,6 +415,75 @@ async def _handle_trigger_sabotage(ws: WebSocket, msg: TriggerSabotage) -> None:
         await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
 
 
+async def _handle_repair_sabotage(ws: WebSocket, msg: RepairSabotage) -> None:
+    """Tier 2.4: a player at the matching panel clears a live sabotage."""
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    try:
+        room.repair_sabotage(session.player_id, msg.payload.sabotage_id)
+    except GameRoomError as exc:
+        await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+
+
+async def _handle_use_vent(ws: WebSocket, msg: UseVent) -> None:
+    """Tier 2.3: chaos teleports through a vent edge."""
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    try:
+        room.use_vent(session.player_id, msg.payload.target_vent_id)
+    except GameRoomError as exc:
+        await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+
+
+async def _handle_mini_game_input(ws: WebSocket, msg: MiniGameInput) -> None:
+    """Tier 3.1: forward player action into the active mini-game session."""
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    try:
+        room.apply_mini_game_input(session.player_id, msg.payload.action, msg.payload.params)
+    except GameRoomError as exc:
+        await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+    await _drain_mini_game_events(room)
+
+
+async def _drain_mini_game_events(room: GameRoom) -> None:
+    """Forward queued mini-game lifecycle events to the owning sockets.
+
+    Each event is per-player by design — only the player whose mini-game it
+    is receives ``mini_game_started`` / ``state`` / ``completed`` frames. The
+    rest of the room sees the player as ``in_progress`` on the task via the
+    regular game_state broadcast.
+    """
+    events = room.drain_pending_mini_game_events()
+    if not events:
+        return
+    for player_id, kind, payload in events:
+        ws = manager.ws_for_player(room.code, player_id)
+        if ws is None:
+            continue
+        if kind == "started":
+            msg = MiniGameStartedMsg(**payload)
+            await ws.send_json(envelope("mini_game_started", msg))
+        elif kind == "state":
+            msg = MiniGameStateMsg(**payload)
+            await ws.send_json(envelope("mini_game_state", msg))
+        elif kind == "completed":
+            msg = MiniGameCompletedMsg(**payload)
+            await ws.send_json(envelope("mini_game_completed", msg))
+
+
 async def _handle_call_emergency_meeting(ws: WebSocket) -> None:
     session = manager.session_for(ws)
     if session is None:
@@ -403,6 +495,7 @@ async def _handle_call_emergency_meeting(ws: WebSocket) -> None:
         room.call_emergency_meeting(requesting_player_id=session.player_id)
     except GameRoomError as exc:
         await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+    await _drain_mini_game_events(room)
 
 
 async def _handle_cast_vote(ws: WebSocket, msg: CastVote) -> None:
@@ -442,6 +535,7 @@ async def _handle_trigger_takedown(ws: WebSocket, msg: TriggerTakedown) -> None:
         room.apply_takedown(killer_id=session.player_id, target_id=msg.payload.target_player_id)
     except GameRoomError as exc:
         await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+    await _drain_mini_game_events(room)
 
 
 async def _handle_report_body(ws: WebSocket, msg: ReportBody) -> None:
@@ -455,6 +549,7 @@ async def _handle_report_body(ws: WebSocket, msg: ReportBody) -> None:
         room.apply_report_body(reporter_id=session.player_id, body_id=msg.payload.body_id)
     except GameRoomError as exc:
         await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+    await _drain_mini_game_events(room)
 
 
 async def _handle_select_map(ws: WebSocket, msg: SelectMap) -> None:
@@ -494,6 +589,66 @@ async def _handle_return_to_lobby(ws: WebSocket) -> None:
             envelope(
                 "error",
                 ErrorMsg(code="WRONG_PHASE", message="Only allowed in ENDED phase."),
+            )
+        )
+        return
+    room.reset_for_new_round()
+    await manager.broadcast(
+        room.code,
+        envelope("lobby_state", _lobby_state_msg(room)),
+    )
+
+
+async def _handle_leave_room(ws: WebSocket) -> None:
+    """Player explicitly leaves the room (in-game menu → 'Lobby verlassen').
+
+    Differs from _handle_disconnect in two ways: it is intentional, so we do
+    not preserve identity for grace-period reconnect; and the WS stays open
+    so the client can immediately re-join under a new identity if it wants.
+    """
+    session = manager.forget(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    if session.player_id not in room.players:
+        return
+    room.remove_player(session.player_id)
+    if room.is_empty():
+        registry.drop_if_empty(session.room_code)
+        return
+    if room.phase is Phase.LOBBY:
+        await manager.broadcast(room.code, envelope("lobby_state", _lobby_state_msg(room)))
+    else:
+        for s in manager.sessions_in_room(room.code):
+            await s.ws.send_json(envelope("game_state", _game_state_msg_for(room, s.player_id)))
+
+
+async def _handle_abort_round(ws: WebSocket) -> None:
+    """Host bricht eine laufende Runde ab (in-game menu → 'Runde beenden').
+
+    Erlaubt nur in PLAYING/MEETING und nur dem Host. Setzt den Raum direkt
+    zurück in die Lobby — kein Endscreen, weil die Rollen-Reveal bei einem
+    bewussten Host-Abbruch unangebracht ist.
+    """
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    player = room.players.get(session.player_id)
+    if player is None or not player.is_host:
+        await ws.send_json(
+            envelope("error", ErrorMsg(code="NOT_HOST", message="Only host can abort the round."))
+        )
+        return
+    if room.phase not in (Phase.PLAYING, Phase.MEETING):
+        await ws.send_json(
+            envelope(
+                "error",
+                ErrorMsg(code="WRONG_PHASE", message="Can only abort a running round."),
             )
         )
         return
@@ -550,6 +705,11 @@ app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
 @app.get("/")
 async def root_index() -> FileResponse:
+    return FileResponse(_static_dir / "landing.html")
+
+
+@app.get("/play")
+async def play_page() -> FileResponse:
     return FileResponse(_static_dir / "index.html")
 
 

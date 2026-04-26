@@ -78,16 +78,16 @@ def test_task_complete_emits_event():
     room, _ = _started_room(player_count=2)
     pid = next(iter(room.players))
     p = room.players[pid]
-    task_x, task_y = room.task_position("fix_unit_tests")
+    task_x, task_y = room.task_position("review_pr")
     p.x, p.y = task_x, task_y
-    room.apply_task_hold_start(pid, "fix_unit_tests")
+    room.apply_task_hold_start(pid, "review_pr")
     pre_seqs = {e.seq for e in room.events}
     # Required time is 5.0s -- one big tick is enough to finish.
-    required = task_by_id("fix_unit_tests").required_seconds
+    required = task_by_id("review_pr").required_seconds
     room.tick(required + 0.1)
     new_events = [e for e in room.events if e.seq not in pre_seqs]
     assert any(
-        e.severity == "info" and e.message == "Unit Tests fixen erledigt." for e in new_events
+        e.severity == "info" and e.message == "Pull Request reviewen erledigt." for e in new_events
     )
 
 
@@ -290,10 +290,10 @@ def test_task_cooldown_does_not_re_emit_completion():
     room, _ = _started_room(player_count=2)
     pid = next(iter(room.players))
     p = room.players[pid]
-    task_x, task_y = room.task_position("fix_unit_tests")
+    task_x, task_y = room.task_position("review_pr")
     p.x, p.y = task_x, task_y
-    room.apply_task_hold_start(pid, "fix_unit_tests")
-    required = task_by_id("fix_unit_tests").required_seconds
+    room.apply_task_hold_start(pid, "review_pr")
+    required = task_by_id("review_pr").required_seconds
     room.tick(required + 0.1)
     # Now in cooldown. Tick a few more times -- no further completion events.
     seen = len(room.events)

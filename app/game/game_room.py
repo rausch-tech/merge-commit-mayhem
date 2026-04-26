@@ -11,6 +11,9 @@ from app.game.game_map import (
     task_position_map,
     war_room_bounds_for,
 )
+from app.game.minigames.base import MiniGamePluginError
+from app.game.minigames.registry import get_plugin as get_mini_game_plugin
+from app.game.minigames.registry import is_known as mini_game_is_known
 from app.game.models import InputState, Phase, Player
 from app.game.roles import RoleInfo, description_for
 from app.game.roles import assign as assign_roles
@@ -22,9 +25,11 @@ from app.game.sabotages import (
     SabotageDefinition,
 )
 from app.game.tasks import (
+    SABOTAGE_PANEL_INTERACTION_RADIUS,
     TASK_DEFINITIONS,
     TASK_INTERACTION_RADIUS,
     TASK_RESPAWN_COOLDOWN,
+    VENT_INTERACTION_RADIUS,
     TaskDefinition,
 )
 from app.game.voting import SKIP_TARGET, all_chaos_eliminated
@@ -119,6 +124,16 @@ class Body:
     color: str  # victim's color, for rendering
 
 
+@dataclass
+class MiniGameSession:
+    """Tier 3.1: per-player live mini-game state. The framework owns this
+    dict; the plugin owns its inner ``state`` schema."""
+
+    plugin_id: str
+    task_id: str
+    state: dict
+
+
 class GameRoom:
     def __init__(
         self,
@@ -152,6 +167,14 @@ class GameRoom:
         # Mandatory-meeting slow-down timer (seconds remaining; 0 = inactive).
         self.meeting_active_for: float = 0.0
 
+        # Tier 2.4: Lights-out flag. Server-authoritative; cleared by repairing
+        # the lights_out panel.
+        self.lights_off: bool = False
+
+        # Tier 2.5: Comms outage flag. While true, task holds and other
+        # sabotage triggers are rejected. Cleared via the comms_outage panel.
+        self.comms_down: bool = False
+
         # End-of-round state.
         self.winner: str | None = None
         self.win_reason: str | None = None
@@ -173,6 +196,14 @@ class GameRoom:
         # release-team player; cooldowns gate the next take-down per chaos id.
         self.bodies: dict[str, Body] = {}
         self.takedown_cooldowns: dict[str, float] = {}
+
+        # Tier 3.1: active mini-games per player (max one each). Keyed by
+        # player_id; the framework treats this as authoritative.
+        self.active_mini_games: dict[str, MiniGameSession] = {}
+        # Tier 3.1: framework-emitted events for mini-game lifecycle. Drained
+        # by the WS layer once per tick / on_input. Each entry is a tuple
+        # (player_id, kind, payload) where kind is 'started'|'state'|'completed'.
+        self.pending_mini_game_events: list[tuple[str, str, dict]] = []
 
     def _emit_event(self, severity: str, message: str) -> None:
         """Append an event to the rolling buffer. Internal use only."""
@@ -236,6 +267,10 @@ class GameRoom:
                 task.per_player_progress.pop(player_id)
                 if not task.per_player_progress and task.status == "in_progress":
                     task.status = "available"
+        # Tier 3.1: drop any active mini-game — state is not preserved across
+        # reconnects (the player resumes outside the modal).
+        if player_id in self.active_mini_games:
+            self._cancel_mini_game(player_id, "disconnected")
         # Reset their input.
         player.input_state = InputState()
         # Host transfer if they were host. If no candidate exists (solo
@@ -407,6 +442,8 @@ class GameRoom:
         self.coffee_level = 100
         self.incidents = 0
         self.meeting_active_for = 0.0
+        self.lights_off = False
+        self.comms_down = False
         self.winner = None
         self.win_reason = None
         self.completed_tasks_by_player = {pid: 0 for pid in self.players}
@@ -463,6 +500,10 @@ class GameRoom:
         if self.phase is not Phase.PLAYING:
             return
         for player in self.players.values():
+            # Tier 3.1: a player inside a mini-game is locked in place — their
+            # WASD inputs are ignored until the session ends.
+            if player.id in self.active_mini_games:
+                continue
             dx = int(player.input_state.right) - int(player.input_state.left)
             dy = int(player.input_state.down) - int(player.input_state.up)
             if dx or dy:
@@ -560,6 +601,8 @@ class GameRoom:
         self.phase = Phase.ENDED
         self.winner = winner
         self.win_reason = reason
+        # Tier 3.1: end any active mini-games — no reward for in-flight sessions.
+        self._cancel_all_mini_games("round_ended")
 
     # --- speed helpers -----------------------------------------------------
 
@@ -586,6 +629,9 @@ class GameRoom:
     def apply_task_hold_start(self, player_id: str, task_id: str) -> None:
         if self.phase is not Phase.PLAYING:
             raise GameRoomError(code="WRONG_PHASE", message="Tasks only during playing.")
+        # Tier 2.5: Slack-Down — release team can't see or progress tasks.
+        if self.comms_down:
+            raise GameRoomError(code="COMMS_DOWN", message="Slack ist down — keine Tasks.")
         # Ghosts may complete tasks — they help the release-team win.
         player = self.players.get(player_id)
         if player is None:
@@ -597,16 +643,146 @@ class GameRoom:
             raise GameRoomError(code="TASK_ON_COOLDOWN", message="Task in cooldown.")
         if not self._task_in_range(player_id, task):
             raise GameRoomError(code="TASK_TOO_FAR", message="Too far from task.")
+        # Tier 3.1: when the task has an associated mini-game, switch into the
+        # mini-game flow instead of starting hold-E progress. Hold-E remains
+        # the default for tasks without mini_game set.
+        if task.definition.mini_game:
+            if player_id in self.active_mini_games:
+                raise GameRoomError(
+                    code="MINI_GAME_ALREADY_ACTIVE",
+                    message="Finish the current mini-game first.",
+                )
+            self._start_mini_game(player_id, task_id, task.definition.mini_game)
+            return
         task.status = "in_progress"
         task.per_player_progress.setdefault(player_id, 0.0)
 
     def apply_task_hold_stop(self, player_id: str, task_id: str) -> None:
+        # Tier 3.1: a stop on a mini-game-bearing task cancels the mini-game.
+        if player_id in self.active_mini_games:
+            session = self.active_mini_games[player_id]
+            if session.task_id == task_id:
+                self._cancel_mini_game(player_id, "cancelled")
+                return
         task = self.tasks.get(task_id)
         if task is None:
             return
         task.per_player_progress.pop(player_id, None)
         if not task.per_player_progress and task.status == "in_progress":
             task.status = "available"
+
+    # --- mini-game framework (Tier 3.1) -----------------------------------
+
+    def _start_mini_game(self, player_id: str, task_id: str, mini_game_id: str) -> None:
+        """Internal: open a mini-game session for ``player_id`` on ``task_id``.
+
+        Called from apply_task_hold_start when the task carries a mini_game
+        field. Emits a 'started' event for the WS layer.
+        """
+        if not mini_game_is_known(mini_game_id):
+            raise GameRoomError(
+                code="UNKNOWN_MINI_GAME", message=f"Unknown mini-game {mini_game_id!r}."
+            )
+        plugin = get_mini_game_plugin(mini_game_id)
+        seed = random.getrandbits(31)
+        state = plugin.init_state(seed)
+        session = MiniGameSession(plugin_id=mini_game_id, task_id=task_id, state=state)
+        self.active_mini_games[player_id] = session
+        # Mark the task as in_progress so other players see "Sven is at the
+        # task" through the same UI affordances as hold-E.
+        task = self.tasks.get(task_id)
+        if task is not None and task.status == "available":
+            task.status = "in_progress"
+        self.pending_mini_game_events.append(
+            (
+                player_id,
+                "started",
+                {
+                    "taskId": task_id,
+                    "miniGameId": mini_game_id,
+                    "title": plugin.title,
+                    "view": plugin.public_view(state),
+                },
+            )
+        )
+
+    def apply_mini_game_input(self, player_id: str, action: str, params: dict) -> None:
+        """WS-facing entry point for a player's mini-game action."""
+        session = self.active_mini_games.get(player_id)
+        if session is None:
+            raise GameRoomError(
+                code="NO_ACTIVE_MINI_GAME", message="No mini-game running for this player."
+            )
+        plugin = get_mini_game_plugin(session.plugin_id)
+        try:
+            session.state = plugin.handle_input(session.state, action, params)
+        except MiniGamePluginError as exc:
+            # Translate plugin-level cheat/format errors to GameRoomError so
+            # the WS layer surfaces them consistently with other guards.
+            raise GameRoomError(code=exc.code, message=exc.message) from exc
+        # Echo the new public view back to the player.
+        self.pending_mini_game_events.append(
+            (
+                player_id,
+                "state",
+                {"taskId": session.task_id, "view": plugin.public_view(session.state)},
+            )
+        )
+        # Completion check.
+        if plugin.is_complete(session.state):
+            self._complete_mini_game(player_id)
+
+    def _complete_mini_game(self, player_id: str) -> None:
+        session = self.active_mini_games.pop(player_id, None)
+        if session is None:
+            return
+        # Apply the same reward + cooldown the hold-E path uses.
+        task = self.tasks.get(session.task_id)
+        if task is not None:
+            self._apply_task_reward(task.definition)
+            self.completed_tasks_by_player[player_id] = (
+                self.completed_tasks_by_player.get(player_id, 0) + 1
+            )
+            task.per_player_progress.clear()
+            task.status = "cooldown"
+            task.cooldown_remaining = TASK_RESPAWN_COOLDOWN
+        self.pending_mini_game_events.append(
+            (
+                player_id,
+                "completed",
+                {"taskId": session.task_id, "success": True, "reason": "solved"},
+            )
+        )
+
+    def _cancel_mini_game(self, player_id: str, reason: str) -> None:
+        """Drop a player's active mini-game without applying the reward."""
+        session = self.active_mini_games.pop(player_id, None)
+        if session is None:
+            return
+        # Release the task back to "available" — kein Cooldown bei Cancel.
+        task = self.tasks.get(session.task_id)
+        if task is not None and task.status == "in_progress":
+            task.per_player_progress.pop(player_id, None)
+            if not task.per_player_progress:
+                task.status = "available"
+        self.pending_mini_game_events.append(
+            (
+                player_id,
+                "completed",
+                {"taskId": session.task_id, "success": False, "reason": reason},
+            )
+        )
+
+    def _cancel_all_mini_games(self, reason: str) -> None:
+        """Used on round end / meeting start / reset to drop every session."""
+        for pid in list(self.active_mini_games.keys()):
+            self._cancel_mini_game(pid, reason)
+
+    def drain_pending_mini_game_events(self) -> list[tuple[str, str, dict]]:
+        """WS layer pulls events here once per tick / after each input."""
+        events = self.pending_mini_game_events
+        self.pending_mini_game_events = []
+        return events
 
     def _apply_incidents_delta(self, delta: int) -> None:
         """Clamp incidents into 0..100 after applying delta. Internal use only."""
@@ -682,6 +858,13 @@ class GameRoom:
             raise GameRoomError(code="UNKNOWN_SABOTAGE", message=f"Unknown {sabotage_id!r}.")
         if sab.cooldown_remaining > 0:
             raise GameRoomError(code="SABOTAGE_ON_COOLDOWN", message="Sabotage on cooldown.")
+        # Tier 2.5: while comms are down, no other sabotage can be triggered.
+        # Comms-outage itself is exempt so chaos can chain it (and the repair
+        # path runs through repair_sabotage anyway, not here).
+        if self.comms_down and sabotage_id != "comms_outage":
+            raise GameRoomError(
+                code="COMMS_DOWN", message="Slack ist down — keine weitere Sabotage."
+            )
 
         # Apply the effect.
         if sabotage_id == "ci_cd_red":
@@ -696,6 +879,10 @@ class GameRoom:
             self.release_progress = max(0, self.release_progress - 15)
         elif sabotage_id == "flaky_tests":
             pass  # Effect lives entirely in incidents_increase.
+        elif sabotage_id == "lights_out":
+            self.lights_off = True
+        elif sabotage_id == "comms_outage":
+            self.comms_down = True
         # Future sabotages: add here.
 
         if sab.definition.incidents_increase:
@@ -718,6 +905,111 @@ class GameRoom:
             self._emit_event("warn", "Eine kleine Kundenänderung. Scope explodiert.")
         elif sabotage_id == "flaky_tests":
             self._emit_event("warn", "Die Tests schlagen fehl, aber nur manchmal.")
+        elif sabotage_id == "lights_out":
+            self._emit_event("danger", "PagerDuty-Storm — alle starren auf ihre Telefone.")
+        elif sabotage_id == "comms_outage":
+            self._emit_event("danger", "Slack ist down. Niemand kommuniziert.")
+
+    def use_vent(self, player_id: str, target_vent_id: str) -> None:
+        """Tier 2.3: chaos-only teleport through the vent network.
+
+        The player must currently be next to a vent ('source'); target_vent_id
+        must be in that source vent's connected_to list. Teleport snaps the
+        player to the target's coordinates. Wall collision is bypassed by
+        construction (the move is a discrete jump, not a swept motion).
+        """
+        if self.phase is not Phase.PLAYING:
+            raise GameRoomError(
+                code="WRONG_PHASE", message="Vents only work during a running round."
+            )
+        player = self.players.get(player_id)
+        if player is None:
+            raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
+        if not player.is_alive:
+            raise GameRoomError(code="PLAYER_ELIMINATED", message="Eliminated players cannot vent.")
+        if player.team != "chaos_agents":
+            raise GameRoomError(code="NOT_CHAOS_AGENT", message="Only chaos agents can use vents.")
+        # Find source vent: closest vent within reach.
+        source = None
+        best_dist_sq = VENT_INTERACTION_RADIUS * VENT_INTERACTION_RADIUS
+        for v in self.map.vents:
+            dx = player.x - v.x
+            dy = player.y - v.y
+            d2 = dx * dx + dy * dy
+            if d2 <= best_dist_sq:
+                source = v
+                best_dist_sq = d2
+        if source is None:
+            raise GameRoomError(code="NO_VENT_NEARBY", message="No vent in reach.")
+        if target_vent_id not in source.connected_to:
+            raise GameRoomError(
+                code="VENT_NOT_CONNECTED",
+                message=f"Vent {target_vent_id!r} is not reachable from {source.id!r}.",
+            )
+        target = next((v for v in self.map.vents if v.id == target_vent_id), None)
+        if target is None:
+            raise GameRoomError(
+                code="UNKNOWN_VENT", message=f"Vent {target_vent_id!r} does not exist."
+            )
+        player.x = float(target.x)
+        player.y = float(target.y)
+
+    def repair_sabotage(self, player_id: str, sabotage_id: str) -> None:
+        """Tier 2.4: a player at the matching sabotage panel clears the effect.
+
+        One-shot interact (no hold) — Among Us classic uses a mini-puzzle, but
+        for the MVP we keep the cost a positional one. The chaos agent has to
+        physically reach the panel, which usually means crossing the map and
+        risking detection.
+        """
+        if self.phase not in (Phase.PLAYING, Phase.MEETING):
+            raise GameRoomError(
+                code="WRONG_PHASE", message="Repair only allowed during a running round."
+            )
+        player = self.players.get(player_id)
+        if player is None:
+            raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
+        if not player.is_alive:
+            raise GameRoomError(
+                code="PLAYER_ELIMINATED", message="Eliminated players cannot repair."
+            )
+        sab = self.sabotages.get(sabotage_id)
+        if sab is None:
+            raise GameRoomError(code="UNKNOWN_SABOTAGE", message=f"Unknown {sabotage_id!r}.")
+        # Only currently-active sabotages can be repaired.
+        if sabotage_id == "lights_out":
+            if not self.lights_off:
+                raise GameRoomError(code="SABOTAGE_NOT_ACTIVE", message="lights_out is not active.")
+        elif sabotage_id == "comms_outage":
+            if not self.comms_down:
+                raise GameRoomError(
+                    code="SABOTAGE_NOT_ACTIVE", message="comms_outage is not active."
+                )
+        else:
+            raise GameRoomError(
+                code="SABOTAGE_NOT_REPAIRABLE",
+                message=f"{sabotage_id!r} has no repair panel.",
+            )
+        panel = next(
+            (p for p in self.map.sabotage_panels if p.sabotage_id == sabotage_id),
+            None,
+        )
+        if panel is None:
+            raise GameRoomError(code="NO_PANEL", message=f"Map has no panel for {sabotage_id!r}.")
+        dx = player.x - panel.x
+        dy = player.y - panel.y
+        if (
+            dx * dx + dy * dy
+            > SABOTAGE_PANEL_INTERACTION_RADIUS * SABOTAGE_PANEL_INTERACTION_RADIUS
+        ):
+            raise GameRoomError(code="TOO_FAR", message="Move closer to the panel.")
+
+        if sabotage_id == "lights_out":
+            self.lights_off = False
+            self._emit_event("info", f"{player.name} hat das PagerDuty-Storm beendet.")
+        elif sabotage_id == "comms_outage":
+            self.comms_down = False
+            self._emit_event("info", f"{player.name} hat Slack wieder online gebracht.")
 
     def _tick_sabotages(self, dt: float) -> None:
         for sab in self.sabotages.values():
@@ -728,6 +1020,10 @@ class GameRoom:
                 sab.active = self.coffee_level == 0
             elif sab.definition.id == "mandatory_meeting":
                 sab.active = self.meeting_active_for > 0
+            elif sab.definition.id == "lights_out":
+                sab.active = self.lights_off
+            elif sab.definition.id == "comms_outage":
+                sab.active = self.comms_down
             else:
                 sab.active = False
         if self.meeting_active_for > 0:
@@ -798,6 +1094,10 @@ class GameRoom:
                 task.per_player_progress.pop(target_id)
                 if not task.per_player_progress and task.status == "in_progress":
                     task.status = "available"
+        # Tier 3.1: a take-down victim drops their mini-game (and the modal
+        # snaps shut on the client when the framework forwards 'killed').
+        if target_id in self.active_mini_games:
+            self._cancel_mini_game(target_id, "killed")
         self.bodies[body.id] = body
         self.takedown_cooldowns[killer_id] = TAKEDOWN_COOLDOWN
         return body
@@ -842,6 +1142,9 @@ class GameRoom:
             task.per_player_progress = {}
             if task.status == "in_progress":
                 task.status = "available"
+        # Tier 3.1: end any active mini-games — modals snap shut as players
+        # are pulled into the meeting overlay.
+        self._cancel_all_mini_games("meeting_started")
 
     def private_state_for(self, player_id: str) -> dict:
         cd = self.takedown_cooldowns.get(player_id, 0.0)
@@ -891,6 +1194,8 @@ class GameRoom:
             task.per_player_progress = {}
             if task.status == "in_progress":
                 task.status = "available"
+        # Tier 3.1: end any active mini-games when the round flips to MEETING.
+        self._cancel_all_mini_games("meeting_started")
 
     def cast_vote(self, voter_id: str, target_id: str) -> None:
         if self.phase is not Phase.MEETING:
@@ -1060,6 +1365,15 @@ class GameRoom:
                 }
                 for b in self.bodies.values()
             ],
+            "lightsOff": self.lights_off,
+            "commsDown": self.comms_down,
+            "sabotagePanels": [
+                {"sabotageId": p.sabotage_id, "x": p.x, "y": p.y} for p in self.map.sabotage_panels
+            ],
+            "vents": [
+                {"id": v.id, "x": v.x, "y": v.y, "connectedTo": list(v.connected_to)}
+                for v in self.map.vents
+            ],
         }
 
     def public_state(self) -> dict:
@@ -1162,6 +1476,8 @@ class GameRoom:
         self.coffee_level = 100
         self.incidents = 0
         self.meeting_active_for = 0.0
+        self.lights_off = False
+        self.comms_down = False
         self.winner = None
         self.win_reason = None
         self.has_broadcast_end = False
@@ -1179,6 +1495,9 @@ class GameRoom:
         self._next_event_seq = 1
         self.bodies = {}
         self.takedown_cooldowns = {}
+        # Tier 3.1: clear mini-game state across rounds.
+        self.active_mini_games = {}
+        self.pending_mini_game_events = []
         for player in self.players.values():
             player.role = None
             player.team = None

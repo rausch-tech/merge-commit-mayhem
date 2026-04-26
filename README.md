@@ -52,4 +52,10 @@ Aktuell: 207 Tests grün.
 
 ## Lizenz
 
-Aktuell privates Repo, keine Lizenz definiert. Entscheidung pending.
+The source code of this project is licensed under the MIT License — see
+[`LICENSE`](LICENSE).
+
+Game assets, including logos, artwork, sprites, audio, and branding materials,
+are licensed separately. See [`ASSET_LICENSE.md`](ASSET_LICENSE.md) for the
+asset terms and `sounds/CREDITS.md` / `images/README.md` for third-party
+attributions.

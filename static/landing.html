@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <title>Merge Conflict Mayhem — Social Deduction für Tech-Teams</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Among-Us-artiges Multiplayer-Spiel für Tech-Teams. Release-Team gegen geheime Chaos-Agenten. 8-12 Minuten pro Runde, 4-12 Spieler, läuft im Browser."
+    />
+    <link rel="stylesheet" href="/static/landing.css" />
+    <link rel="preload" as="image" href="/images/logo.png" />
+    <link rel="preload" as="image" href="/images/figuren.png" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="/">
+          <span class="brand-prompt">$</span>
+          <span class="brand-name">merge-conflict-mayhem</span>
+        </a>
+        <nav class="topbar-nav">
+          <a href="#was-ist-das">Was ist das?</a>
+          <a href="#how-to-play">How to Play</a>
+          <a href="#rollen">Rollen</a>
+          <a href="#features">Features</a>
+          <a href="#roadmap">Roadmap</a>
+          <a href="#faq">FAQ</a>
+          <a class="topbar-cta" href="/play">Spielen &rarr;</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <!-- Hero -->
+      <section class="hero">
+        <div class="hero-grid">
+          <div class="hero-text">
+            <p class="kicker">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-yellow"></span>
+              <span class="dot dot-green"></span>
+              <span class="kicker-text">// social deduction für tech-teams</span>
+            </p>
+            <h1 class="hero-title">
+              <span class="hero-title-line">Merge Conflict</span>
+              <span class="hero-title-line accent">Mayhem<span class="caret">_</span></span>
+            </h1>
+            <p class="hero-sub">
+              Ein Among-Us-artiges Multiplayer-Spiel für Tech-Teams. Release-Team gegen geheime
+              Chaos-Agenten. 8&ndash;12 Minuten pro Runde. Direkt im Browser.
+            </p>
+            <div class="hero-cta">
+              <a class="btn btn-primary" href="/play">
+                <span class="btn-prompt">$</span>
+                ./join_room
+              </a>
+              <a
+                class="btn btn-ghost"
+                href="https://github.com/rausch-tech/merge-commit-mayhem"
+                target="_blank"
+                rel="noopener"
+              >
+                <span class="btn-prompt">git</span>
+                clone
+              </a>
+            </div>
+            <ul class="hero-meta">
+              <li><strong>4&ndash;12</strong> Spieler</li>
+              <li><strong>~10</strong> min / Runde</li>
+              <li><strong>0</strong> Downloads</li>
+              <li><strong>1</strong> URL</li>
+            </ul>
+          </div>
+          <div class="hero-visual">
+            <img class="hero-logo" src="/images/logo.png" alt="Merge Conflict Mayhem Logo" />
+            <div class="hero-characters" aria-hidden="true">
+              <div class="character" data-char="0"></div>
+              <div class="character" data-char="1"></div>
+              <div class="character" data-char="2"></div>
+              <div class="character" data-char="3"></div>
+              <div class="character" data-char="4"></div>
+              <div class="character" data-char="5"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Was ist das -->
+      <section id="was-ist-das" class="section">
+        <div class="section-head">
+          <span class="section-tag">// section_01</span>
+          <h2>Was ist das eigentlich?</h2>
+        </div>
+        <div class="prose">
+          <p>
+            Stell dir Among Us vor &mdash; aber statt Crewmates und Imposter sitzt dein Team mitten
+            im Release-Tag. Das <strong>Release-Team</strong> hetzt Tasks ab: Tests fixen, PRs
+            reviewen, Deployment reparieren, Kaffee nachfüllen. Im Hintergrund streuen
+            <strong>Chaos-Agenten</strong> Sabotagen ein: Pipeline rot, Mandatory Meeting, Merge
+            Conflict Storm.
+          </p>
+          <p>
+            Niemand weiß, wer auf welcher Seite steht. Wenn ein Body gefunden wird oder jemand
+            Verdacht schöpft, gibt's ein <strong>Emergency Meeting</strong>: 30 Sekunden
+            diskutieren, dann abstimmen. Wer fliegt raus, war's wirklich Chaos &mdash; oder hast du
+            gerade deinen besten Engineer entfernt?
+          </p>
+          <p class="prose-quote">
+            <span class="prose-quote-mark">&gt;</span>
+            Built als Lunch-Break-Game für Tech-Teams. Insider-Witze inklusive, Kill nicht.
+          </p>
+        </div>
+      </section>
+
+      <!-- How to Play -->
+      <section id="how-to-play" class="section section-alt">
+        <div class="section-head">
+          <span class="section-tag">// section_02</span>
+          <h2>How to Play</h2>
+        </div>
+        <ol class="steps">
+          <li class="step">
+            <div class="step-window">
+              <div class="window-bar">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+                <span class="window-title">terminal &mdash; step 1</span>
+              </div>
+              <div class="window-body">
+                <p class="cmd"><span class="prompt">$</span> open https://game.prod-is-lava.dev</p>
+                <p class="output">&rarr; Name eintippen, Raumcode vom Host eintragen, Join.</p>
+              </div>
+            </div>
+            <p class="step-caption">
+              <strong>1. Joinen.</strong> Ein Spieler erstellt einen Raum, teilt den 4-stelligen
+              Code in Slack. Alle anderen joinen mit Name + Code.
+            </p>
+          </li>
+          <li class="step">
+            <div class="step-window">
+              <div class="window-bar">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+                <span class="window-title">terminal &mdash; step 2</span>
+              </div>
+              <div class="window-body">
+                <p class="cmd"><span class="prompt">host&gt;</span> ./start_round</p>
+                <p class="output">
+                  &rarr; Rollen werden privat zugewiesen.<br />
+                  &rarr; Du bist <span class="role-tag role-developer">Developer</span> oder
+                  <span class="role-tag role-chaos">Vibe&nbsp;Coder</span>.
+                </p>
+              </div>
+            </div>
+            <p class="step-caption">
+              <strong>2. Rolle.</strong> Jeder sieht nur seine eigene Rolle. Developer wollen das
+              Release durchbringen, Vibe Coder wollen es kippen, ohne entdeckt zu werden.
+            </p>
+          </li>
+          <li class="step">
+            <div class="step-window">
+              <div class="window-bar">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+                <span class="window-title">terminal &mdash; step 3</span>
+              </div>
+              <div class="window-body">
+                <p class="cmd"><span class="prompt">$</span> wasd # bewegen</p>
+                <p class="cmd"><span class="prompt">$</span> e # task / interact</p>
+                <p class="output">
+                  &rarr; Tasks erledigen, Sabotagen reparieren, Verdächtige melden.
+                </p>
+              </div>
+            </div>
+            <p class="step-caption">
+              <strong>3. Spielen.</strong> WASD zum Bewegen, E für Interaktion. Release-Team gewinnt
+              bei 100% Release-Progress. Chaos gewinnt durch Voting-Mehrheit oder
+              Sabotage-Eskalation.
+            </p>
+          </li>
+        </ol>
+      </section>
+
+      <!-- Rollen -->
+      <section id="rollen" class="section">
+        <div class="section-head">
+          <span class="section-tag">// section_03</span>
+          <h2>Die zwei Teams</h2>
+        </div>
+        <div class="role-grid">
+          <article class="role-card role-card-dev">
+            <div class="role-card-head">
+              <div class="role-badge role-badge-dev"></div>
+              <div>
+                <h3>Developer</h3>
+                <p class="role-team">Release-Team</p>
+              </div>
+            </div>
+            <p class="role-desc">
+              Bring das Release über die Linie. Erledige Tasks, repariere Sabotagen, halte das Team
+              zusammen. Achtung: Du weißt nicht, wer Chaos ist &mdash; und falsche Anschuldigungen
+              kosten Stimmen.
+            </p>
+            <ul class="role-bullets">
+              <li><span class="check">+</span> Release-Progress hochpushen</li>
+              <li><span class="check">+</span> Pipeline-Stabilität halten</li>
+              <li><span class="check">+</span> Sabotagen reparieren</li>
+              <li><span class="check">+</span> Bodies melden, im Meeting argumentieren</li>
+            </ul>
+          </article>
+          <article class="role-card role-card-chaos">
+            <div class="role-card-head">
+              <div class="role-badge role-badge-chaos"></div>
+              <div>
+                <h3>Vibe Coder</h3>
+                <p class="role-team">Chaos-Agent</p>
+              </div>
+            </div>
+            <p class="role-desc">
+              Sabotiere das Release, ohne entdeckt zu werden. Triggere Sabotagen, blockiere die
+              Pipeline, eliminiere Developer im richtigen Moment &mdash; und überlebe das Voting.
+            </p>
+            <ul class="role-bullets">
+              <li><span class="cross">!</span> Sabotagen triggern (6 verfügbar)</li>
+              <li><span class="cross">!</span> Force-Reboot auf isolierte Spieler</li>
+              <li><span class="cross">!</span> Im Meeting Verdacht ablenken</li>
+              <li><span class="cross">!</span> Pipeline auf 0% drücken</li>
+            </ul>
+          </article>
+        </div>
+        <p class="role-note">
+          Bei 7+ Spielern gibt es <strong>2 Chaos-Agenten</strong> &mdash; die kennen sich
+          untereinander.
+        </p>
+      </section>
+
+      <!-- Features -->
+      <section id="features" class="section section-alt">
+        <div class="section-head">
+          <span class="section-tag">// section_04</span>
+          <h2>Was drin ist</h2>
+        </div>
+        <div class="feature-grid">
+          <div class="feature">
+            <span class="feature-glyph">[</span>
+            <h3>8 Tasks</h3>
+            <p>
+              Tests fixen, PRs reviewen, Deployment reparieren, Kaffee nachfüllen, Logs analysieren,
+              Legacy-Service beruhigen, Scope reduzieren, Release Notes schreiben.
+            </p>
+          </div>
+          <div class="feature">
+            <span class="feature-glyph">!</span>
+            <h3>6 Sabotagen</h3>
+            <p>
+              CI/CD rot, Kaffee leer, Mandatory Meeting, Merge Conflict Storm, Fake Customer
+              Request, Flaky Tests.
+            </p>
+          </div>
+          <div class="feature">
+            <span class="feature-glyph">@</span>
+            <h3>4&ndash;12 Spieler</h3>
+            <p>
+              Skaliert mit eurer Team-Größe. Multi-Chaos ab 7 Spielern. Alle joinen über Raumcode,
+              kein Account nötig.
+            </p>
+          </div>
+          <div class="feature">
+            <span class="feature-glyph">#</span>
+            <h3>Mehrere Maps</h3>
+            <p>
+              Default-Office plus Small-Map. Host wählt in der Lobby. Eigene Maps via Browser-Editor
+              unter <code>/editor</code> bauen.
+            </p>
+          </div>
+          <div class="feature">
+            <span class="feature-glyph">&gt;</span>
+            <h3>Force-Reboot &amp; Body-Report</h3>
+            <p>
+              Chaos kann Developer in der Nähe ausschalten. Lebende finden Bodies und triggern
+              Emergency Meetings.
+            </p>
+          </div>
+          <div class="feature">
+            <span class="feature-glyph">~</span>
+            <h3>Spectator-Mode</h3>
+            <p>
+              Eliminierte Spieler bleiben als Geist auf der Map, können weiter Tasks erledigen
+              &mdash; aber nicht mehr abstimmen.
+            </p>
+          </div>
+          <div class="feature">
+            <span class="feature-glyph">*</span>
+            <h3>Live-Eventfeed</h3>
+            <p>
+              Server-authoritativer Feed: &bdquo;Pipeline ist rot&ldquo;, &bdquo;Carol wurde
+              entfernt &mdash; war Chaos-Agent&ldquo;. Du verpasst nichts.
+            </p>
+          </div>
+          <div class="feature">
+            <span class="feature-glyph">?</span>
+            <h3>Reconnect</h3>
+            <p>
+              30 Sekunden Grace-Period bei Disconnect &mdash; Tab geschlossen? Refresh, Spieler
+              läuft weiter.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Roadmap-Status -->
+      <section id="roadmap" class="section">
+        <div class="section-head">
+          <span class="section-tag">// section_05</span>
+          <h2>Roadmap-Status</h2>
+        </div>
+        <div class="pipeline">
+          <div class="pipeline-stage stage-done">
+            <div class="stage-head">
+              <span class="stage-icon">[OK]</span>
+              <span class="stage-name">Tier 0 &mdash; Foundation</span>
+            </div>
+            <p class="stage-desc">Lint, CI, Docs, Deploy-Script, Reconnect, Edge-Cases.</p>
+          </div>
+          <div class="pipeline-arrow">&rarr;</div>
+          <div class="pipeline-stage stage-done">
+            <div class="stage-head">
+              <span class="stage-icon">[OK]</span>
+              <span class="stage-name">Tier 1 &mdash; Core-Mechaniken</span>
+            </div>
+            <p class="stage-desc">
+              Vollbild-Map, Eventfeed, Incidents, mehr Tasks &amp; Sabotagen, 4&ndash;12 Spieler,
+              Audio, Map-Editor, Multi-Map.
+            </p>
+          </div>
+          <div class="pipeline-arrow">&rarr;</div>
+          <div class="pipeline-stage stage-running">
+            <div class="stage-head">
+              <span class="stage-icon">[..]</span>
+              <span class="stage-name">Tier 2 &mdash; Among-Us-Features</span>
+            </div>
+            <p class="stage-desc">
+              Force-Reboot &amp; Spectator-Mode shipped. Vents, Lights- &amp; Comms-Sabotage als
+              nächstes.
+            </p>
+          </div>
+          <div class="pipeline-arrow">&rarr;</div>
+          <div class="pipeline-stage stage-pending">
+            <div class="stage-head">
+              <span class="stage-icon">[ &nbsp;]</span>
+              <span class="stage-name">Tier 3 &mdash; Godot-Migration</span>
+            </div>
+            <p class="stage-desc">
+              Polished Primary-Client mit Animationen, Tilemaps, Sound-Mixing. Browser bleibt als
+              Fallback.
+            </p>
+          </div>
+        </div>
+        <p class="roadmap-link">
+          Volle Roadmap inkl. Tier 4&ndash;6 (Polish, Mod-Support, Live-Service):
+          <a
+            href="https://github.com/rausch-tech/merge-commit-mayhem/blob/main/docs/ROADMAP.md"
+            target="_blank"
+            rel="noopener"
+            >docs/ROADMAP.md</a
+          >
+        </p>
+      </section>
+
+      <!-- FAQ -->
+      <section id="faq" class="section section-alt">
+        <div class="section-head">
+          <span class="section-tag">// section_06</span>
+          <h2>FAQ</h2>
+        </div>
+        <div class="faq-list">
+          <details class="faq-item">
+            <summary>Brauche ich was zu installieren?</summary>
+            <p>
+              Nein. Browser auf, <a href="/play">/play</a> öffnen, Raumcode eintippen, fertig.
+              Funktioniert auf Desktop in Chrome, Firefox und Safari.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Wie viele Leute brauche ich?</summary>
+            <p>
+              Minimum 4, Maximum 12. Sweet-Spot ist 6&ndash;8. Ab 7 Spielern gibt's automatisch 2
+              Chaos-Agenten, was die Diskussionen deutlich spannender macht.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Wie lange dauert eine Runde?</summary>
+            <p>
+              8&ndash;12 Minuten. Der Timer läuft 15 Minuten, die meisten Runden enden früher durch
+              Win-Condition (Release durch, Chaos-Parität, oder Pipeline-Crash).
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Voice-Chat?</summary>
+            <p>
+              Bringt eigenen mit &mdash; Discord, Slack-Huddle, Meet, was ihr eh nutzt. Das Spiel
+              hat absichtlich keinen eingebauten Voice-Chat, weil eure Tools eh besser sind.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Allein testen?</summary>
+            <p>
+              Ja &mdash; in der Lobby gibt's einen Demo-Mode-Toggle. Damit startest du allein, wirst
+              automatisch Chaos und kannst die Mechaniken durchklicken.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Eigene Maps bauen?</summary>
+            <p>
+              Klar. Browser-Map-Editor unter <a href="/editor">/editor</a>. Räume rechtecken, Wände
+              ziehen, Spawns und Task-Anker setzen, JSON exportieren, in
+              <code>maps/</code> committen.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Was läuft im Hintergrund?</summary>
+            <p>
+              Python 3.12 + FastAPI + WebSockets, autoritativer Server-Tick mit 20 Hz. Frontend ist
+              Vanilla JS + Canvas. Code ist Open-Source auf
+              <a
+                href="https://github.com/rausch-tech/merge-commit-mayhem"
+                target="_blank"
+                rel="noopener"
+                >GitHub</a
+              >.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Bug gefunden?</summary>
+            <p>
+              Issue auf
+              <a
+                href="https://github.com/rausch-tech/merge-commit-mayhem/issues"
+                target="_blank"
+                rel="noopener"
+                >GitHub</a
+              >
+              aufmachen oder einfach Sven anpingen.
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <!-- Final CTA -->
+      <section class="cta-final">
+        <div class="cta-window">
+          <div class="window-bar">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+            <span class="window-title">ready &mdash; press enter</span>
+          </div>
+          <div class="window-body">
+            <p class="cmd"><span class="prompt">$</span> ./start_lunch_break_round</p>
+            <p class="output">
+              &rarr; Spawning room...<br />
+              &rarr; Awaiting players (4&ndash;12)...<br />
+              &rarr; <span class="caret">_</span>
+            </p>
+            <a class="btn btn-primary btn-cta" href="/play">Spielen jetzt &rarr;</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <p>
+            <span class="brand-prompt">$</span>
+            merge-conflict-mayhem &mdash; built for tech-team lunch breaks
+          </p>
+          <a
+            class="footer-rausch"
+            href="https://rausch.se/"
+            target="_blank"
+            rel="noopener"
+            aria-label="RAUSCH technology"
+          >
+            <img
+              src="https://www.rausch.se/wp-content/uploads/RAUSCH-technology_Logo-white.svg"
+              alt="RAUSCH technology"
+            />
+          </a>
+        </div>
+        <p class="footer-links">
+          <a
+            href="https://github.com/rausch-tech/merge-commit-mayhem"
+            target="_blank"
+            rel="noopener"
+            >GitHub</a
+          >
+          <span class="footer-sep">/</span>
+          <a
+            href="https://github.com/rausch-tech/merge-commit-mayhem/blob/main/docs/ROADMAP.md"
+            target="_blank"
+            rel="noopener"
+            >Roadmap</a
+          >
+          <span class="footer-sep">/</span>
+          <a href="/editor">Map-Editor</a>
+          <span class="footer-sep">/</span>
+          <a href="/play">Spielen</a>
+          <span class="footer-sep">/</span>
+          <a href="https://rausch.se/impressum" target="_blank" rel="noopener">Impressum</a>
+        </p>
+      </div>
+    </footer>
+
+    <script type="module" src="/static/landing.js"></script>
+  </body>
+</html>

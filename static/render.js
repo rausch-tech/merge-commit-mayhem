@@ -80,6 +80,12 @@ export class Renderer {
     this.tasks = [];
     this.bodies = [];
     this.localPlayerInRange = null; // task-id of the task within interaction radius for the local player, else null
+    this.localPlayerNearPanel = null; // sabotage-id of an active repair panel within reach, else null (Tier 2.4)
+    this.activePanels = []; // [{sabotageId, x, y}] for currently-broken sabotages
+    this.lightsOff = false; // toggles the radial vignette (Tier 2.4)
+    this.vents = []; // [{id, x, y, connectedTo: [...]}] (Tier 2.3)
+    this.ownTeam = null; // 'release_team' | 'chaos_agents' | null
+    this.localPlayerNearVent = null; // vent object the local chaos player is in reach of, else null
     this._running = false;
     this.map = null; // populated via setMap()
     this._walls = []; // computed when setMap is called
@@ -96,6 +102,18 @@ export class Renderer {
   }
   setBodies(bodies) {
     this.bodies = bodies || [];
+  }
+  setActivePanels(panels) {
+    this.activePanels = panels || [];
+  }
+  setLightsOff(value) {
+    this.lightsOff = !!value;
+  }
+  setVents(vents) {
+    this.vents = vents || [];
+  }
+  setOwnTeam(team) {
+    this.ownTeam = team || null;
   }
 
   setMap(map) {
@@ -257,6 +275,87 @@ export class Renderer {
     }
     this.localPlayerInRange = inRange;
 
+    // Sabotage repair panels (Tier 2.4). Drawn before players so the player
+    // marker can stand on top.
+    const PANEL_INTERACT_RADIUS = 50; // mirror of SABOTAGE_PANEL_INTERACTION_RADIUS
+    let nearPanel = null;
+    for (const panel of this.activePanels) {
+      ctx.save();
+      // Pulsing red diamond — reads as "broken thing, fix me".
+      const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 220);
+      ctx.translate(panel.x, panel.y);
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = `rgba(239, 68, 68, ${pulse.toFixed(3)})`;
+      ctx.fillRect(-14, -14, 28, 28);
+      ctx.strokeStyle = "#0b0f1f";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-14, -14, 28, 28);
+      ctx.restore();
+      ctx.save();
+      ctx.fillStyle = "#fef2f2";
+      ctx.font = "bold 12px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("!", panel.x, panel.y);
+      ctx.restore();
+
+      if (local) {
+        const dx = local.x - panel.x;
+        const dy = local.y - panel.y;
+        if (dx * dx + dy * dy <= PANEL_INTERACT_RADIUS * PANEL_INTERACT_RADIUS) {
+          ctx.beginPath();
+          ctx.arc(panel.x, panel.y, PANEL_INTERACT_RADIUS, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(74, 222, 128, 0.85)";
+          ctx.lineWidth = 2;
+          ctx.setLineDash([6, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          if (!nearPanel) nearPanel = panel.sabotageId;
+        }
+      }
+    }
+    this.localPlayerNearPanel = nearPanel;
+
+    // Vents (Tier 2.3). Drawn for everyone — they are part of the world's
+    // architecture. Only chaos can interact with them.
+    const VENT_INTERACT_RADIUS = 50;
+    let nearVent = null;
+    for (const vent of this.vents) {
+      ctx.save();
+      // Dark steel grille icon — small rectangle with parallel lines.
+      ctx.fillStyle = "#1f2937";
+      ctx.fillRect(vent.x - 14, vent.y - 12, 28, 24);
+      ctx.strokeStyle = "#475569";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(vent.x - 14, vent.y - 12, 28, 24);
+      ctx.beginPath();
+      for (let i = 0; i < 4; i++) {
+        const yy = vent.y - 9 + i * 6;
+        ctx.moveTo(vent.x - 11, yy);
+        ctx.lineTo(vent.x + 11, yy);
+      }
+      ctx.strokeStyle = "#94a3b8";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+
+      if (this.ownTeam === "chaos_agents" && local) {
+        const dx = local.x - vent.x;
+        const dy = local.y - vent.y;
+        if (dx * dx + dy * dy <= VENT_INTERACT_RADIUS * VENT_INTERACT_RADIUS) {
+          ctx.beginPath();
+          ctx.arc(vent.x, vent.y, VENT_INTERACT_RADIUS, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(96, 165, 250, 0.7)";
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          if (!nearVent) nearVent = vent;
+        }
+      }
+    }
+    this.localPlayerNearVent = nearVent;
+
     // Bodies (rendered BEFORE players so live players draw on top).
     for (const body of this.bodies) {
       ctx.save();
@@ -340,6 +439,22 @@ export class Renderer {
       const displayName = player.name + (isDisconnected ? " (off)" : "");
       ctx.fillText(displayName, player.x, player.y - half - 6);
 
+      ctx.restore();
+    }
+
+    // Lights-out vignette (Tier 2.4). Applied AFTER world rendering, BEFORE
+    // we restore the camera transform so the cutout can follow the player in
+    // world space. Outside the cutout the canvas reads near-black; inside a
+    // ~150 px radius the world remains visible.
+    if (this.lightsOff && local) {
+      ctx.save();
+      const grad = ctx.createRadialGradient(local.x, local.y, 60, local.x, local.y, 220);
+      grad.addColorStop(0, "rgba(0, 0, 0, 0)");
+      grad.addColorStop(0.55, "rgba(0, 0, 0, 0.6)");
+      grad.addColorStop(1, "rgba(0, 0, 0, 0.95)");
+      ctx.fillStyle = grad;
+      // Cover the entire visible viewport in world coordinates.
+      ctx.fillRect(cameraX, cameraY, viewW, viewH);
       ctx.restore();
     }
 

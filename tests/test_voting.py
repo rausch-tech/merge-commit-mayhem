@@ -218,10 +218,10 @@ def test_eliminated_player_can_start_task():
     pid = ids[0]
     room.players[pid].is_alive = False
     # Place near a task.
-    tx, ty = room.task_position("fix_unit_tests")
+    tx, ty = room.task_position("review_pr")
     room.players[pid].x, room.players[pid].y = tx, ty
-    room.apply_task_hold_start(pid, "fix_unit_tests")
-    assert pid in room.tasks["fix_unit_tests"].per_player_progress
+    room.apply_task_hold_start(pid, "review_pr")
+    assert pid in room.tasks["review_pr"].per_player_progress
 
 
 def test_eliminated_chaos_cannot_sabotage():

@@ -6,19 +6,35 @@ Dieses Dokument ist der **eine** Plan. Es ist die Wahrheit über den Stand und d
 
 ---
 
-## Stand (2026-04-25)
+## Stand (2026-04-26)
 
-|                        |                                                                                                                                 |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Repo**               | https://github.com/rausch-tech/merge-commit-mayhem                                                                              |
-| **Live (Test-Server)** | https://game.prod-is-lava.dev                                                                                                   |
-| **Backend-Tests**      | 207 grün (`uv run pytest`)                                                                                                      |
-| **Stack**              | Python 3.12 + FastAPI + Pydantic v2 + WebSockets, Vanilla JS + Canvas, Map als JSON-Daten                                       |
-| **Geshippt**           | 8 getaggte Slices: lobby-movement → game-loop → scrolling-camera → spritesheets → character-sprites → walls → voting → map-data |
+|                         |                                                                                                                                                                                                                                                                                                                       |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Repo**                | https://github.com/rausch-tech/merge-commit-mayhem                                                                                                                                                                                                                                                                    |
+| **Live (Test-Server)**  | https://game.prod-is-lava.dev                                                                                                                                                                                                                                                                                         |
+| **Backend-Tests**       | 433 grün (`uv run pytest`)                                                                                                                                                                                                                                                                                            |
+| **Frontend-Tests**      | 27 grün (`npx vitest run`)                                                                                                                                                                                                                                                                                            |
+| **Stack**               | Python 3.12 + FastAPI + Pydantic v2 + WebSockets, Vanilla JS + Canvas, Map als JSON-Daten, Vitest + happy-dom für Frontend-Smoke                                                                                                                                                                                      |
+| **Geshippte Tier 0–3**  | Foundation cleanup, Mechanik-Komplettierung, Among-Us-Features, Mini-Game-Framework — alles auf Live deployt                                                                                                                                                                                                          |
+| **Geshippte Slice-IDs** | lobby-movement → game-loop → scrolling-camera → spritesheets → character-sprites → walls → voting → map-data → eventfeed → incidents → tasks-1.4 → sabotages-1.4 → multi-chaos → audio-mute → map-editor → multi-map → in-game-menu → take-down → spectator → lights-out → vents → comms-outage → minigames-framework |
 
-Was funktioniert: drei Browser-Tabs joinen einen Raum, Host startet, Rollen werden privat verteilt, Spieler bewegen sich mit WASD durch eine 2400×1600-Karte mit Räumen + Wänden + Türen, machen Tasks, Chaos sabotiert, Voting im War Room kann Spieler eliminieren, Endscreen mit Rollen-Reveal. Demo-Mode für Solo-Test.
+**Was funktioniert (Live, Stand 2026-04-26):**
 
-Was noch nicht: vents, killable players + body discovery, lights/comms-Sabotage, eventfeed, take-down-Mechanik. Außerdem: Code-Hygiene (kein Lint, keine CI, keine Frontend-Tests), Doku unvollständig (kein protocol.md, kein contributing.md), 4 Tasks und 3 Sabotagen sind nach 5 min repetitiv.
+- 4–12 Spieler joinen einen Raum (Multi-Map-Auswahl in Lobby, Map-Editor unter `/editor`).
+- 4800×3200-Map mit Räumen, Wänden, Türen, Vents, Sabotage-Panels. Camera scrollt am Spieler.
+- Rollen werden privat verteilt (vibe_coder/developer, mehrere Chaos ab 7 Spielern).
+- Hold-E auf 7 von 8 Tasks; `fix_unit_tests` startet das Mini-Game „Test-Suite reparieren" (klick 5 Tests in numerischer Reihenfolge).
+- 7 Sabotagen: ci_cd_red, coffee_outage, mandatory_meeting, merge_conflict_storm, fake_customer_request, flaky_tests, lights_out (Vignette + Repair am Panel im Server-Room), comms_outage (Slack-Down: Tasks + andere Sabotagen blockiert, Repair am Panel im War-Room).
+- Take-Down + Body-Discovery + Report-Trigger; Spectator-Mode für Geister (können noch Tasks erledigen).
+- Vents: Chaos-only Teleport-Netzwerk, V-Taste cycelt durch Verbindungen.
+- Voting + Endscreen mit Rollen-Reveal; In-Game-Menü via ESC mit Lobby verlassen / Runde beenden / Audio.
+- Eventfeed rechts neben Canvas; konsistente HUD-Stats (Release, Pipeline, Coffee, Incidents, Timer, Rolle).
+- Auto-Deploy auf jedem main-Push via GitHub Actions; CI gates pytest + vitest + ruff (lint+format) + prettier.
+
+**Offen vor dem Godot-Sprint:**
+
+- 0.13 Live-Test mit Team — die einzige Tier-0-Lücke; bestätigt Tier 0–3 in echter Spielsituation.
+- Asset-Pipeline-Entscheidung (Tier 4.0.x) bevor Tier 4 startet.
 
 ---
 
@@ -49,7 +65,7 @@ Sechs Tier, in der Reihenfolge wie sie gebaut werden sollten. Jedes Tier hat ein
 | ---- | --------------------------------------------------------------------------------------------------- | --------- |
 | 0.1  | **Lint + Format** — `ruff` für Python, `prettier` für JS, pre-commit-Hook                           | ✅ done   |
 | 0.2  | **CI auf GitHub Actions** — pytest + ruff + prettier bei jedem Push/PR                              | ✅ done   |
-| 0.3  | **Frontend-Tests** — Vitest + happy-dom, Smoke-Coverage pro JS-Modul                                | offen     |
+| 0.3  | **Frontend-Tests** — Vitest + happy-dom, Smoke-Coverage pro JS-Modul                                | ✅ done   |
 | 0.4  | **`docs/PROTOCOL.md`** — vollständiger WebSocket-Vertrag                                            | ✅ done   |
 | 0.5  | **`docs/ARCHITECTURE.md`** — high-level Overview                                                    | ✅ done   |
 | 0.6  | **`docs/DEPLOY.md`** — Deploy-Workflow                                                              | ✅ done   |
@@ -71,18 +87,18 @@ Sechs Tier, in der Reihenfolge wie sie gebaut werden sollten. Jedes Tier hat ein
 
 **Aufwand:** ~1.5 Wochen.
 
-| #   | Was                                                                                                                                                      | Status   |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| 1.0 | **Canvas-Vollbild + Map 2× größer** — Canvas füllt das Browser-Fenster, Map skaliert von 2400×1600 auf 4800×3200, Timer 720s → 900s                      | ✅ done  |
-| 1.1 | **Eventfeed** — Live-Feed rechts neben Canvas: „Pipeline ist rot", „PR gemerged", „Carol wurde entfernt — war Chaos-Agent". Trigger durch Server-Events. | ✅ done  |
-| 1.2 | **Incidents-Mechanik** — drittes Stat im HUD. Tasks „Logs analysieren" + „Legacy-Service beruhigen" reduzieren. Eine zukünftige Sabotage erzeugt sie.    | ✅ done  |
-| 1.3 | **Mehr Tasks** — vier zusätzliche aus dem Master-Doc: Logs analysieren, Legacy-Service beruhigen, Scope reduzieren, Release Notes schreiben              | ✅ done  |
-| 1.4 | **Mehr Sabotagen** — Merge Conflict Storm, Fake Customer Request, Flaky Tests                                                                            | ✅ done  |
-| 1.5 | **Spielerzahl 4–12** — MAX_PLAYERS auf 12, Color-Palette erweitern, Multi-Chaos bei großen Lobbys (2 Chaos ab 7 Spielern)                                | ✅ done  |
-| 1.6 | **Mute-Toggle / Volume-Slider** — Audio-Hygiene                                                                                                          | ✅ done  |
-| 1.7 | **Map-Editor (Phase 1)** — Browser-Editor unter `/editor`: Räume rechtecken, Wand-Linien + Türen, Spawns, Task-Anker. JSON-Export.                       | ✅ done  |
-| 1.8 | **Multi-Map-Support** — Lobby-Dropdown, mehrere `maps/*.json`, Host wählt                                                                                | ✅ done  |
-| 1.9 | **In-Game-Menü** — ESC-Overlay mit Lobby verlassen (alle), Runde beenden (host-only), Audio-Controls reingezogen, Rolle/Aufgaben-Recap                   | ~1 Tag   |
+| #   | Was                                                                                                                                                      | Status  |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 1.0 | **Canvas-Vollbild + Map 2× größer** — Canvas füllt das Browser-Fenster, Map skaliert von 2400×1600 auf 4800×3200, Timer 720s → 900s                      | ✅ done |
+| 1.1 | **Eventfeed** — Live-Feed rechts neben Canvas: „Pipeline ist rot", „PR gemerged", „Carol wurde entfernt — war Chaos-Agent". Trigger durch Server-Events. | ✅ done |
+| 1.2 | **Incidents-Mechanik** — drittes Stat im HUD. Tasks „Logs analysieren" + „Legacy-Service beruhigen" reduzieren. Eine zukünftige Sabotage erzeugt sie.    | ✅ done |
+| 1.3 | **Mehr Tasks** — vier zusätzliche aus dem Master-Doc: Logs analysieren, Legacy-Service beruhigen, Scope reduzieren, Release Notes schreiben              | ✅ done |
+| 1.4 | **Mehr Sabotagen** — Merge Conflict Storm, Fake Customer Request, Flaky Tests                                                                            | ✅ done |
+| 1.5 | **Spielerzahl 4–12** — MAX_PLAYERS auf 12, Color-Palette erweitern, Multi-Chaos bei großen Lobbys (2 Chaos ab 7 Spielern)                                | ✅ done |
+| 1.6 | **Mute-Toggle / Volume-Slider** — Audio-Hygiene                                                                                                          | ✅ done |
+| 1.7 | **Map-Editor (Phase 1)** — Browser-Editor unter `/editor`: Räume rechtecken, Wand-Linien + Türen, Spawns, Task-Anker. JSON-Export.                       | ✅ done |
+| 1.8 | **Multi-Map-Support** — Lobby-Dropdown, mehrere `maps/*.json`, Host wählt                                                                                | ✅ done |
+| 1.9 | **In-Game-Menü** — ESC-Overlay mit Lobby verlassen (alle), Runde beenden (host-only), Audio-Controls reingezogen, Rolle/Aufgaben-Recap                   | ~1 Tag  |
 
 **Done-Kriterium:** Browser-Client deckt das gesamte Master-Doc-MVP ab plus Eventfeed plus Map-Editor plus In-Game-Menü. Mit 8 Leuten testbar. Multi-Map-Auswahl in der Lobby. Spieler können die Runde jederzeit verlassen, Host kann sie beenden.
 
@@ -92,121 +108,137 @@ Sechs Tier, in der Reihenfolge wie sie gebaut werden sollten. Jedes Tier hat ein
 
 **Aufwand:** ~2 Wochen.
 
-| #   | Was                                                                                                                                                                                                                     | Aufwand  | Naming-Idee                                           |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------- |
-| 2.1 | **Take-Down-Mechanik** — Chaos kann Spieler im Proximity-Radius außer Gefecht setzen. Cooldown ~25 s. Kein Take-Down im War Room (Sicherheitszone).                                                                     | 1 Tag    | „Force-Reboot", „Captcha-Loop", „LinkedIn-Spam-Blast" |
-| 2.2 | **Body-Discovery + Report** — eliminierte Spieler bleiben als „Body" sichtbar bis entdeckt. Lebende Spieler in Proximity können Report-Button drücken → triggert Meeting.                                               | 1.5 Tage | „Stale-Process-Found", Ghost = „Coredumped Engineer"  |
-| 2.3 | **Vents** — Chaos kann zwischen vorab-definierten Punkten teleportieren. Map-JSON kriegt `vents: [...]`-Feld. Animation + Sound.                                                                                        | 1.5 Tage | „SSH-Tunnel", „Internal-Pipeline"                     |
-| 2.4 | **Lights-Sabotage** — Sichtbarkeits-Reduktion: Viewport bekommt Vignette, Spieler sehen nur ~150 px Radius um sich herum. Repariert durch Interact mit „Electrical Panel" (im Server Room).                             | 1 Tag    | „PagerDuty-Storm" / „Production-Outage"               |
-| 2.5 | **Comms-Sabotage** — Tasks-Sidebar wird leer (kann nicht erfüllt werden), Sabotage-Buttons disabled. Repariert durch Interact mit „Comms Panel" (im War Room).                                                          | 1 Tag    | „Slack-Down", „Confluence-Outage"                     |
-| 2.6 | **Spectator-Mode für Geister** — Tote Spieler können sich frei durch die Map bewegen, andere Geister sehen, Lebende sehen sie nicht. Tasks erfüllen können sie weiter (helfen Release-Team), aber nicht mehr abstimmen. | 1 Tag    | „Coredumped"                                          |
+| #   | Was                                                                                                                                                                                                                     | Status  | Naming-Idee                                           |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ----------------------------------------------------- |
+| 2.1 | **Take-Down-Mechanik** — Chaos kann Spieler im Proximity-Radius außer Gefecht setzen. Cooldown ~25 s. Kein Take-Down im War Room (Sicherheitszone).                                                                     | ✅ done | „Force-Reboot", „Captcha-Loop", „LinkedIn-Spam-Blast" |
+| 2.2 | **Body-Discovery + Report** — eliminierte Spieler bleiben als „Body" sichtbar bis entdeckt. Lebende Spieler in Proximity können Report-Button drücken → triggert Meeting.                                               | ✅ done | „Stale-Process-Found", Ghost = „Coredumped Engineer"  |
+| 2.3 | **Vents** — Chaos kann zwischen vorab-definierten Punkten teleportieren. Map-JSON kriegt `vents: [...]`-Feld. Animation + Sound.                                                                                        | ✅ done | „SSH-Tunnel", „Internal-Pipeline"                     |
+| 2.4 | **Lights-Sabotage** — Sichtbarkeits-Reduktion: Viewport bekommt Vignette, Spieler sehen nur ~150 px Radius um sich herum. Repariert durch Interact mit „Electrical Panel" (im Server Room).                             | ✅ done | „PagerDuty-Storm" / „Production-Outage"               |
+| 2.5 | **Comms-Sabotage** — Tasks-Sidebar wird leer (kann nicht erfüllt werden), Sabotage-Buttons disabled. Repariert durch Interact mit „Comms Panel" (im War Room).                                                          | ✅ done | „Slack-Down", „Confluence-Outage"                     |
+| 2.6 | **Spectator-Mode für Geister** — Tote Spieler können sich frei durch die Map bewegen, andere Geister sehen, Lebende sehen sie nicht. Tasks erfüllen können sie weiter (helfen Release-Team), aber nicht mehr abstimmen. | ✅ done | „Coredumped"                                          |
 
 Naming-Prinzip: nerdig, dev-thematisch, „kill" wird vermieden zugunsten von harmlos-witzigen Tech-Bezeichnungen. Final-Naming entscheiden wir bei Implementation jeder Slice.
 
 **Done-Kriterium:** Alle 6 Features implementiert + getestet. Game spielt sich „wie Among Us, aber dev-themed". Mit Live-Tests bestätigt.
 
-### Pre-Tier-3 — Godot-Bootstrapping-Spike (code done, runtime-verification offen)
+### Tier 3 — Mini-Games (Task-Tiefe)
 
-**Ziel:** Protokoll-Annahmen vor dem Tier-3-Sprint validieren, Doku-Lücken schließen, Skelett-Repo-Struktur etablieren.
+**Ziel:** Tasks fühlen sich nicht mehr wie „hinlaufen + E drücken" an. Jede Task wird zu einem kleinen Spiel — entscheidende Spannungsquelle, weil ein Spieler an einer Task „sichtbar beschäftigt" sein muss und Saboteure das ausnutzen können.
+
+**Aufwand:** ~3 Tage (für Framework + Beispiel). Erweiterung auf alle Tasks erfolgt iterativ in folgenden Slices, sobald sich das Pattern bewährt hat.
+
+**Reihenfolge:** kommt **vor** Godot, weil das Mini-Game-API die Godot-Migration prägt. Wird das API in Browser ausgereift festgelegt, spart Tier 4 (Godot) doppelte Arbeit.
+
+| #   | Was                                                                                                                                                                                      | Status  |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 3.1 | **Mini-Game-Framework** — Server: Task-Schema kriegt `mini_game: str`. WS: `mini_game_started` / `mini_game_input` / `mini_game_state` / `mini_game_completed`. Client: pluggable Modal. | ✅ done |
+| 3.2 | **Beispiel: „Test-Suite reparieren"** (für `fix_unit_tests`) — Liste aus 5 fehlerhaften Tests, klick die Bugs in der richtigen Reihenfolge weg.                                          | ✅ done |
+
+**Done-Kriterium:** Eine Task läuft komplett über ein Mini-Game (Server-validiert), die anderen 7 bleiben Hold-E. Das Mini-Game-API ist dokumentiert und Live-getestet, sodass weitere Mini-Games als eigene Slices folgen können (Code-Review-Simulator, Logs-Filtern, Coffee-Pour-Timing usw.).
+
+### Pre-Tier-4 — Godot-Bootstrapping-Spike (code done, runtime-verification offen)
+
+**Ziel:** Protokoll-Annahmen vor dem Tier-4-Sprint validieren, Doku-Lücken schließen, Skelett-Repo-Struktur etablieren. Ist parallel zu Tier 3 (Mini-Games) entstanden — Tier 3 betrifft den Spike nicht (Mini-Games sind Browser-only und kommen über das Mini-Game-API in Tier 4 nach).
 
 | #    | Was                                                                                                                                | Status                                  |
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| P3.0 | `godot/`-Subfolder, `project.godot`, Branch `slice/godot-spike`, `.gitignore`                                                      | done                                    |
-| P3.1 | `docs/CLIENT.md` mit Koordinaten/Tick/Reconnect-Sektionen + Test-Plan                                                              | done                                    |
-| P3.2 | Spike-Code: Connect, Map-Render, Player-Boxen, Input mit Snapshot-Interpolation                                                    | done                                    |
-| P3.3 | Pre-Spike-Doku-Fixes auf `main` (PROTOCOL.md: rejoin/multi-map/game_state/private_state, maps.md: Map-Größe, REJOIN_NOT_AVAILABLE) | done (commit `19ecbbf`)                 |
-| P3.4 | Runtime-Verification mit echtem Godot 4.3 Editor — siehe `docs/CLIENT.md §6` Test-Plan                                             | offen (wartet auf lokalen Godot-Editor) |
+| P4.0 | `godot/`-Subfolder, `project.godot`, Branch `slice/godot-spike`, `.gitignore`                                                      | ✅ done                                 |
+| P4.1 | `docs/CLIENT.md` mit Koordinaten/Tick/Reconnect-Sektionen + Test-Plan                                                              | ✅ done                                 |
+| P4.2 | Spike-Code: Connect, Map-Render, Player-Boxen, Input mit Snapshot-Interpolation                                                    | ✅ done                                 |
+| P4.3 | Pre-Spike-Doku-Fixes auf `main` (PROTOCOL.md: rejoin/multi-map/game_state/private_state, maps.md: Map-Größe, REJOIN_NOT_AVAILABLE) | ✅ done                                 |
+| P4.4 | Runtime-Verification mit echtem Godot 4.3 Editor — siehe `docs/CLIENT.md §6` Test-Plan                                             | offen (wartet auf lokalen Godot-Editor) |
 
-**Spec:** `docs/superpowers/specs/2026-04-26-godot-spike-design.md`. **Plan:** `docs/superpowers/plans/2026-04-26-godot-spike.md`.
+**Spec:** `docs/superpowers/specs/2026-04-26-godot-spike-design.md`. **Plan:** `docs/superpowers/plans/2026-04-26-godot-spike.md`. **Resume-Notes:** `docs/superpowers/notes/2026-04-26-godot-spike-resume.md`.
 
-**Branch:** `slice/godot-spike` (im Worktree `.worktrees/godot-spike/`). Merge nach `main` erst nach P3.4 + ggf. den daraus folgenden Code-Anpassungen.
+**Branch:** `slice/godot-spike` (im Worktree `.worktrees/godot-spike/`). Merge nach `main` erst nach P4.4 + ggf. den daraus folgenden Code-Anpassungen.
 
-### Tier 3 — Godot-Migration
+### Tier 4 — Godot-Migration
 
 **Ziel:** Browser-Client bleibt als Web-Fallback und Reference-Implementation. Godot wird der polished primary client mit echten Charakter-Animationen, Tilemaps, Sound-Mixing und Particle-Effects.
 
 **Aufwand:** ~5–7 Wochen.
 
-Der Godot-Sprint kommt **nach** Tier 0–2 (und nach Pre-Tier-3-Runtime-Verification), weil:
+Der Godot-Sprint kommt **nach** Tier 0–3 (und nach der Pre-Tier-4-Runtime-Verification), weil:
 
 - Mit unfinishedem Browser doppelte Feature-Arbeit
 - Ohne Foundation-Cleanup (Tier 0) keine Test-Sicherheit beim Porten
-- Without Among-Us-Features im Browser (Tier 2) keine klare Spec für Godot
+- Ohne Among-Us-Features im Browser (Tier 2) keine klare Spec für Godot
+- Ohne Mini-Game-API im Browser (Tier 3) doppelte Mini-Game-Arbeit in Godot
 
 #### Vor-Godot-Block (Decisions, ~1 Woche)
 
 | #     | Was                                                                                                                    | Status           |
 | ----- | ---------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| 3.0.1 | Asset-Pipeline-Entscheidung — Pixel-Art-Pack einkaufen + AI-generierte DevOps-Sprites (Coffee-Maschinen, Server-Racks) | Sven entscheidet |
-| 3.0.2 | Asset-Pack-Beschaffung — itch.io / Humble / Synty research + Lizenz-Doku                                               | 1 Tag            |
-| 3.0.3 | DevOps-Theme-Sprites generieren oder commission'en (Coffee, Server, Bug, etc.)                                         | 1–3 Tage         |
+| 4.0.1 | Asset-Pipeline-Entscheidung — Pixel-Art-Pack einkaufen + AI-generierte DevOps-Sprites (Coffee-Maschinen, Server-Racks) | Sven entscheidet |
+| 4.0.2 | Asset-Pack-Beschaffung — itch.io / Humble / Synty research + Lizenz-Doku                                               | 1 Tag            |
+| 4.0.3 | DevOps-Theme-Sprites generieren oder commission'en (Coffee, Server, Bug, etc.)                                         | 1–3 Tage         |
 
 #### Godot-Sprint (~4–6 Wochen)
 
 | #    | Paket                                                                                                                        | Aufwand  |
 | ---- | ---------------------------------------------------------------------------------------------------------------------------- | -------- |
-| 3.1  | Godot 4 Projekt-Setup, Web-Export-Config, WebSocketPeer-Anbindung                                                            | 1 Tag    |
-| 3.2  | Lobby-Scene (UI, Raumcode-Input, Spielerliste, Map-Auswahl, Start)                                                           | 1–2 Tage |
-| 3.3  | Map-Loader: Map-JSON → Tilemap-Layer dynamisch                                                                               | 2 Tage   |
-| 3.4  | Charakter-Scene: Sprites + 4-Richtungs-Idle/Walk-Animation + Movement-Interpolation                                          | 2–3 Tage |
-| 3.5  | HUD + Stat-Pills + Rolle + Timer mit Tween-Animationen                                                                       | 1 Tag    |
-| 3.6  | Task-Interaktion (Hold-E + Progress-Ring + Completion-VFX)                                                                   | 1 Tag    |
-| 3.7  | Sabotage-Buttons mit Cooldown-Anzeige                                                                                        | 1 Tag    |
-| 3.8  | Voting-Overlay + Result-Toast mit Slide-Animationen                                                                          | 1 Tag    |
-| 3.9  | Endscreen mit Rollen-Reveal + Stats + Confetti-Particles                                                                     | 1 Tag    |
-| 3.10 | Among-Us-Features: Vents (Animation + Sound), Body-Discovery + Report, Take-Down-Animation, Lights/Comms-VFX, Spectator-Mode | 5–8 Tage |
-| 3.11 | Sound-Integration (Footsteps, UI-SFX, BGM)                                                                                   | 1 Tag    |
-| 3.12 | Polish + Bug-Fixes                                                                                                           | 3–5 Tage |
-| 3.13 | Web-Export-Deploy auf gleiche EC2                                                                                            | 0.5 Tag  |
+| 4.1  | Godot 4 Projekt-Setup, Web-Export-Config, WebSocketPeer-Anbindung                                                            | 1 Tag    |
+| 4.2  | Lobby-Scene (UI, Raumcode-Input, Spielerliste, Map-Auswahl, Start)                                                           | 1–2 Tage |
+| 4.3  | Map-Loader: Map-JSON → Tilemap-Layer dynamisch                                                                               | 2 Tage   |
+| 4.4  | Charakter-Scene: Sprites + 4-Richtungs-Idle/Walk-Animation + Movement-Interpolation                                          | 2–3 Tage |
+| 4.5  | HUD + Stat-Pills + Rolle + Timer mit Tween-Animationen                                                                       | 1 Tag    |
+| 4.6  | Task-Interaktion (Mini-Game-Modals via Tier-3-API + Progress-Ring + Completion-VFX)                                          | 2 Tage   |
+| 4.7  | Sabotage-Buttons mit Cooldown-Anzeige                                                                                        | 1 Tag    |
+| 4.8  | Voting-Overlay + Result-Toast mit Slide-Animationen                                                                          | 1 Tag    |
+| 4.9  | Endscreen mit Rollen-Reveal + Stats + Confetti-Particles                                                                     | 1 Tag    |
+| 4.10 | Among-Us-Features: Vents (Animation + Sound), Body-Discovery + Report, Take-Down-Animation, Lights/Comms-VFX, Spectator-Mode | 5–8 Tage |
+| 4.11 | Sound-Integration (Footsteps, UI-SFX, BGM)                                                                                   | 1 Tag    |
+| 4.12 | Polish + Bug-Fixes                                                                                                           | 3–5 Tage |
+| 4.13 | Web-Export-Deploy auf gleiche EC2                                                                                            | 0.5 Tag  |
 
 **Done-Kriterium:** Godot-Web-Build läuft auf gleichem Server, fühlt sich „wie Among Us, dev-themed" an, hat mindestens dieselbe Featuredecke wie Browser-Client, plus Tier-2-Animationen + Sound + Particles.
 
-### Tier 4 — Polish + Distribution
+### Tier 5 — Polish + Distribution
 
 **Ziel:** „echt fertig"-Niveau. Was zwischen Beta und „würde ich öffentlich zeigen" liegt.
 
 | #   | Was                                                                                                                                | Aufwand  |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| 4.1 | **BGM** — kuratierte Tracks, Mute-Toggle, Volume-Slider                                                                            | 0.5 Tag  |
-| 4.2 | **Mobile-Layout** (Tablet 1024px) + Touch-Controls (virtual joystick)                                                              | 1 Woche  |
-| 4.3 | **Account-System** (light) — Profil mit Skin-Auswahl, Win-Stats                                                                    | 3–5 Tage |
-| 4.4 | **Custom Skins** — neben Color auch Hat-/Pet-Variationen, kosmetisch                                                               | 2–3 Tage |
-| 4.5 | **Bessere Animationen** — Reaction-Idles, Walking-Wackel, Death-Pose                                                               | ongoing  |
-| 4.6 | **Lobby-Link-Sharing** — URL mit Raumcode, evtl. QR                                                                                | 0.5 Tag  |
-| 4.7 | **Better Error-Handling** — Toast-System mit Severity-Levels                                                                       | 0.5 Tag  |
-| 4.8 | **Settings-Menü** — Sound, Sprache, Tastenkonfiguration                                                                            | 1 Tag    |
-| 4.9 | **Endscreen-Awards** — „Held der Kaffeemaschine", „Pipeline Whisperer", „Most Suspicious Innocent", basierend auf Per-Player-Stats | 1 Tag    |
+| 5.1 | **BGM** — kuratierte Tracks, Mute-Toggle, Volume-Slider                                                                            | 0.5 Tag  |
+| 5.2 | **Mobile-Layout** (Tablet 1024px) + Touch-Controls (virtual joystick)                                                              | 1 Woche  |
+| 5.3 | **Account-System** (light) — Profil mit Skin-Auswahl, Win-Stats                                                                    | 3–5 Tage |
+| 5.4 | **Custom Skins** — neben Color auch Hat-/Pet-Variationen, kosmetisch                                                               | 2–3 Tage |
+| 5.5 | **Bessere Animationen** — Reaction-Idles, Walking-Wackel, Death-Pose                                                               | ongoing  |
+| 5.6 | **Lobby-Link-Sharing** — URL mit Raumcode, evtl. QR                                                                                | 0.5 Tag  |
+| 5.7 | **Better Error-Handling** — Toast-System mit Severity-Levels                                                                       | 0.5 Tag  |
+| 5.8 | **Settings-Menü** — Sound, Sprache, Tastenkonfiguration                                                                            | 1 Tag    |
+| 5.9 | **Endscreen-Awards** — „Held der Kaffeemaschine", „Pipeline Whisperer", „Most Suspicious Innocent", basierend auf Per-Player-Stats | 1 Tag    |
 
 **Done-Kriterium:** Spielt sich auf Desktop + Tablet flüssig. Sieht poliert aus. Es gibt Wiederspielwert (Awards, Skins, Stats).
 
-### Tier 5 — Community + Mod-Support
+### Tier 6 — Community + Mod-Support
 
 **Ziel:** Anderer Devs in deinem Team können Inhalte beitragen ohne Code-Touch.
 
 | #   | Was                                                                                                                                                                                                                                             | Aufwand  |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| 5.1 | **Tasks aus JSON** (`tasks.json`) — Reward-Werte, Räume, Dauern. Code lädt validiert.                                                                                                                                                           | 1 Tag    |
-| 5.2 | **Sabotagen aus JSON** (`sabotages.json`)                                                                                                                                                                                                       | 1 Tag    |
-| 5.3 | **Rollen aus JSON** (`roles.json`) — Team, Description, available Sabotagen, Spezial-Fähigkeiten                                                                                                                                                | 1.5 Tage |
-| 5.4 | **Eventtexte aus JSON** (`event_texts.json`) — Pool pro Event-Typ, zufällig                                                                                                                                                                     | 0.5 Tag  |
-| 5.5 | **Map-Editor Phase 2** — Live-Preview (Map sofort spielen), Validierung visualisieren, mehrere Maps gleichzeitig                                                                                                                                | 2–3 Tage |
-| 5.6 | **Map-Browser** — Liste aller `maps/*.json` mit Vorschau, Hot-Reload                                                                                                                                                                            | 1 Tag    |
-| 5.7 | **Erweiterte Rollen** — Data Wizard, Consultant, Shadow Admin, Incident Commander, Caffeine Collector, Bug Squasher, Legacy Oracle, Scrum Master mit Spezial-Fähigkeiten (Auto-Fix Bot, Distract, Speed Boost, Coffee Run, Scan Logs, Rollback) | 2 Wochen |
-| 5.8 | **Insider-Gags + Memes** — kuratiert von Sven + Team, im Pool                                                                                                                                                                                   | ongoing  |
+| 6.1 | **Tasks aus JSON** (`tasks.json`) — Reward-Werte, Räume, Dauern. Code lädt validiert.                                                                                                                                                           | 1 Tag    |
+| 6.2 | **Sabotagen aus JSON** (`sabotages.json`)                                                                                                                                                                                                       | 1 Tag    |
+| 6.3 | **Rollen aus JSON** (`roles.json`) — Team, Description, available Sabotagen, Spezial-Fähigkeiten                                                                                                                                                | 1.5 Tage |
+| 6.4 | **Eventtexte aus JSON** (`event_texts.json`) — Pool pro Event-Typ, zufällig                                                                                                                                                                     | 0.5 Tag  |
+| 6.5 | **Map-Editor Phase 2** — Live-Preview (Map sofort spielen), Validierung visualisieren, mehrere Maps gleichzeitig                                                                                                                                | 2–3 Tage |
+| 6.6 | **Map-Browser** — Liste aller `maps/*.json` mit Vorschau, Hot-Reload                                                                                                                                                                            | 1 Tag    |
+| 6.7 | **Erweiterte Rollen** — Data Wizard, Consultant, Shadow Admin, Incident Commander, Caffeine Collector, Bug Squasher, Legacy Oracle, Scrum Master mit Spezial-Fähigkeiten (Auto-Fix Bot, Distract, Speed Boost, Coffee Run, Scan Logs, Rollback) | 2 Wochen |
+| 6.8 | **Insider-Gags + Memes** — kuratiert von Sven + Team, im Pool                                                                                                                                                                                   | ongoing  |
 
 **Done-Kriterium:** Person ohne Code-Wissen kann eine neue Sabotage via Pull-Request beitragen. `docs/CONTRIBUTING.md` reicht aus dafür.
 
-### Tier 6 — Live-Service-Phase
+### Tier 7 — Live-Service-Phase
 
 **Ziel:** Das Game lebt. Wir oder Community erweitern es regelmäßig.
 
 | #   | Was                                                                                  |
 | --- | ------------------------------------------------------------------------------------ |
-| 6.1 | **Stable Releases + Versioning** — Server hat Version, Client checkt Kompatibilität  |
-| 6.2 | **Statistik-Backend** — Per-Player-Stats persistieren, Win-Rate, Lieblings-Rolle     |
-| 6.3 | **Saisons / Events** — temporäre Maps, Theme-Roll-outs (Halloween, Christmas-Office) |
-| 6.4 | **Translation-Support** — i18n für Eventtexte, UI                                    |
-| 6.5 | **Public Release** — falls gewünscht: Itch-Page, Discord, etc.                       |
+| 7.1 | **Stable Releases + Versioning** — Server hat Version, Client checkt Kompatibilität  |
+| 7.2 | **Statistik-Backend** — Per-Player-Stats persistieren, Win-Rate, Lieblings-Rolle     |
+| 7.3 | **Saisons / Events** — temporäre Maps, Theme-Roll-outs (Halloween, Christmas-Office) |
+| 7.4 | **Translation-Support** — i18n für Eventtexte, UI                                    |
+| 7.5 | **Public Release** — falls gewünscht: Itch-Page, Discord, etc.                       |
 
 Diese Tier ist absichtlich vage — was hier passiert hängt davon ab wie das Game vom Team angenommen wird.
 
@@ -214,19 +246,17 @@ Diese Tier ist absichtlich vage — was hier passiert hängt davon ab wie das Ga
 
 ## Was als nächstes konkret zu tun ist
 
-**Heute / morgen:** Tier 0.1 (Lint+Format) und 0.2 (CI) — weil die alle nachfolgenden Tiers sauberer machen. Dann 0.4 (`PROTOCOL.md`) damit der Godot-Sprint einen klaren Vertrag hat.
+**Aktueller Stand (2026-04-26):** Tier 0–3 sind durch (außer 0.13 Live-Test). Browser-Client deckt das gesamte Among-Us-Feature-Set ab + Mini-Game-Framework mit erstem Beispiel.
 
-**Diese Woche:** Tier 0 fertig.
+**Als nächstes:** **Tier 0.13 Live-Test mit Team** — bestätigt das Bauwerk in echter Spielsituation, surface Bugs bevor wir den Godot-Sprint starten. Plus iterative Mini-Game-Erweiterungen (Tier-3-Slices) je nachdem welche Tasks sich auf Live als platt anfühlen.
 
-**Nächste 1–2 Wochen:** Tier 1 (Mechanik-Vervollständigung + Map-Editor + Multi-Map).
+**Vor Godot:** Asset-Pipeline-Entscheidung (Tier 4.0.x) — Pixel-Art-Pack einkaufen vs. AI-generierte DevOps-Sprites. Sven entscheidet.
 
-**Wochen 3–4:** Tier 2 (Among-Us-Features im Browser).
+**Wochen 1–7 ab Godot-Start:** Tier 4 (Godot-Migration mit Polish).
 
-**Wochen 5–11:** Tier 3 (Godot-Migration mit Polish).
+**Anschließend:** Tier 5–7 als ongoing Slices.
 
-**Danach:** Tier 4–6 als ongoing Slices.
-
-Total bis „polished public-fähig": ~3 Monate fokussierte Arbeit. Mit Asset-Pack-Hilfe und ohne Mobile/Account: ~2 Monate.
+Mit Asset-Pack-Hilfe und ohne Mobile/Account: ~2 Monate ab Tier 4 bis „polished public-fähig".
 
 ---
 
@@ -241,7 +271,7 @@ Total bis „polished public-fähig": ~3 Monate fokussierte Arbeit. Mit Asset-Pa
 ## Verwandte Docs
 
 - `docs/maps.md` — Map-JSON-Schema (Referenz für Map-Bauer)
-- `docs/CONTRIBUTING.md` — wie Mitarbeitende beitragen können (kommt mit Tier 5.0)
+- `docs/CONTRIBUTING.md` — wie Mitarbeitende beitragen können (kommt mit Tier 6.0)
 - `docs/PROTOCOL.md` — vollständiger WS-Vertrag (kommt mit Tier 0.4)
 - `docs/ARCHITECTURE.md` — High-Level-Overview (kommt mit Tier 0.5)
 - `docs/DEPLOY.md` — Deploy-Workflow (kommt mit Tier 0.6)
