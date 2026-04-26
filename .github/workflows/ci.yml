@@ -52,9 +52,22 @@ jobs:
       - name: prettier check
         run: npx --yes prettier@3.3.3 --check 'static/**/*.{js,css,html}' '*.md' 'docs/**/*.md' 'CONTRIBUTING.md' 'README.md'
 
+  test-frontend:
+    name: vitest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install JS dev deps
+        run: npm install --no-audit --no-fund
+      - name: Run vitest
+        run: npx vitest run
+
   deploy:
     name: deploy to EC2
-    needs: [test, lint-python, lint-frontend]
+    needs: [test, lint-python, lint-frontend, test-frontend]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     concurrency:

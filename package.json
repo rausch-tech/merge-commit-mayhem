@@ -1,12 +1,15 @@
 {
   "name": "merge-commit-mayhem-frontend",
   "private": true,
-  "description": "Frontend dev tooling (prettier). The runtime frontend is plain HTML/CSS/JS served by FastAPI.",
+  "description": "Frontend dev tooling (prettier + vitest). The runtime frontend is plain HTML/CSS/JS served by FastAPI.",
   "scripts": {
     "format": "prettier --write 'static/**/*.{js,css,html}' '*.md' 'docs/**/*.md' 'CONTRIBUTING.md' 'README.md'",
-    "format:check": "prettier --check 'static/**/*.{js,css,html}' '*.md' 'docs/**/*.md' 'CONTRIBUTING.md' 'README.md'"
+    "format:check": "prettier --check 'static/**/*.{js,css,html}' '*.md' 'docs/**/*.md' 'CONTRIBUTING.md' 'README.md'",
+    "test": "vitest run"
   },
   "devDependencies": {
-    "prettier": "^3.3.3"
+    "happy-dom": "^15.11.0",
+    "prettier": "^3.3.3",
+    "vitest": "^2.1.0"
   }
 }
