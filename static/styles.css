@@ -544,6 +544,31 @@ button:hover {
   margin: 0;
 }
 
+#map-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+#map-selector label {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.75rem;
+}
+
+#map-dropdown {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #2e3656;
+  background: #10152a;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
 /* Sabotage icon inside the button */
 .sabotage-btn-icon {
   display: grid;

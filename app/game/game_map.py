@@ -5,11 +5,13 @@ Die Karte definiert: Raeume, Wand-Linien (mit Tuer-Cutouts), Spawn-Punkte,
 Task-Anker und welcher Raum der War Room ist. Wand-Rechtecke werden zur
 Lade-Zeit aus den Wand-Linien + Tuerenberechnet (siehe walls.py).
 
-Eine einzelne Standard-Karte liegt unter /maps/default.json. Der Editor
-(spaeter) erzeugt das gleiche Format.
+Mehrere Karten liegen unter /maps/*.json. ``discover_maps`` scannt das
+Verzeichnis; ``MAP_REGISTRY`` ist die lazy gefuellte module-globale Map-Map.
+Der Editor (spaeter) erzeugt das gleiche Format.
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Final, Literal
 
@@ -119,3 +121,60 @@ def task_position_map(game_map: GameMap) -> dict[str, tuple[float, float]]:
 # Default map loaded at module import time. Tests can override.
 _DEFAULT_MAP_PATH: Final[Path] = Path(__file__).parent.parent.parent / "maps" / "default.json"
 DEFAULT_MAP: Final[GameMap] = load_map(_DEFAULT_MAP_PATH)
+
+
+# --- map registry -----------------------------------------------------------
+
+DEFAULT_MAP_ID: Final[str] = "default"
+
+_MAPS_DIR: Final[Path] = Path(__file__).parent.parent.parent / "maps"
+_log = logging.getLogger("mcm.maps")
+
+# Lazy-populated cache of {stem: GameMap}. Tests can call ``reload_map_registry``
+# to force a re-scan; production code typically reads via ``get_map_registry``.
+_MAP_REGISTRY_CACHE: dict[str, GameMap] | None = None
+
+
+def discover_maps(maps_dir: Path = _MAPS_DIR) -> dict[str, GameMap]:
+    """Scan ``maps_dir`` for *.json maps and return ``{stem: GameMap}``.
+
+    Files that fail to load are logged and skipped — one bad map should not
+    poison the whole registry. Result keys are sorted alphabetically for
+    deterministic ordering on the wire.
+    """
+    out: dict[str, GameMap] = {}
+    if not maps_dir.exists():
+        return out
+    for path in sorted(maps_dir.glob("*.json")):
+        try:
+            out[path.stem] = load_map(path)
+        except Exception:
+            _log.exception("Skipping invalid map file %s", path)
+    return out
+
+
+def reload_map_registry() -> dict[str, GameMap]:
+    """Force a re-scan of the maps directory and return the fresh registry."""
+    global _MAP_REGISTRY_CACHE
+    _MAP_REGISTRY_CACHE = discover_maps()
+    return _MAP_REGISTRY_CACHE
+
+
+def get_map_registry() -> dict[str, GameMap]:
+    """Return the lazily-populated registry of available maps."""
+    global _MAP_REGISTRY_CACHE
+    if _MAP_REGISTRY_CACHE is None:
+        _MAP_REGISTRY_CACHE = discover_maps()
+    return _MAP_REGISTRY_CACHE
+
+
+def resolve_default_map_id(registry: dict[str, GameMap] | None = None) -> str:
+    """Return ``DEFAULT_MAP_ID`` if present in the registry, else the first
+    sorted id (registry guarantees alphabetic ordering). Falls back to the
+    constant if the registry is empty so the wire field is never blank."""
+    reg = registry if registry is not None else get_map_registry()
+    if DEFAULT_MAP_ID in reg:
+        return DEFAULT_MAP_ID
+    if reg:
+        return next(iter(sorted(reg.keys())))
+    return DEFAULT_MAP_ID

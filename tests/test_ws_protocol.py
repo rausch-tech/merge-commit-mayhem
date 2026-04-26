@@ -737,3 +737,64 @@ def test_meeting_resolves_with_skip_when_only_skips_received():
         assert result["payload"]["removedPlayerId"] == ""
         assert result["payload"]["skipped"] is True
         assert result["payload"]["tie"] is False
+
+
+# --- Multi-map (Tier 1.8) ----------------------------------------------------
+
+
+def test_lobby_state_includes_available_maps_and_selected_map_id():
+    client = TestClient(app)
+    with client.websocket_connect("/ws") as ws_a:
+        joined = _join(ws_a, "MAPLOB", "Alice")
+        assert joined["type"] == "room_joined"
+        # Initial lobby_state right after the join.
+        lobby = ws_a.receive_json()
+        assert lobby["type"] == "lobby_state"
+        payload = lobby["payload"]
+        assert payload["selectedMapId"] == "default"
+        ids = {m["id"] for m in payload["availableMaps"]}
+        assert "default" in ids
+        # Each entry has both id and name.
+        for m in payload["availableMaps"]:
+            assert "id" in m and "name" in m
+
+
+def test_host_select_map_broadcasts_new_selected_map_id():
+    client = TestClient(app)
+    with client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+        _join(ws_a, "MAPSEL", "Alice")
+        ws_a.receive_json()  # lobby
+        _join(ws_b, "MAPSEL", "Bob")
+        ws_a.receive_json()  # lobby update (2 players)
+        ws_b.receive_json()  # lobby update
+
+        # Host switches map.
+        ws_a.send_json({"type": "select_map", "payload": {"mapId": "small"}})
+
+        lobby_a = _drain_until(ws_a, "lobby_state")
+        lobby_b = _drain_until(ws_b, "lobby_state")
+        assert lobby_a["payload"]["selectedMapId"] == "small"
+        assert lobby_b["payload"]["selectedMapId"] == "small"
+
+        # A fresh joiner now receives the small map in their room_joined.
+        with client.websocket_connect("/ws") as ws_c:
+            joined = _join(ws_c, "MAPSEL", "Carol")
+            assert joined["type"] == "room_joined"
+            assert joined["payload"]["map"]["name"] == "small-arena"
+
+
+def test_non_host_select_map_returns_not_host_error():
+    client = TestClient(app)
+    with client.websocket_connect("/ws") as ws_a, client.websocket_connect("/ws") as ws_b:
+        _join(ws_a, "MAPNH", "Alice")
+        ws_a.receive_json()  # lobby
+        _join(ws_b, "MAPNH", "Bob")
+        ws_a.receive_json()
+        ws_b.receive_json()
+
+        ws_b.send_json({"type": "select_map", "payload": {"mapId": "small"}})
+        msg = ws_b.receive_json()
+        # Drain past any extra lobby_state if interleaved.
+        while msg["type"] != "error":
+            msg = ws_b.receive_json()
+        assert msg["payload"]["code"] == "NOT_HOST"

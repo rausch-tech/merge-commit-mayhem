@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
-from app.game.game_map import DEFAULT_MAP
+from app.game.game_map import GameMap, get_map_registry
 from app.game.game_room import GameRoom, GameRoomError
 from app.game.models import InputState, Phase
 from app.game.sabotages import SABOTAGE_DEFINITIONS
@@ -27,6 +27,7 @@ from app.protocol import (
     ReportBody,
     ReturnToLobby,
     RoomJoinedMsg,
+    SelectMap,
     SkipVote,
     StartGame,
     TaskHoldStart,
@@ -74,6 +75,22 @@ class GameRegistry:
 
 registry = GameRegistry()
 manager = ConnectionManager()
+
+
+def _available_maps_payload(registry: dict[str, GameMap] | None = None) -> list[dict[str, str]]:
+    """Stable [{id, name}] list of all available maps, sorted by id."""
+    reg = registry if registry is not None else get_map_registry()
+    return [{"id": map_id, "name": gm.name} for map_id, gm in sorted(reg.items())]
+
+
+def _lobby_state_msg(room: GameRoom) -> LobbyStateMsg:
+    """Build a LobbyStateMsg with the public lobby snapshot + map listing."""
+    snapshot = room.lobby_snapshot()
+    return LobbyStateMsg(
+        **snapshot,
+        available_maps=_available_maps_payload(),
+        selected_map_id=room.map_id,
+    )
 
 
 def _game_state_msg_for(room: GameRoom, viewer_id: str, base: dict | None = None) -> GameStateMsg:
@@ -196,6 +213,8 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 await _handle_trigger_takedown(ws, msg)
             elif isinstance(msg, ReportBody):
                 await _handle_report_body(ws, msg)
+            elif isinstance(msg, SelectMap):
+                await _handle_select_map(ws, msg)
             elif isinstance(msg, ReturnToLobby):
                 await _handle_return_to_lobby(ws)
     except WebSocketDisconnect:
@@ -223,11 +242,11 @@ async def _handle_join(ws: WebSocket, msg: JoinRoom) -> None:
                 room_code=code,
                 player_id=player.id,
                 is_host=player.is_host,
-                map=DEFAULT_MAP.model_dump(by_alias=True),
+                map=room.map.model_dump(by_alias=True),
             ),
         )
     )
-    await manager.broadcast(code, envelope("lobby_state", LobbyStateMsg(**room.lobby_snapshot())))
+    await manager.broadcast(code, envelope("lobby_state", _lobby_state_msg(room)))
 
 
 async def _handle_rejoin(ws: WebSocket, msg: Rejoin) -> None:
@@ -253,7 +272,7 @@ async def _handle_rejoin(ws: WebSocket, msg: Rejoin) -> None:
                 room_code=code,
                 player_id=player.id,
                 is_host=player.is_host,
-                map=DEFAULT_MAP.model_dump(by_alias=True),
+                map=room.map.model_dump(by_alias=True),
             ),
         )
     )
@@ -274,7 +293,7 @@ async def _handle_rejoin(ws: WebSocket, msg: Rejoin) -> None:
         )
     # Send fresh state — phase-appropriate.
     if room.phase is Phase.LOBBY:
-        await ws.send_json(envelope("lobby_state", LobbyStateMsg(**room.lobby_snapshot())))
+        await ws.send_json(envelope("lobby_state", _lobby_state_msg(room)))
     else:
         await ws.send_json(envelope("game_state", _game_state_msg_for(room, player.id)))
 
@@ -433,6 +452,25 @@ async def _handle_report_body(ws: WebSocket, msg: ReportBody) -> None:
         await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
 
 
+async def _handle_select_map(ws: WebSocket, msg: SelectMap) -> None:
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    try:
+        room.set_map(
+            requesting_player_id=session.player_id,
+            map_id=msg.payload.map_id,
+            registry=get_map_registry(),
+        )
+    except GameRoomError as exc:
+        await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+        return
+    await manager.broadcast(room.code, envelope("lobby_state", _lobby_state_msg(room)))
+
+
 async def _handle_return_to_lobby(ws: WebSocket) -> None:
     session = manager.session_for(ws)
     if session is None:
@@ -457,7 +495,7 @@ async def _handle_return_to_lobby(ws: WebSocket) -> None:
     room.reset_for_new_round()
     await manager.broadcast(
         room.code,
-        envelope("lobby_state", LobbyStateMsg(**room.lobby_snapshot())),
+        envelope("lobby_state", _lobby_state_msg(room)),
     )
 
 
@@ -485,9 +523,7 @@ async def _handle_disconnect(ws: WebSocket) -> None:
             registry.drop_if_empty(session.room_code)
             return
         if room.phase is Phase.LOBBY:
-            await manager.broadcast(
-                room.code, envelope("lobby_state", LobbyStateMsg(**room.lobby_snapshot()))
-            )
+            await manager.broadcast(room.code, envelope("lobby_state", _lobby_state_msg(room)))
         else:
             for s in manager.sessions_in_room(room.code):
                 await s.ws.send_json(envelope("game_state", _game_state_msg_for(room, s.player_id)))

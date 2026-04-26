@@ -164,6 +164,17 @@ class ReportBody(BaseModel):
     payload: ReportBodyPayload
 
 
+class SelectMapPayload(BaseModel):
+    model_config = _camel_config()
+    map_id: str
+
+
+class SelectMap(BaseModel):
+    model_config = _camel_config()
+    type: Literal["select_map"]
+    payload: SelectMapPayload
+
+
 IncomingMessage = Annotated[
     JoinRoom
     | Rejoin
@@ -177,7 +188,8 @@ IncomingMessage = Annotated[
     | CastVote
     | SkipVote
     | TriggerTakedown
-    | ReportBody,
+    | ReportBody
+    | SelectMap,
     Discriminator("type"),
 ]
 
@@ -208,6 +220,8 @@ class LobbyStateMsg(BaseModel):
     model_config = _camel_config()
     room_code: str
     players: list[dict[str, Any]]
+    available_maps: list[dict[str, Any]] = Field(default_factory=list)
+    selected_map_id: str = ""
 
 
 class GameStateMsg(BaseModel):

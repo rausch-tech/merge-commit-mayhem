@@ -50,6 +50,8 @@ const state = {
   bodies: [],
   takedownCooldown: 0,
   amDead: false,
+  availableMaps: [],
+  selectedMapId: "",
 };
 
 const previousTaskStatus = {}; // taskId -> last seen status
@@ -63,6 +65,8 @@ const els = {
   btnStart: document.getElementById("btn-start"),
   demoModeRow: document.getElementById("demo-mode-row"),
   demoMode: document.getElementById("demo-mode"),
+  mapSelector: document.getElementById("map-selector"),
+  mapDropdown: document.getElementById("map-dropdown"),
   inputName: document.getElementById("input-name"),
   inputRoomCode: document.getElementById("input-room-code"),
   lobbyScreen: document.getElementById("lobby-screen"),
@@ -129,6 +133,29 @@ function renderLobby() {
   }
   els.btnStart.classList.toggle("hidden", !state.isHost);
   els.demoModeRow.classList.toggle("hidden", !state.isHost);
+  renderMapSelector();
+}
+
+function renderMapSelector() {
+  if (!els.mapDropdown || !els.mapSelector) return;
+  const maps = state.availableMaps || [];
+  // Rebuild options only when the list contents changed.
+  const signature = maps.map((m) => `${m.id}:${m.name}`).join("|");
+  if (els.mapDropdown.dataset.signature !== signature) {
+    els.mapDropdown.innerHTML = "";
+    for (const m of maps) {
+      const opt = document.createElement("option");
+      opt.value = m.id;
+      opt.textContent = m.name;
+      els.mapDropdown.appendChild(opt);
+    }
+    els.mapDropdown.dataset.signature = signature;
+  }
+  if (state.selectedMapId) {
+    els.mapDropdown.value = state.selectedMapId;
+  }
+  // Host only — non-hosts see no selector at all.
+  els.mapSelector.classList.toggle("hidden", !state.isHost || maps.length === 0);
 }
 
 ws.on("room_joined", (payload) => {
@@ -147,6 +174,8 @@ ws.on("room_joined", (payload) => {
 
 ws.on("lobby_state", (payload) => {
   state.players = payload.players;
+  state.availableMaps = payload.availableMaps || [];
+  state.selectedMapId = payload.selectedMapId || "";
   state.phase = "lobby";
   state.amDead = false;
   els.ghostBanner.classList.add("hidden");
@@ -292,6 +321,15 @@ els.btnStart.addEventListener("click", () => {
   const demo = !!els.demoMode.checked;
   ws.send("start_game", { demo });
 });
+
+if (els.mapDropdown) {
+  els.mapDropdown.addEventListener("change", () => {
+    if (!state.isHost) return;
+    const mapId = els.mapDropdown.value;
+    if (!mapId || mapId === state.selectedMapId) return;
+    ws.send("select_map", { mapId });
+  });
+}
 
 attachInput(ws);
 attachTaskInteraction(ws, renderer);

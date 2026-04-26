@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 from app.game.game_map import (
     DEFAULT_MAP,
+    DEFAULT_MAP_ID,
     GameMap,
     compute_walls,
     task_position_map,
@@ -119,9 +120,15 @@ class Body:
 
 
 class GameRoom:
-    def __init__(self, code: str, game_map: GameMap | None = None) -> None:
+    def __init__(
+        self,
+        code: str,
+        game_map: GameMap | None = None,
+        map_id: str = DEFAULT_MAP_ID,
+    ) -> None:
         self.code = code
         self.map = game_map if game_map is not None else DEFAULT_MAP
+        self.map_id = map_id
         self._walls = compute_walls(self.map)
         self._war_room_bounds = war_room_bounds_for(self.map)
         self._task_position = task_position_map(self.map)
@@ -307,6 +314,43 @@ class GameRoom:
                 return color
         # Fallback -- kann nur passieren, wenn MAX_PLAYERS > Palette.
         raise GameRoomError(code="NO_COLORS", message="Color palette exhausted.")
+
+    # --- map selection -----------------------------------------------------
+
+    def set_map(
+        self,
+        requesting_player_id: str,
+        map_id: str,
+        registry: dict[str, GameMap],
+    ) -> None:
+        """Host swaps the active map while the room is in LOBBY.
+
+        Tasks/sabotages/players are not reset here — they are reinitialized at
+        ``start()`` from the new map's data. Updating ``_walls``,
+        ``_war_room_bounds`` and ``_task_position`` is enough at this point.
+        """
+        if self.phase is not Phase.LOBBY:
+            raise GameRoomError(
+                code="WRONG_PHASE",
+                message=f"Map kann nur in der Lobby gewechselt werden (aktuell {self.phase.value}).",
+            )
+        player = self.players.get(requesting_player_id)
+        if player is None or not player.is_host:
+            raise GameRoomError(
+                code="NOT_HOST",
+                message="Nur der Host kann die Map wechseln.",
+            )
+        new_map = registry.get(map_id)
+        if new_map is None:
+            raise GameRoomError(
+                code="UNKNOWN_MAP",
+                message=f"Unbekannte Map {map_id!r}.",
+            )
+        self.map = new_map
+        self.map_id = map_id
+        self._walls = compute_walls(new_map)
+        self._war_room_bounds = war_room_bounds_for(new_map)
+        self._task_position = task_position_map(new_map)
 
     # --- lifecycle ---------------------------------------------------------
 

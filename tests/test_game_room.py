@@ -570,3 +570,78 @@ def test_reset_restores_isconnected():
     room.reset_for_new_round()
     assert room.players[pid].is_connected is True
     assert room.players[pid].disconnected_at_monotonic is None
+
+
+# --- Multi-map: set_map + map_id ----------------------------------------
+
+
+def test_new_room_uses_default_map_id():
+    room = GameRoom(code="MAPS")
+    assert room.map_id == "default"
+
+
+def test_new_room_with_small_map_id_uses_small_map():
+    from app.game.game_map import discover_maps
+
+    registry = discover_maps()
+    small = registry["small"]
+    room = GameRoom(code="MAPS", game_map=small, map_id="small")
+    assert room.map_id == "small"
+    assert room.map.name == "small-arena"
+    # War-room bounds reflect the small map (2400x1600 world, war_room at
+    # (1200, 800)..(2400, 1600)).
+    x_min, y_min, x_max, y_max = room._war_room_bounds
+    assert (x_min, y_min, x_max, y_max) == (1200, 800, 2400, 1600)
+
+
+def test_set_map_happy_path_swaps_walls_and_anchors():
+    from app.game.game_map import discover_maps
+
+    registry = discover_maps()
+    room = GameRoom(code="MAPS")
+    host = room.add_player("Sven")
+    walls_before = list(room._walls)
+    anchors_before = dict(room._task_position)
+
+    room.set_map(requesting_player_id=host.id, map_id="small", registry=registry)
+
+    assert room.map_id == "small"
+    assert room.map.name == "small-arena"
+    assert room._walls != walls_before
+    assert room._task_position != anchors_before
+    # War-room bounds switched to the small map's war_room.
+    assert room._war_room_bounds == (1200, 800, 2400, 1600)
+
+
+def test_set_map_rejects_non_host():
+    from app.game.game_map import discover_maps
+
+    registry = discover_maps()
+    room = GameRoom(code="MAPS")
+    room.add_player("Sven")
+    second = room.add_player("Max")
+    with pytest.raises(GameRoomError) as exc:
+        room.set_map(requesting_player_id=second.id, map_id="small", registry=registry)
+    assert exc.value.code == "NOT_HOST"
+
+
+def test_set_map_rejects_outside_lobby():
+    from app.game.game_map import discover_maps
+
+    registry = discover_maps()
+    room = _make_started_room(player_count=4)
+    host_id = next(p.id for p in room.players.values() if p.is_host)
+    with pytest.raises(GameRoomError) as exc:
+        room.set_map(requesting_player_id=host_id, map_id="small", registry=registry)
+    assert exc.value.code == "WRONG_PHASE"
+
+
+def test_set_map_rejects_unknown_id():
+    from app.game.game_map import discover_maps
+
+    registry = discover_maps()
+    room = GameRoom(code="MAPS")
+    host = room.add_player("Sven")
+    with pytest.raises(GameRoomError) as exc:
+        room.set_map(requesting_player_id=host.id, map_id="ghost-town", registry=registry)
+    assert exc.value.code == "UNKNOWN_MAP"
