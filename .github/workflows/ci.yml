@@ -65,6 +65,37 @@ jobs:
       - name: Run vitest
         run: npx vitest run
 
+  godot-check:
+    name: godot --check-only
+    runs-on: ubuntu-latest
+    # Skip when godot/ doesn't exist (main without spike merged yet) so the job
+    # doesn't fail on branches that have no Godot project.
+    if: hashFiles('godot/project.godot') != ''
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Godot binary
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot-bin
+          key: godot-4.6-stable-linux-x86_64
+      - name: Install Godot 4.6 (cache miss)
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot-bin && cd ~/godot-bin
+          curl -fL -o godot.zip "https://github.com/godotengine/godot/releases/download/4.6-stable/Godot_v4.6-stable_linux.x86_64.zip"
+          unzip -q godot.zip && rm godot.zip
+          chmod +x Godot_v4.6-stable_linux.x86_64
+      - name: Add godot to PATH
+        run: |
+          mkdir -p ~/.local/bin
+          ln -sf ~/godot-bin/Godot_v4.6-stable_linux.x86_64 ~/.local/bin/godot
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Show Godot version
+        run: godot --version
+      - name: Parse-check GDScripts
+        run: ./scripts/godot-check.sh -v
+
   deploy:
     name: deploy to EC2
     needs: [test, lint-python, lint-frontend, test-frontend]
