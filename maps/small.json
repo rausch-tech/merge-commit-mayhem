@@ -24,7 +24,8 @@
     { "taskId": "analyze_logs",      "x": 1800, "y": 1200 }
   ],
   "sabotagePanels": [
-    { "sabotageId": "lights_out", "x": 1800, "y": 400 }
+    { "sabotageId": "lights_out",   "x": 1800, "y": 400  },
+    { "sabotageId": "comms_outage", "x": 1800, "y": 1200 }
   ],
   "vents": [
     { "id": "v_open",    "x": 200,  "y": 200,  "connectedTo": ["v_kitchen"] },

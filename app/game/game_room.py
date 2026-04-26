@@ -158,6 +158,10 @@ class GameRoom:
         # the lights_out panel.
         self.lights_off: bool = False
 
+        # Tier 2.5: Comms outage flag. While true, task holds and other
+        # sabotage triggers are rejected. Cleared via the comms_outage panel.
+        self.comms_down: bool = False
+
         # End-of-round state.
         self.winner: str | None = None
         self.win_reason: str | None = None
@@ -414,6 +418,7 @@ class GameRoom:
         self.incidents = 0
         self.meeting_active_for = 0.0
         self.lights_off = False
+        self.comms_down = False
         self.winner = None
         self.win_reason = None
         self.completed_tasks_by_player = {pid: 0 for pid in self.players}
@@ -593,6 +598,9 @@ class GameRoom:
     def apply_task_hold_start(self, player_id: str, task_id: str) -> None:
         if self.phase is not Phase.PLAYING:
             raise GameRoomError(code="WRONG_PHASE", message="Tasks only during playing.")
+        # Tier 2.5: Slack-Down — release team can't see or progress tasks.
+        if self.comms_down:
+            raise GameRoomError(code="COMMS_DOWN", message="Slack ist down — keine Tasks.")
         # Ghosts may complete tasks — they help the release-team win.
         player = self.players.get(player_id)
         if player is None:
@@ -689,6 +697,13 @@ class GameRoom:
             raise GameRoomError(code="UNKNOWN_SABOTAGE", message=f"Unknown {sabotage_id!r}.")
         if sab.cooldown_remaining > 0:
             raise GameRoomError(code="SABOTAGE_ON_COOLDOWN", message="Sabotage on cooldown.")
+        # Tier 2.5: while comms are down, no other sabotage can be triggered.
+        # Comms-outage itself is exempt so chaos can chain it (and the repair
+        # path runs through repair_sabotage anyway, not here).
+        if self.comms_down and sabotage_id != "comms_outage":
+            raise GameRoomError(
+                code="COMMS_DOWN", message="Slack ist down — keine weitere Sabotage."
+            )
 
         # Apply the effect.
         if sabotage_id == "ci_cd_red":
@@ -705,6 +720,8 @@ class GameRoom:
             pass  # Effect lives entirely in incidents_increase.
         elif sabotage_id == "lights_out":
             self.lights_off = True
+        elif sabotage_id == "comms_outage":
+            self.comms_down = True
         # Future sabotages: add here.
 
         if sab.definition.incidents_increase:
@@ -729,6 +746,8 @@ class GameRoom:
             self._emit_event("warn", "Die Tests schlagen fehl, aber nur manchmal.")
         elif sabotage_id == "lights_out":
             self._emit_event("danger", "PagerDuty-Storm — alle starren auf ihre Telefone.")
+        elif sabotage_id == "comms_outage":
+            self._emit_event("danger", "Slack ist down. Niemand kommuniziert.")
 
     def use_vent(self, player_id: str, target_vent_id: str) -> None:
         """Tier 2.3: chaos-only teleport through the vent network.
@@ -746,13 +765,9 @@ class GameRoom:
         if player is None:
             raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
         if not player.is_alive:
-            raise GameRoomError(
-                code="PLAYER_ELIMINATED", message="Eliminated players cannot vent."
-            )
+            raise GameRoomError(code="PLAYER_ELIMINATED", message="Eliminated players cannot vent.")
         if player.team != "chaos_agents":
-            raise GameRoomError(
-                code="NOT_CHAOS_AGENT", message="Only chaos agents can use vents."
-            )
+            raise GameRoomError(code="NOT_CHAOS_AGENT", message="Only chaos agents can use vents.")
         # Find source vent: closest vent within reach.
         source = None
         best_dist_sq = VENT_INTERACTION_RADIUS * VENT_INTERACTION_RADIUS
@@ -803,8 +818,11 @@ class GameRoom:
         # Only currently-active sabotages can be repaired.
         if sabotage_id == "lights_out":
             if not self.lights_off:
+                raise GameRoomError(code="SABOTAGE_NOT_ACTIVE", message="lights_out is not active.")
+        elif sabotage_id == "comms_outage":
+            if not self.comms_down:
                 raise GameRoomError(
-                    code="SABOTAGE_NOT_ACTIVE", message="lights_out is not active."
+                    code="SABOTAGE_NOT_ACTIVE", message="comms_outage is not active."
                 )
         else:
             raise GameRoomError(
@@ -816,17 +834,21 @@ class GameRoom:
             None,
         )
         if panel is None:
-            raise GameRoomError(
-                code="NO_PANEL", message=f"Map has no panel for {sabotage_id!r}."
-            )
+            raise GameRoomError(code="NO_PANEL", message=f"Map has no panel for {sabotage_id!r}.")
         dx = player.x - panel.x
         dy = player.y - panel.y
-        if dx * dx + dy * dy > SABOTAGE_PANEL_INTERACTION_RADIUS * SABOTAGE_PANEL_INTERACTION_RADIUS:
+        if (
+            dx * dx + dy * dy
+            > SABOTAGE_PANEL_INTERACTION_RADIUS * SABOTAGE_PANEL_INTERACTION_RADIUS
+        ):
             raise GameRoomError(code="TOO_FAR", message="Move closer to the panel.")
 
         if sabotage_id == "lights_out":
             self.lights_off = False
             self._emit_event("info", f"{player.name} hat das PagerDuty-Storm beendet.")
+        elif sabotage_id == "comms_outage":
+            self.comms_down = False
+            self._emit_event("info", f"{player.name} hat Slack wieder online gebracht.")
 
     def _tick_sabotages(self, dt: float) -> None:
         for sab in self.sabotages.values():
@@ -839,6 +861,8 @@ class GameRoom:
                 sab.active = self.meeting_active_for > 0
             elif sab.definition.id == "lights_out":
                 sab.active = self.lights_off
+            elif sab.definition.id == "comms_outage":
+                sab.active = self.comms_down
             else:
                 sab.active = False
         if self.meeting_active_for > 0:
@@ -1172,9 +1196,9 @@ class GameRoom:
                 for b in self.bodies.values()
             ],
             "lightsOff": self.lights_off,
+            "commsDown": self.comms_down,
             "sabotagePanels": [
-                {"sabotageId": p.sabotage_id, "x": p.x, "y": p.y}
-                for p in self.map.sabotage_panels
+                {"sabotageId": p.sabotage_id, "x": p.x, "y": p.y} for p in self.map.sabotage_panels
             ],
             "vents": [
                 {"id": v.id, "x": v.x, "y": v.y, "connectedTo": list(v.connected_to)}
@@ -1283,6 +1307,7 @@ class GameRoom:
         self.incidents = 0
         self.meeting_active_for = 0.0
         self.lights_off = False
+        self.comms_down = False
         self.winner = None
         self.win_reason = None
         self.has_broadcast_end = False

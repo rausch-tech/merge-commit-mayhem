@@ -41,6 +41,7 @@ SABOTAGE_DEFINITIONS: Final[list[SabotageDefinition]] = [
         incidents_increase=30,
     ),
     SabotageDefinition(id="lights_out", title="PagerDuty-Storm", cooldown_seconds=70.0),
+    SabotageDefinition(id="comms_outage", title="Slack-Down", cooldown_seconds=80.0),
 ]
 
 

@@ -58,6 +58,7 @@ const state = {
   amDead: false,
   availableMaps: [],
   selectedMapId: "",
+  commsDown: false,
 };
 
 const previousTaskStatus = {}; // taskId -> last seen status
@@ -307,7 +308,13 @@ ws.on("game_state", (payload) => {
   // Tier 2.3: vents are part of the static map snapshot but the server now
   // re-broadcasts them in every game_state for client-side simplicity.
   renderer.setVents(payload.vents || []);
-  taskList.render(payload.tasks || []);
+  // Tier 2.5: Slack-Down — clear the task sidebar visually and flag the
+  // sabotage panel so chaos buttons gray out.
+  state.commsDown = !!payload.commsDown;
+  // Tier 2.5: when comms are down the release team can't see their tasks.
+  // The list still exists server-side; we just hide it client-side until
+  // someone repairs the comms panel.
+  taskList.render(payload.commsDown ? [] : payload.tasks || []);
   for (const t of payload.tasks || []) {
     const prev = previousTaskStatus[t.id];
     if (prev === "in_progress" && t.status === "cooldown") {
@@ -324,6 +331,7 @@ ws.on("game_state", (payload) => {
   });
   sabotagePanel.updateFromGameState(payload.sabotages || [], {
     disabledByOwnDeath: state.amDead,
+    disabledByCommsDown: !!payload.commsDown,
   });
   eventFeed.render(payload.events || []);
 

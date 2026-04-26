@@ -280,6 +280,7 @@ def test_chaos_sees_available_sabotages_in_private_role():
                     "fake_customer_request",
                     "flaky_tests",
                     "lights_out",
+                    "comms_outage",
                 ]
             else:
                 assert role["payload"]["availableSabotages"] == []
@@ -313,6 +314,7 @@ def test_game_state_carries_stats_and_tasks_and_sabotages():
             "fake_customer_request",
             "flaky_tests",
             "lights_out",
+            "comms_outage",
         }
 
 
@@ -441,6 +443,7 @@ def test_demo_mode_lets_single_player_start_via_ws():
             "fake_customer_request",
             "flaky_tests",
             "lights_out",
+            "comms_outage",
         ]
         state = _drain_until(ws, "game_state")
         assert state["payload"]["phase"] == "playing"

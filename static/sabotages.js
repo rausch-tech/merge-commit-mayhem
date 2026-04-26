@@ -4,6 +4,11 @@ const TITLE_LABELS = {
   ci_cd_red: "CI/CD Rot",
   coffee_outage: "Kaffee leer",
   mandatory_meeting: "Mandatory Meeting",
+  merge_conflict_storm: "Merge Conflict Storm",
+  fake_customer_request: "Fake Customer Request",
+  flaky_tests: "Flaky Tests",
+  lights_out: "PagerDuty-Storm",
+  comms_outage: "Slack-Down",
 };
 
 export class SabotagePanel {
@@ -71,17 +76,21 @@ export class SabotagePanel {
    * Update each button from a fresh game_state.payload.sabotages array.
    * Buttons not in availableIds are ignored. When `disabledByOwnDeath` is true
    * (Tier 2.6 spectator-mode), every button is force-disabled regardless of
-   * cooldown — ghosts cannot sabotage even if they were chaos.
+   * cooldown — ghosts cannot sabotage even if they were chaos. When
+   * `disabledByCommsDown` is true (Tier 2.5), every button is also disabled
+   * except `comms_outage` itself, since the server gates other sabotages.
    */
   updateFromGameState(sabotages, opts = {}) {
     if (!sabotages || this.availableIds.length === 0) return;
     const disabledByOwnDeath = !!opts.disabledByOwnDeath;
+    const disabledByCommsDown = !!opts.disabledByCommsDown;
     for (const sab of sabotages) {
       const entry = this.buttons.get(sab.id);
       if (!entry) continue;
       const cd = Math.max(0, sab.cooldownRemaining || 0);
       const total = this._cooldownTotal(sab.id, cd);
-      entry.btn.disabled = cd > 0 || disabledByOwnDeath;
+      const blockedByComms = disabledByCommsDown && sab.id !== "comms_outage";
+      entry.btn.disabled = cd > 0 || disabledByOwnDeath || blockedByComms;
       entry.cdEl.textContent = cd > 0 ? `${Math.ceil(cd)}s` : "";
       // Fill height represents ratio of remaining to total cooldown.
       const ratio = total > 0 && cd > 0 ? Math.min(1, cd / total) : 0;

@@ -179,6 +179,7 @@ def test_public_state_exposes_sabotages_and_tasks():
         "fake_customer_request",
         "flaky_tests",
         "lights_out",
+        "comms_outage",
     }
     ci_cd = next(s for s in state["sabotages"] if s["id"] == "ci_cd_red")
     assert ci_cd["cooldownRemaining"] > 0
@@ -333,3 +334,67 @@ def test_public_state_carries_lights_off_and_panels():
     room.apply_sabotage(chaos_id, "lights_out")
     state = room.public_state()
     assert state["lightsOff"] is True
+
+
+# --- Tier 2.5: comms_outage + repair --------------------------------------
+
+
+def test_comms_outage_sets_comms_down_flag():
+    room, chaos_id, _ = _room_with_roles()
+    assert room.comms_down is False
+    room.apply_sabotage(chaos_id, "comms_outage")
+    assert room.comms_down is True
+    room.tick(0.05)
+    assert room.sabotages["comms_outage"].active is True
+
+
+def test_comms_down_blocks_task_hold_start():
+    room, chaos_id, dev_id = _room_with_roles()
+    room.apply_sabotage(chaos_id, "comms_outage")
+    # Park the dev player on top of an actual task anchor.
+    task_id, (tx, ty) = next(iter(room._task_position.items()))
+    room.players[dev_id].x = tx
+    room.players[dev_id].y = ty
+    with pytest.raises(GameRoomError) as exc:
+        room.apply_task_hold_start(dev_id, task_id)
+    assert exc.value.code == "COMMS_DOWN"
+
+
+def test_comms_down_blocks_other_sabotage_triggers():
+    room, chaos_id, _ = _room_with_roles()
+    room.apply_sabotage(chaos_id, "comms_outage")
+    # ci_cd_red would normally be available on a fresh round.
+    room.sabotages["ci_cd_red"].cooldown_remaining = 0.0
+    with pytest.raises(GameRoomError) as exc:
+        room.apply_sabotage(chaos_id, "ci_cd_red")
+    assert exc.value.code == "COMMS_DOWN"
+
+
+def test_repair_comms_outage_clears_flag():
+    room, chaos_id, dev_id = _room_with_roles()
+    room.apply_sabotage(chaos_id, "comms_outage")
+    panel = next(p for p in room.map.sabotage_panels if p.sabotage_id == "comms_outage")
+    dev = room.players[dev_id]
+    dev.x, dev.y = panel.x, panel.y
+    room.repair_sabotage(dev_id, "comms_outage")
+    assert room.comms_down is False
+    room.tick(0.05)
+    assert room.sabotages["comms_outage"].active is False
+
+
+def test_comms_down_resets_on_new_round():
+    room, chaos_id, _ = _room_with_roles()
+    room.apply_sabotage(chaos_id, "comms_outage")
+    assert room.comms_down is True
+    room._finish_round("release_team", "test")
+    room.reset_for_new_round()
+    assert room.comms_down is False
+
+
+def test_public_state_carries_comms_down():
+    room, chaos_id, _ = _room_with_roles()
+    state = room.public_state()
+    assert state["commsDown"] is False
+    room.apply_sabotage(chaos_id, "comms_outage")
+    state = room.public_state()
+    assert state["commsDown"] is True
