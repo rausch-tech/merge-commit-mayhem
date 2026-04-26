@@ -30,6 +30,7 @@ godot/.godot/
 godot/exports/
 godot/**/*.import
 godot/**/*.uid
+godot/feedback/
 
 # Playwright MCP scratch dir (per-session screenshots/snapshots)
 .playwright-mcp/

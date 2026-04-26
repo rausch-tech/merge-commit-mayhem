@@ -3,12 +3,26 @@ extends Node2D
 
 const COLOR_ROOM_OUTLINE: Color = Color(0.9, 0.9, 0.95, 0.6)
 const COLOR_ROOM_FILL: Color = Color(0.2, 0.2, 0.28, 0.4)
-const COLOR_WALL: Color = Color(0.95, 0.3, 0.3, 0.85)
-const COLOR_DOOR: Color = Color(0.3, 0.7, 0.95, 0.9)
+const COLOR_WALL: Color = Color(0.95, 0.3, 0.3, 0.95)
+const COLOR_DOOR: Color = Color(0.3, 0.85, 0.7, 1.0)
 const COLOR_SPAWN: Color = Color(0.3, 0.95, 0.4, 0.9)
 const COLOR_TASK: Color = Color(0.95, 0.85, 0.2, 0.9)
-const PLAYER_BOX_SIZE: Vector2 = Vector2(40, 40)
+const PLAYER_BOX_SIZE: Vector2 = Vector2(80, 80)
 const COLOR_SELF_OUTLINE: Color = Color(1, 1, 1, 1)
+
+# World-pixel sizes — tuned to be readable at the default fit-to-viewport zoom
+# (~0.225 for 1280x720, larger for bigger windows). Lines/markers are thick in
+# world pixels so they survive the zoom-out.
+const WALL_THICKNESS: float = 24.0
+const ROOM_OUTLINE_THICKNESS: float = 6.0
+const DOOR_DOT_RADIUS: float = 28.0
+const SPAWN_ARM: float = 30.0
+const SPAWN_THICKNESS: float = 8.0
+const TASK_RADIUS: float = 28.0
+const PLAYER_OUTLINE_THICKNESS: float = 8.0
+const ROOM_LABEL_SIZE: int = 96
+const TASK_LABEL_SIZE: int = 56
+const PLAYER_LABEL_SIZE: int = 56
 
 var _map: Dictionary = {}
 var _self_player_id: String = ""
@@ -24,7 +38,24 @@ func _ready() -> void:
 
 func set_map(map: Dictionary) -> void:
 	_map = map
+	_fit_camera_to_map()
 	queue_redraw()
+
+func _fit_camera_to_map() -> void:
+	var camera := get_parent().get_node_or_null("Camera") as Camera2D
+	if camera == null:
+		return
+	var size_dict: Dictionary = _map.get("size", {})
+	var map_w := float(size_dict.get("width", 4800))
+	var map_h := float(size_dict.get("height", 3200))
+	if map_w <= 0 or map_h <= 0:
+		return
+	var viewport_size := get_viewport_rect().size
+	var fit_x: float = viewport_size.x / map_w
+	var fit_y: float = viewport_size.y / map_h
+	var zoom_factor: float = minf(fit_x, fit_y) * 0.95
+	camera.zoom = Vector2(zoom_factor, zoom_factor)
+	camera.position = Vector2(map_w * 0.5, map_h * 0.5)
 
 func set_self_player_id(id: String) -> void:
 	_self_player_id = id
@@ -86,9 +117,9 @@ func _draw_rooms() -> void:
 			fill = Color(hex)
 			fill.a = 0.35
 		draw_rect(rect, fill, true)
-		draw_rect(rect, COLOR_ROOM_OUTLINE, false, 2.0)
+		draw_rect(rect, COLOR_ROOM_OUTLINE, false, ROOM_OUTLINE_THICKNESS)
 		var label := str(room.get("title", room.get("id", "?")))
-		draw_string(ThemeDB.fallback_font, rect.position + Vector2(12, 32), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 28, COLOR_ROOM_OUTLINE)
+		draw_string(ThemeDB.fallback_font, rect.position + Vector2(40, 110), label, HORIZONTAL_ALIGNMENT_LEFT, -1, ROOM_LABEL_SIZE, COLOR_ROOM_OUTLINE)
 
 func _draw_wall_lines() -> void:
 	var size: Dictionary = _map.get("size", {})
@@ -100,31 +131,29 @@ func _draw_wall_lines() -> void:
 		var pos := float(line.get("position", 0))
 		var doors: Array = line.get("doors", [])
 		if axis == "x":
-			draw_line(Vector2(pos, 0), Vector2(pos, map_h), COLOR_WALL, 4.0)
+			draw_line(Vector2(pos, 0), Vector2(pos, map_h), COLOR_WALL, WALL_THICKNESS)
 			for door in doors:
 				var c := float(door.get("center", 0))
-				var w := float(door.get("width", 120))
-				draw_circle(Vector2(pos, c), w * 0.5, COLOR_DOOR)
+				draw_circle(Vector2(pos, c), DOOR_DOT_RADIUS, COLOR_DOOR)
 		elif axis == "y":
-			draw_line(Vector2(0, pos), Vector2(map_w, pos), COLOR_WALL, 4.0)
+			draw_line(Vector2(0, pos), Vector2(map_w, pos), COLOR_WALL, WALL_THICKNESS)
 			for door in doors:
 				var c := float(door.get("center", 0))
-				var w := float(door.get("width", 120))
-				draw_circle(Vector2(c, pos), w * 0.5, COLOR_DOOR)
+				draw_circle(Vector2(c, pos), DOOR_DOT_RADIUS, COLOR_DOOR)
 
 func _draw_spawns() -> void:
 	var spawns: Array = _map.get("spawnPoints", [])
 	for sp in spawns:
 		var p := Vector2(float(sp.get("x", 0)), float(sp.get("y", 0)))
-		draw_line(p + Vector2(-12, -12), p + Vector2(12, 12), COLOR_SPAWN, 3.0)
-		draw_line(p + Vector2(-12, 12), p + Vector2(12, -12), COLOR_SPAWN, 3.0)
+		draw_line(p + Vector2(-SPAWN_ARM, -SPAWN_ARM), p + Vector2(SPAWN_ARM, SPAWN_ARM), COLOR_SPAWN, SPAWN_THICKNESS)
+		draw_line(p + Vector2(-SPAWN_ARM, SPAWN_ARM), p + Vector2(SPAWN_ARM, -SPAWN_ARM), COLOR_SPAWN, SPAWN_THICKNESS)
 
 func _draw_task_anchors() -> void:
 	var tasks: Array = _map.get("taskAnchors", [])
 	for ta in tasks:
 		var p := Vector2(float(ta.get("x", 0)), float(ta.get("y", 0)))
-		draw_circle(p, 16.0, COLOR_TASK)
-		draw_string(ThemeDB.fallback_font, p + Vector2(20, 6), str(ta.get("taskId", "?")), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, COLOR_TASK)
+		draw_circle(p, TASK_RADIUS, COLOR_TASK)
+		draw_string(ThemeDB.fallback_font, p + Vector2(40, 18), str(ta.get("taskId", "?")), HORIZONTAL_ALIGNMENT_LEFT, -1, TASK_LABEL_SIZE, COLOR_TASK)
 
 func _draw_players() -> void:
 	var source: Array = _interp_render if not _interp_render.is_empty() else _players
@@ -137,6 +166,6 @@ func _draw_players() -> void:
 		var rect := Rect2(pos - PLAYER_BOX_SIZE * 0.5, PLAYER_BOX_SIZE)
 		draw_rect(rect, col, true)
 		if str(p.get("id", "")) == _self_player_id:
-			draw_rect(rect, COLOR_SELF_OUTLINE, false, 4.0)
+			draw_rect(rect, COLOR_SELF_OUTLINE, false, PLAYER_OUTLINE_THICKNESS)
 		var name_ := str(p.get("name", "?"))
-		draw_string(ThemeDB.fallback_font, pos + Vector2(-30, -28), name_, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 1, 1, 0.95))
+		draw_string(ThemeDB.fallback_font, pos + Vector2(-PLAYER_BOX_SIZE.x, -PLAYER_BOX_SIZE.y), name_, HORIZONTAL_ALIGNMENT_LEFT, -1, PLAYER_LABEL_SIZE, Color(1, 1, 1, 0.95))
