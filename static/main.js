@@ -176,6 +176,10 @@ ws.on("lobby_state", (payload) => {
   state.players = payload.players;
   state.availableMaps = payload.availableMaps || [];
   state.selectedMapId = payload.selectedMapId || "";
+  if (payload.map && Object.keys(payload.map).length > 0) {
+    state.map = payload.map;
+    renderer.setMap(payload.map);
+  }
   state.phase = "lobby";
   state.amDead = false;
   els.ghostBanner.classList.add("hidden");

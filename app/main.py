@@ -84,12 +84,17 @@ def _available_maps_payload(registry: dict[str, GameMap] | None = None) -> list[
 
 
 def _lobby_state_msg(room: GameRoom) -> LobbyStateMsg:
-    """Build a LobbyStateMsg with the public lobby snapshot + map listing."""
+    """Build a LobbyStateMsg with the public lobby snapshot + map listing.
+
+    Includes the active map snapshot so non-host clients re-render the
+    correct geometry after the host swaps maps in the lobby.
+    """
     snapshot = room.lobby_snapshot()
     return LobbyStateMsg(
         **snapshot,
         available_maps=_available_maps_payload(),
         selected_map_id=room.map_id,
+        map=room.map.model_dump(by_alias=True),
     )
 
 

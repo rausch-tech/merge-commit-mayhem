@@ -222,6 +222,7 @@ class LobbyStateMsg(BaseModel):
     players: list[dict[str, Any]]
     available_maps: list[dict[str, Any]] = Field(default_factory=list)
     selected_map_id: str = ""
+    map: dict[str, Any] = Field(default_factory=dict)
 
 
 class GameStateMsg(BaseModel):
