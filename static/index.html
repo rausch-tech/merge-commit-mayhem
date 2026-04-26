@@ -11,6 +11,17 @@
     <link rel="preload" as="image" href="/images/figuren.png" />
   </head>
   <body>
+    <div id="audio-controls" aria-label="Audio-Einstellungen">
+      <button id="audio-mute-btn" type="button" aria-pressed="false">Ton aus</button>
+      <input
+        id="audio-volume-slider"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        aria-label="Lautstärke"
+      />
+    </div>
     <main id="app">
       <section id="lobby-screen">
         <div id="lobby-header">

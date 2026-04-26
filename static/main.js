@@ -5,7 +5,7 @@ import { Hud } from "./hud.js";
 import { TaskList } from "./tasks.js";
 import { SabotagePanel } from "./sabotages.js";
 import { EndscreenOverlay } from "./endscreen.js";
-import { playTaskComplete, wireGlobalClickSound } from "./audio.js";
+import { playTaskComplete, wireAudioControls, wireGlobalClickSound } from "./audio.js";
 import { MeetingOverlay, VotingResultToast, EmergencyMeetingBtn } from "./meetings.js";
 import { EventFeed } from "./eventfeed.js";
 import { TakedownButton } from "./takedown.js";
@@ -304,3 +304,4 @@ ws.onOpen(() => {
 });
 ws.connect();
 wireGlobalClickSound();
+wireAudioControls(document.getElementById("audio-controls"));
