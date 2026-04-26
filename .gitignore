@@ -24,3 +24,7 @@ merge_conflict_mayhem_project.zip
 # Frontend tooling (only used for prettier, no runtime deps)
 node_modules/
 package-lock.json
+
+# Godot
+godot/.godot/
+godot/exports/
