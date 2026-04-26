@@ -49,6 +49,7 @@ const state = {
   map: null,
   bodies: [],
   takedownCooldown: 0,
+  amDead: false,
 };
 
 const previousTaskStatus = {}; // taskId -> last seen status
@@ -68,6 +69,7 @@ const els = {
   gameScreen: document.getElementById("game-screen"),
   errorBanner: document.getElementById("error-banner"),
   canvas: document.getElementById("game-canvas"),
+  ghostBanner: document.getElementById("ghost-banner"),
 };
 
 const taskSidebarEl = document.getElementById("task-sidebar");
@@ -146,6 +148,8 @@ ws.on("room_joined", (payload) => {
 ws.on("lobby_state", (payload) => {
   state.players = payload.players;
   state.phase = "lobby";
+  state.amDead = false;
+  els.ghostBanner.classList.add("hidden");
   endscreen.hide();
   meetingOverlay.hide();
   emergencyBtn.reset();
@@ -177,6 +181,16 @@ ws.on("game_state", (payload) => {
   state.phase = payload.phase;
   state.players = payload.players;
   state.bodies = payload.bodies || [];
+
+  // Detect ghost transition. Server sends personalized state — alive viewers
+  // see only alive players, but a ghost viewer always sees themselves with
+  // isAlive=false. We look up our own entry; if it's missing OR false → dead.
+  const me = (payload.players || []).find((p) => p.id === state.playerId);
+  const wasDead = state.amDead;
+  state.amDead = !!(me && me.isAlive === false);
+  if (state.amDead !== wasDead) {
+    els.ghostBanner.classList.toggle("hidden", !state.amDead);
+  }
   renderer.setPlayers(payload.players);
   renderer.setTasks(payload.tasks || []);
   renderer.setBodies(state.bodies);
@@ -194,7 +208,9 @@ ws.on("game_state", (payload) => {
     pipelineStability: payload.pipelineStability,
     coffeeLevel: payload.coffeeLevel,
   });
-  sabotagePanel.updateFromGameState(payload.sabotages || []);
+  sabotagePanel.updateFromGameState(payload.sabotages || [], {
+    disabledByOwnDeath: state.amDead,
+  });
   eventFeed.render(payload.events || []);
 
   // Meeting overlay shows during MEETING phase, hides otherwise.

@@ -205,16 +205,18 @@ def test_meeting_resolves_early_when_all_alive_voted():
 # --- eliminated player gating ---------------------------------------------
 
 
-def test_eliminated_player_cannot_start_task():
+def test_eliminated_player_can_start_task():
+    """Spectator-Mode (Tier 2.6): ghosts may complete tasks to help the
+    release team win. The previous PLAYER_ELIMINATED guard was removed.
+    """
     room, ids = _started_room(3)
     pid = ids[0]
     room.players[pid].is_alive = False
     # Place near a task.
     tx, ty = room.task_position("fix_unit_tests")
     room.players[pid].x, room.players[pid].y = tx, ty
-    with pytest.raises(GameRoomError) as exc:
-        room.apply_task_hold_start(pid, "fix_unit_tests")
-    assert exc.value.code == "PLAYER_ELIMINATED"
+    room.apply_task_hold_start(pid, "fix_unit_tests")
+    assert pid in room.tasks["fix_unit_tests"].per_player_progress
 
 
 def test_eliminated_chaos_cannot_sabotage():
@@ -226,13 +228,16 @@ def test_eliminated_chaos_cannot_sabotage():
     assert exc.value.code == "PLAYER_ELIMINATED"
 
 
-def test_eliminated_player_input_is_ignored():
+def test_eliminated_player_input_is_accepted():
+    """Spectator-Mode (Tier 2.6): ghosts can keep moving — apply_input no longer
+    drops their input. They still cannot move during MEETING phase (the tick
+    loop is frozen for everyone). This test only validates input acceptance.
+    """
     room, ids = _started_room(3)
     pid = ids[0]
     room.players[pid].is_alive = False
     room.apply_input(pid, InputState(right=True))
-    # The input was rejected -> input_state stays at default.
-    assert room.players[pid].input_state.right is False
+    assert room.players[pid].input_state.right is True
 
 
 # --- win condition --------------------------------------------------------

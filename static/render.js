@@ -289,15 +289,17 @@ export class Renderer {
       const charIndex = COLOR_TO_CHAR_INDEX[player.color] ?? 0;
       const half = CHARACTER_RENDER_SIZE / 2;
       ctx.save();
-      ctx.globalAlpha = isDead ? 0.35 : isDisconnected ? 0.5 : 1.0;
+      // Ghosts and disconnected players both render at 0.5 alpha; living
+      // players draw fully opaque. Color stays the player's own color.
+      ctx.globalAlpha = isDead || isDisconnected ? 0.5 : 1.0;
 
       // Colored ring at feet (player identity color stays visible).
       ctx.beginPath();
       ctx.ellipse(player.x, player.y + half * 0.85, half * 0.7, half * 0.22, 0, 0, Math.PI * 2);
       ctx.fillStyle = player.color;
-      ctx.globalAlpha = isDead ? 0.35 * 0.55 : isDisconnected ? 0.5 * 0.55 : 0.55;
+      ctx.globalAlpha = isDead || isDisconnected ? 0.5 * 0.55 : 0.55;
       ctx.fill();
-      ctx.globalAlpha = isDead ? 0.35 : isDisconnected ? 0.5 : 1.0;
+      ctx.globalAlpha = isDead || isDisconnected ? 0.5 : 1.0;
       ctx.strokeStyle = "#0b0f1f";
       ctx.lineWidth = 1.5;
       ctx.stroke();

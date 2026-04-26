@@ -76,13 +76,14 @@ registry = GameRegistry()
 manager = ConnectionManager()
 
 
-def _game_state_msg(room: GameRoom) -> GameStateMsg:
+def _game_state_msg_for(room: GameRoom, viewer_id: str) -> GameStateMsg:
+    """Per-viewer build of GameStateMsg — alive viewers see only alive players.
+
+    Spectator-Mode (Tier 2.6): the server is authoritative for hiding ghosts
+    from alive players. There's no all-viewers variant in the broadcast path
+    anymore; ghosts/unknown viewers receive the full roster as a fallback.
     """
-    Build a GameStateMsg from the room's public_state dict. Using model_validate
-    relies on public_state using camelCase keys that match GameStateMsg field aliases.
-    """
-    public = room.public_state()
-    return GameStateMsg.model_validate(public)
+    return GameStateMsg.model_validate(room.public_state_for(viewer_id))
 
 
 async def _tick_loop() -> None:
@@ -96,9 +97,15 @@ async def _tick_loop() -> None:
                         if room.is_empty():
                             registry.drop_if_empty(room.code)
                             continue
-                        await manager.broadcast(
-                            room.code, envelope("game_state", _game_state_msg(room))
-                        )
+                        # Per-socket personalized game_state: alive viewers
+                        # only see alive players (ghosts are hidden from them).
+                        for session in manager.sessions_in_room(room.code):
+                            await session.ws.send_json(
+                                envelope(
+                                    "game_state",
+                                    _game_state_msg_for(room, session.player_id),
+                                )
+                            )
                         # Per-chaos-agent private_state with their take-down
                         # cooldown. Release-team players don't get this msg
                         # (avoids cluttering their channel + zero-leak surface).
@@ -263,7 +270,7 @@ async def _handle_rejoin(ws: WebSocket, msg: Rejoin) -> None:
     if room.phase is Phase.LOBBY:
         await ws.send_json(envelope("lobby_state", LobbyStateMsg(**room.lobby_snapshot())))
     else:
-        await ws.send_json(envelope("game_state", _game_state_msg(room)))
+        await ws.send_json(envelope("game_state", _game_state_msg_for(room, player.id)))
 
 
 async def _handle_start(ws: WebSocket, msg: StartGame) -> None:
@@ -297,7 +304,8 @@ async def _handle_start(ws: WebSocket, msg: StartGame) -> None:
             ),
         )
     # Immediate public state so clients switch to the game view.
-    await manager.broadcast(room.code, envelope("game_state", _game_state_msg(room)))
+    for s in manager.sessions_in_room(room.code):
+        await s.ws.send_json(envelope("game_state", _game_state_msg_for(room, s.player_id)))
 
 
 async def _handle_input(ws: WebSocket, msg: PlayerInput) -> None:
@@ -462,7 +470,8 @@ async def _handle_disconnect(ws: WebSocket) -> None:
         # Mid-round disconnect — preserve identity for grace period.
         room.mark_disconnected(session.player_id)
         # Broadcast updated state so others see them as disconnected.
-        await manager.broadcast(room.code, envelope("game_state", _game_state_msg(room)))
+        for s in manager.sessions_in_room(room.code):
+            await s.ws.send_json(envelope("game_state", _game_state_msg_for(room, s.player_id)))
     else:
         # Lobby/Ended — fully remove.
         room.remove_player(session.player_id)
@@ -474,7 +483,8 @@ async def _handle_disconnect(ws: WebSocket) -> None:
                 room.code, envelope("lobby_state", LobbyStateMsg(**room.lobby_snapshot()))
             )
         else:
-            await manager.broadcast(room.code, envelope("game_state", _game_state_msg(room)))
+            for s in manager.sessions_in_room(room.code):
+                await s.ws.send_json(envelope("game_state", _game_state_msg_for(room, s.player_id)))
 
 
 # Static frontend.

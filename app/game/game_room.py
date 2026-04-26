@@ -390,8 +390,10 @@ class GameRoom:
     # --- input + tick ------------------------------------------------------
 
     def apply_input(self, player_id: str, input_state: InputState) -> None:
+        # Ghosts (is_alive=False) are allowed to send input — they keep moving
+        # as spectators. Disconnected players still cannot.
         player = self.players.get(player_id)
-        if player is None or not player.is_alive or not player.is_connected:
+        if player is None or not player.is_connected:
             return
         player.input_state = input_state
 
@@ -407,35 +409,41 @@ class GameRoom:
             dx = int(player.input_state.right) - int(player.input_state.left)
             dy = int(player.input_state.down) - int(player.input_state.up)
             if dx or dy:
-                speed = self._current_speed_for(player.id)
+                # Ghosts ignore the slow-down sabotages and pass through walls.
+                speed = self._current_speed_for(player.id) if player.is_alive else NORMAL_SPEED
                 length = (dx * dx + dy * dy) ** 0.5
                 step_x = (dx / length) * speed * dt
                 step_y = (dy / length) * speed * dt
 
-                # Move along x first, then resolve walls.
-                new_x = player.x + step_x
-                if step_x != 0:
-                    new_x, _ = resolve_wall_collision(
-                        new_x,
-                        player.y,
-                        step_x,
-                        0.0,
-                        self._walls,
-                    )
-                # Then y.
-                new_y = player.y + step_y
-                if step_y != 0:
-                    _, new_y = resolve_wall_collision(
-                        new_x,
-                        new_y,
-                        0.0,
-                        step_y,
-                        self._walls,
-                    )
+                if player.is_alive:
+                    # Move along x first, then resolve walls.
+                    new_x = player.x + step_x
+                    if step_x != 0:
+                        new_x, _ = resolve_wall_collision(
+                            new_x,
+                            player.y,
+                            step_x,
+                            0.0,
+                            self._walls,
+                        )
+                    # Then y.
+                    new_y = player.y + step_y
+                    if step_y != 0:
+                        _, new_y = resolve_wall_collision(
+                            new_x,
+                            new_y,
+                            0.0,
+                            step_y,
+                            self._walls,
+                        )
+                else:
+                    # Ghosts: no wall collision resolution.
+                    new_x = player.x + step_x
+                    new_y = player.y + step_y
                 player.x = new_x
                 player.y = new_y
 
-                # Map-edge clamp (perimeter).
+                # Map-edge clamp (perimeter) — applies to ghosts too.
                 if player.x < 0:
                     player.x = 0.0
                 elif player.x > self.map.size.width:
@@ -514,11 +522,10 @@ class GameRoom:
     def apply_task_hold_start(self, player_id: str, task_id: str) -> None:
         if self.phase is not Phase.PLAYING:
             raise GameRoomError(code="WRONG_PHASE", message="Tasks only during playing.")
+        # Ghosts may complete tasks — they help the release-team win.
         player = self.players.get(player_id)
-        if player is None or not player.is_alive:
-            raise GameRoomError(
-                code="PLAYER_ELIMINATED", message="Eliminated players cannot do tasks."
-            )
+        if player is None:
+            raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
         task = self.tasks.get(task_id)
         if task is None:
             raise GameRoomError(code="UNKNOWN_TASK", message=f"Unknown task {task_id!r}.")
@@ -893,27 +900,29 @@ class GameRoom:
 
     # --- serialization accessors ------------------------------------------
 
-    def public_state(self) -> dict:
-        """Oeffentlicher GameState -- enthaelt keine Rolle/Team/Input."""
+    def _all_players_serialized(self) -> list[dict]:
+        return [
+            {
+                "id": p.id,
+                "name": p.name,
+                "x": round(p.x, 2),
+                "y": round(p.y, 2),
+                "color": p.color,
+                "isHost": p.is_host,
+                "isAlive": p.is_alive,
+                "isConnected": p.is_connected,
+            }
+            for p in self.players.values()
+        ]
+
+    def _public_state_base(self) -> dict:
+        """Shared state across all viewers. The `players` field is filled by callers."""
         return {
             "phase": self.phase.value,
             "remainingSeconds": int(self.remaining_seconds),
             "releaseProgress": int(self.release_progress),
             "pipelineStability": int(self.pipeline_stability),
             "coffeeLevel": int(self.coffee_level),
-            "players": [
-                {
-                    "id": p.id,
-                    "name": p.name,
-                    "x": round(p.x, 2),
-                    "y": round(p.y, 2),
-                    "color": p.color,
-                    "isHost": p.is_host,
-                    "isAlive": p.is_alive,
-                    "isConnected": p.is_connected,
-                }
-                for p in self.players.values()
-            ],
             "tasks": [
                 {
                     "id": t.definition.id,
@@ -966,6 +975,45 @@ class GameRoom:
                 for b in self.bodies.values()
             ],
         }
+
+    def public_state(self) -> dict:
+        """Oeffentlicher GameState -- enthaelt keine Rolle/Team/Input.
+
+        Unfiltered: every viewer sees every player. Used by callers without a
+        specific viewer (lobby snapshots, tests). For per-socket broadcasts
+        prefer `public_state_for(viewer_id)`.
+        """
+        state = self._public_state_base()
+        state["players"] = self._all_players_serialized()
+        return state
+
+    def public_state_for(self, viewer_id: str) -> dict:
+        """Personalized GameState — alive viewers do NOT see ghosts.
+
+        Ghosts (and unknown viewers, defensive fallback) get the full player
+        list including dead players. Bodies/tasks/sabotages/events/meeting are
+        identical for everyone.
+        """
+        state = self._public_state_base()
+        viewer = self.players.get(viewer_id)
+        if viewer is None or not viewer.is_alive:
+            state["players"] = self._all_players_serialized()
+        else:
+            state["players"] = [
+                {
+                    "id": p.id,
+                    "name": p.name,
+                    "x": round(p.x, 2),
+                    "y": round(p.y, 2),
+                    "color": p.color,
+                    "isHost": p.is_host,
+                    "isAlive": p.is_alive,
+                    "isConnected": p.is_connected,
+                }
+                for p in self.players.values()
+                if p.is_alive
+            ]
+        return state
 
     def ended_snapshot(self) -> dict:
         """

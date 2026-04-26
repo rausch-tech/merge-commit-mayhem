@@ -550,16 +550,26 @@ def test_full_voting_round_eliminates_named_target():
         assert result["payload"]["removedPlayerName"] == "Carol"
         assert result["payload"]["tie"] is False
         assert result["payload"]["skipped"] is False
-        # Phase should be back to playing afterward.
+        # Phase should be back to playing afterward. Spectator-Mode (Tier 2.6):
+        # alive viewers no longer see ghosts in their player list, so we look
+        # at Carol's own socket (ws_c, dead viewer) which always includes herself.
         for _ in range(20):
-            msg = ws_a.receive_json()
+            msg = ws_c.receive_json()
             if msg["type"] == "game_state" and msg["payload"]["phase"] == "playing":
-                # Carol should be marked dead in the player list.
                 carol_in_state = next(p for p in msg["payload"]["players"] if p["id"] == carol_id)
                 assert carol_in_state["isAlive"] is False
                 break
         else:
             raise AssertionError("Phase did not return to playing")
+        # And from Alice's (alive) point of view, Carol must be hidden.
+        for _ in range(20):
+            msg = ws_a.receive_json()
+            if msg["type"] == "game_state" and msg["payload"]["phase"] == "playing":
+                ids_seen = {p["id"] for p in msg["payload"]["players"]}
+                assert carol_id not in ids_seen
+                break
+        else:
+            raise AssertionError("Alice did not receive a playing-phase game_state")
 
 
 # --- Reconnect integration tests ---
