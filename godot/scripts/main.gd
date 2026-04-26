@@ -89,8 +89,21 @@ func _switch_to_world() -> void:
 	var sender := world.get_node("InputSender") as InputSender
 	if sender != null:
 		sender.attach(_ws)
-	visible = false
+	# Connect-Form ausblenden, Log als Overlay sichtbar lassen.
+	$Panel/VBox/Title.visible = false
+	$Panel/VBox/UrlLabel.visible = false
+	$Panel/VBox/UrlField.visible = false
+	$Panel/VBox/RoomLabel.visible = false
+	$Panel/VBox/RoomField.visible = false
+	$Panel/VBox/NameLabel.visible = false
+	$Panel/VBox/NameField.visible = false
+	$Panel/VBox/ConnectBtn.visible = false
+	$Panel.modulate = Color(1, 1, 1, 0.55)
+	$Panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	$Panel/VBox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_log.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 func _append_log(line: String) -> void:
+	print(line)
 	_log.text += line + "\n"
 	_log.scroll_vertical = _log.get_line_count()
