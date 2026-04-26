@@ -9,6 +9,7 @@ extends Control
 var _ws: WSClient
 var _player_id: String = ""
 var _map: Dictionary = {}
+var _renderer: DebugRenderer = null
 
 func _ready() -> void:
 	_ws = WSClient.new()
@@ -53,18 +54,39 @@ func _on_message(type_: String, payload: Dictionary) -> void:
 			_append_log("[room_joined] playerId=%s isHost=%s mapName=%s" % [
 				_player_id, is_host, _map.get("name", "?")
 			])
+			_switch_to_world()
 		Protocol.TYPE_LOBBY_STATE:
 			var players: Array = payload.get("players", [])
 			var names: Array = []
 			for p in players:
 				names.append(str(p.get("name", "?")))
 			_append_log("[lobby_state] players=[%s]" % ", ".join(names))
+			if _renderer != null:
+				_renderer.set_players(players)
+		Protocol.TYPE_GAME_STATE:
+			if _renderer != null:
+				_renderer.push_snapshot(payload.get("players", []), float(Time.get_ticks_msec()))
 		Protocol.TYPE_ERROR:
 			_append_log("[server_error] code=%s message=%s" % [
 				payload.get("code", "?"), payload.get("message", "?")
 			])
 		_:
 			_append_log("[%s] %s" % [type_, JSON.stringify(payload)])
+
+func _switch_to_world() -> void:
+	if _renderer != null:
+		return  # already switched
+	var world_scene := load("res://scenes/debug_world.tscn") as PackedScene
+	if world_scene == null:
+		_append_log("[error] debug_world.tscn not found")
+		return
+	var world := world_scene.instantiate()
+	get_tree().root.add_child.call_deferred(world)
+	await get_tree().process_frame
+	_renderer = world.get_node("Renderer") as DebugRenderer
+	_renderer.set_map(_map)
+	_renderer.set_self_player_id(_player_id)
+	visible = false
 
 func _append_log(line: String) -> void:
 	_log.text += line + "\n"
