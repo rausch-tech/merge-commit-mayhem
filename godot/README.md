@@ -1,6 +1,10 @@
 # MCM Godot Spike
 
-Bootstrapping-Spike für den späteren Tier-3-Godot-Client.
+Bootstrapping-Spike für den späteren Tier-4-Godot-Client.
+
+> **Hinweis (2026-04-27):** Die Roadmap wurde nach Spike-Erstellung restrukturiert
+> — Mini-Games sind jetzt Tier 3 (auf `main` shipped), Godot-Migration ist Tier 4.
+> Funktional ändert das am Spike nichts. `docs/ROADMAP.md` zeigt den aktuellen Stand.
 
 ## Was das ist
 
@@ -63,8 +67,9 @@ Room Code joinen — beide Clients sehen sich gegenseitig.
 - `scripts/debug_renderer.gd` — `_draw()` für Map und Spieler, Snapshot-Buffer
 - `scripts/input_sender.gd` — Tastatur-Capture mit 20-Hz-Throttle
 
-## Nächste Schritte (Tier 3)
+## Nächste Schritte (Tier 4)
 
-Siehe `../docs/ROADMAP.md` Tier 3. Der Spike ist die Basis — Tier 3.1
-übernimmt Connect+Lobby aus diesem Skelett, Tier 3.3 ersetzt den
-DebugRenderer durch Tilemap, Tier 3.4 ersetzt Player-Boxen durch Sprites.
+Siehe `../docs/ROADMAP.md` Tier 4. Der Spike ist die Basis — Tier 4.1
+übernimmt Connect+Lobby aus diesem Skelett, Tier 4.3 ersetzt den
+DebugRenderer durch Tilemap, Tier 4.4 ersetzt Player-Boxen durch Sprites,
+Tier 4.6 implementiert das in Tier 3 etablierte Mini-Game-API in Godot.

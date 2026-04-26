@@ -1,6 +1,11 @@
 # Godot-Client Bootstrapping-Spike — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+>
+> **Roadmap-Update 2026-04-27:** Tier 3 heißt jetzt „Mini-Games (Task-Tiefe)", die Godot-Migration
+> ist auf **Tier 4** gewandert. Tier-Referenzen unten beziehen sich auf den Stand bei Plan-Erstellung
+> (2026-04-26). Aktuelle Nummerierung in `docs/ROADMAP.md` und in den Resume-Notes.
+> Der Plan wurde inline implementiert und ist abgeschlossen — siehe Resume-Notes für Status.
 
 **Goal:** Schmaler Godot-4.3-Client gegen den existierenden FastAPI-Backend, der das WS-Protokoll real validiert, `docs/CLIENT.md` mit gemessenen Werten füllt und ein Skelett für Tier 3 hinterlässt.
 

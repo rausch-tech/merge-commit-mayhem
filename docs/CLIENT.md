@@ -1,6 +1,6 @@
 # Client Expectations
 
-> Server-seitige Erwartungen an *jeden* Client (Browser jetzt, Godot ab Tier 3).
+> Server-seitige Erwartungen an *jeden* Client (Browser jetzt, Godot ab Tier 4).
 > Diese Doku ist normativ. Wenn Client-Verhalten widerspricht, ist eines von beiden
 > falsch — wir entscheiden bewusst, welches angepasst wird.
 >
@@ -21,7 +21,7 @@
 - **Default-Zoom-Faktor (Spike, Viewport 1280×720):** `Vector2(0.225, 0.225)` zeigt die Map vollständig zentriert. `[VERIFY:Phase-3]`
 - **Player-Kollisions-Radius:** 20 px (siehe `app/game/walls.py:PLAYER_COLLISION_RADIUS`).
 - **Task-Interaction-Radius:** 40 px (siehe `app/game/tasks.py:TASK_INTERACTION_RADIUS`).
-- **Tilemap-Cell-Size:** offen, kommt mit Tier 3.3.
+- **Tilemap-Cell-Size:** offen, kommt mit Tier 4.3 (Map-Loader → Tilemap-Layer).
 
 ## 2. Tick- und Interpolations-Modell
 
@@ -42,8 +42,9 @@
 
 ## 4. Bewusst ausgeklammert (eigene Slices)
 
-- **Asset-Mapping** (Sprites/Animations pro Spieler/Task/Sabotage) → Tier 3.0.1–3.0.3.
-- **Sound-Trigger-Liste** (welches Server-Event triggert welchen SFX) → Tier 3.11.
+- **Asset-Mapping** (Sprites/Animations pro Spieler/Task/Sabotage) → Tier 4.0.1–4.0.3.
+- **Sound-Trigger-Liste** (welches Server-Event triggert welchen SFX) → Tier 4.11.
+- **Mini-Game-API** (Tier 3, seit 2026-04-27 auf `main`): die WS-Messages `mini_game_started` / `mini_game_input` / `mini_game_state` / `mini_game_completed` sowie das pluggable Modal-Pattern (`static/minigames/`) sind Browser-only. Der Godot-Client muss in Tier 4.6 das gleiche API umsetzen — bis dahin ignoriert der Spike Mini-Game-Messages.
 
 ## 5. Backend-Doku-Lücken (vom Spike entdeckt)
 
