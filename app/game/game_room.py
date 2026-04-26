@@ -25,6 +25,7 @@ from app.game.sabotages import (
     SabotageDefinition,
 )
 from app.game.tasks import (
+    SABOTAGE_CONSOLE_INTERACTION_RADIUS,
     SABOTAGE_PANEL_INTERACTION_RADIUS,
     TASK_DEFINITIONS,
     TASK_INTERACTION_RADIUS,
@@ -865,6 +866,14 @@ class GameRoom:
             raise GameRoomError(
                 code="COMMS_DOWN", message="Slack ist down — keine weitere Sabotage."
             )
+        # Tier 2.7: chaos must stand at a Sabotage-Console. Maps without any
+        # console fall back to the legacy "trigger from anywhere" behaviour so
+        # editor maps don't break silently — author opts in by adding consoles.
+        if self.map.sabotage_consoles and not self._near_any_sabotage_console(player):
+            raise GameRoomError(
+                code="NOT_NEAR_CONSOLE",
+                message="Stell dich an eine Sabotage-Konsole, um zu sabotieren.",
+            )
 
         # Apply the effect.
         if sabotage_id == "ci_cd_red":
@@ -1152,6 +1161,17 @@ class GameRoom:
 
     # --- meeting + voting -------------------------------------------------
 
+    def _near_any_sabotage_console(self, player) -> bool:
+        """Tier 2.7: returns True iff the player is within reach of any
+        Sabotage-Console on the current map."""
+        r2 = SABOTAGE_CONSOLE_INTERACTION_RADIUS * SABOTAGE_CONSOLE_INTERACTION_RADIUS
+        for c in self.map.sabotage_consoles:
+            dx = player.x - c.x
+            dy = player.y - c.y
+            if dx * dx + dy * dy <= r2:
+                return True
+        return False
+
     def _is_in_war_room(self, player) -> bool:
         x_min, y_min, x_max, y_max = self._war_room_bounds
         return x_min <= player.x <= x_max and y_min <= player.y <= y_max
@@ -1373,6 +1393,9 @@ class GameRoom:
             "vents": [
                 {"id": v.id, "x": v.x, "y": v.y, "connectedTo": list(v.connected_to)}
                 for v in self.map.vents
+            ],
+            "sabotageConsoles": [
+                {"id": c.id, "x": c.x, "y": c.y} for c in self.map.sabotage_consoles
             ],
         }
 

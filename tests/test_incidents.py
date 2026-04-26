@@ -160,8 +160,11 @@ def test_task_with_negative_incidents_change_reduces_incidents():
 
 def test_sabotage_with_incidents_increase_raises_incidents_on_trigger():
     """A sabotage carrying incidents_increase=25 must raise incidents when triggered."""
+    from tests.conftest import snap_to_first_console
+
     room = _started_room()
     chaos_id = next(p.id for p in room.players.values() if p.team == "chaos_agents")
+    snap_to_first_console(room, chaos_id)
 
     # Patch the runtime sabotage definition with an incidents_increase clone.
     sab_runtime = room.sabotages["ci_cd_red"]

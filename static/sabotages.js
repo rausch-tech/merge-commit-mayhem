@@ -18,6 +18,24 @@ export class SabotagePanel {
     this.buttons = new Map(); // sabotage_id -> { btn, cdEl, fillEl }
     this.availableIds = [];
     this.totalCooldowns = {}; // sabotage_id -> total seconds (for ring fraction)
+    this.consoleAvailable = true; // Tier 2.7: defaults true so legacy maps without consoles still work
+  }
+
+  /**
+   * Tier 2.7: when the local chaos player is in reach of a Sabotage-Console
+   * (or the map has none), buttons are tappable. Otherwise we show them
+   * disabled with a hint, so the player doesn't waste time on rejected taps.
+   */
+  updateConsoleAvailability(available) {
+    const next = !!available;
+    if (this.consoleAvailable === next) return;
+    this.consoleAvailable = next;
+    this.root.classList.toggle("sabotage-console-out-of-range", !next);
+    // Force a refresh of all button disabled states from the latest known
+    // sabotage snapshot — we cache it on the entry during update.
+    for (const entry of this.buttons.values()) {
+      this._applyDisabledState(entry);
+    }
   }
 
   /**
@@ -82,15 +100,16 @@ export class SabotagePanel {
    */
   updateFromGameState(sabotages, opts = {}) {
     if (!sabotages || this.availableIds.length === 0) return;
-    const disabledByOwnDeath = !!opts.disabledByOwnDeath;
-    const disabledByCommsDown = !!opts.disabledByCommsDown;
+    this._lastDisabledByOwnDeath = !!opts.disabledByOwnDeath;
+    this._lastDisabledByCommsDown = !!opts.disabledByCommsDown;
     for (const sab of sabotages) {
       const entry = this.buttons.get(sab.id);
       if (!entry) continue;
       const cd = Math.max(0, sab.cooldownRemaining || 0);
       const total = this._cooldownTotal(sab.id, cd);
-      const blockedByComms = disabledByCommsDown && sab.id !== "comms_outage";
-      entry.btn.disabled = cd > 0 || disabledByOwnDeath || blockedByComms;
+      entry.lastCooldown = cd;
+      entry.lastSabotageId = sab.id;
+      this._applyDisabledState(entry);
       entry.cdEl.textContent = cd > 0 ? `${Math.ceil(cd)}s` : "";
       // Fill height represents ratio of remaining to total cooldown.
       const ratio = total > 0 && cd > 0 ? Math.min(1, cd / total) : 0;
@@ -98,6 +117,15 @@ export class SabotagePanel {
       // Active state visual cue.
       entry.btn.classList.toggle("sabotage-active", !!sab.active);
     }
+  }
+
+  _applyDisabledState(entry) {
+    const cd = entry.lastCooldown || 0;
+    const blockedByComms =
+      !!this._lastDisabledByCommsDown && entry.lastSabotageId !== "comms_outage";
+    const blockedByConsole = !this.consoleAvailable;
+    entry.btn.disabled =
+      cd > 0 || !!this._lastDisabledByOwnDeath || blockedByComms || blockedByConsole;
   }
 
   _cooldownTotal(id, currentCd) {

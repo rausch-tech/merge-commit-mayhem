@@ -239,6 +239,7 @@ Errors:
 - `UNKNOWN_SABOTAGE`
 - `SABOTAGE_ON_COOLDOWN`
 - `COMMS_DOWN` (beim Trigger waehrend `comms_outage` aktiv ist und die ausgewaehlte Sabotage nicht `comms_outage` selbst ist)
+- `NOT_NEAR_CONSOLE` (Tier 2.7: Chaos nicht in 50 px Reichweite einer `sabotageConsoles`-Konsole; nur wenn die Map mind. eine Konsole definiert)
 
 ### `repair_sabotage`
 
@@ -549,6 +550,7 @@ Felder im Detail:
 - `commsDown`: true waehrend `comms_outage` aktiv ist. Client zeigt Disable-Hinweis auf Tasks/Sabotagen.
 - `sabotagePanels`: Map-statische Liste der Repair-Panel-Positionen (eine pro repariererbarer Sabotage). Client nutzt sie fuer die UI-Hinweise „F naehe Panel".
 - `vents`: Map-statische Liste, dieselbe in jedem Frame. Client zeichnet sie fuer alle, nur Chaos kann interagieren.
+- `sabotageConsoles` (Tier 2.7): Map-statische Liste `[{id, x, y}]`. Chaos-Agenten muessen in 50-px-Reichweite mindestens einer Konsole stehen, um `trigger_sabotage` zu senden. Karten ohne Konsolen-Eintraege fallen zur „triggern von ueberall"-Legacy zurueck (rueckwaerts-kompatibel).
 - `bodies`: alle bisher entdeckten + nicht reporteten Leichen. Verschwindet beim Report.
 - `events`: kontinuierlich anwachsende Liste mit `seq`-Counter. Client trackt `lastSeq` und zeigt nur neue Eintraege.
 - `players[i].isConnected`: false waehrend Reconnect-Grace (Spieler kann zurueckkommen).
@@ -704,6 +706,7 @@ Schliesst die Session — Modal soll schliessen.
 | `NO_PANEL`                   | repair_sabotage                                              | Sabotage hat kein Repair-Panel auf der Map                               |
 | `OUT_OF_RANGE`               | repair_sabotage, report_body                                 | Spieler nicht in Reichweite                                              |
 | `COMMS_DOWN`                 | trigger_sabotage                                             | `comms_outage` blockt andere Sabotagen                                   |
+| `NOT_NEAR_CONSOLE`           | trigger_sabotage                                             | Tier 2.7: Chaos nicht in 50-px-Reichweite einer Sabotage-Konsole         |
 | `NO_VENT_NEARBY`             | use_vent                                                     | Spieler steht an keinem Vent                                             |
 | `UNKNOWN_TARGET`             | use_vent, trigger_takedown                                   | Target-Vent oder -Spieler unbekannt / nicht verbunden                    |
 | `TARGET_ELIMINATED`          | trigger_takedown                                             | Target ist schon tot                                                     |
@@ -731,6 +734,7 @@ Schliesst die Session — Modal soll schliessen.
 | Task-Interaction-Radius                        | 40 px           | `app/game/tasks.py:TASK_INTERACTION_RADIUS`        |
 | Sabotage-Panel-Interaction-Radius              | 50 px           | `app/game/tasks.py:SABOTAGE_PANEL_INTERACTION_RADIUS` |
 | Vent-Interaction-Radius                        | 50 px           | `app/game/tasks.py:VENT_INTERACTION_RADIUS`        |
+| Sabotage-Console-Interaction-Radius (Tier 2.7) | 50 px           | `app/game/tasks.py:SABOTAGE_CONSOLE_INTERACTION_RADIUS` |
 | Take-Down-Radius                               | 40 px           | `app/game/game_room.py:TAKEDOWN_RADIUS`            |
 | Take-Down-Cooldown                             | 25 s            | `app/game/game_room.py:TAKEDOWN_COOLDOWN`          |
 | Task-Respawn-Cooldown                          | 8 s             | `app/game/tasks.py:TASK_RESPAWN_COOLDOWN`          |

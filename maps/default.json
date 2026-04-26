@@ -39,5 +39,9 @@
     { "id": "v_server",  "x": 800,  "y": 2000, "connectedTo": ["v_open", "v_legacy"] },
     { "id": "v_legacy",  "x": 4200, "y": 2800, "connectedTo": ["v_open", "v_server"] }
   ],
+  "sabotageConsoles": [
+    { "id": "console_central",  "x": 1300, "y": 800  },
+    { "id": "console_basement", "x": 3600, "y": 2800 }
+  ],
   "warRoomId": "war_room"
 }

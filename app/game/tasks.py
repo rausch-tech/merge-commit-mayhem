@@ -11,6 +11,7 @@ TASK_INTERACTION_RADIUS: Final[float] = 40.0  # px around task center where E wo
 TASK_RESPAWN_COOLDOWN: Final[float] = 8.0  # s until a completed task becomes available again
 SABOTAGE_PANEL_INTERACTION_RADIUS: Final[float] = 50.0  # Tier 2.4: repair-panel reach
 VENT_INTERACTION_RADIUS: Final[float] = 50.0  # Tier 2.3: chaos-only vent reach
+SABOTAGE_CONSOLE_INTERACTION_RADIUS: Final[float] = 50.0  # Tier 2.7: chaos console reach
 
 
 @dataclass(frozen=True)

@@ -316,6 +316,14 @@ ws.on("game_state", (payload) => {
   // Tier 2.3: vents are part of the static map snapshot but the server now
   // re-broadcasts them in every game_state for client-side simplicity.
   renderer.setVents(payload.vents || []);
+  // Tier 2.7: chaos has to stand at one of these to trigger sabotages.
+  // Maps without consoles fall back to "trigger from anywhere" — mirror the
+  // server's legacy-compatibility branch on the client.
+  const consoles = payload.sabotageConsoles || [];
+  renderer.setSabotageConsoles(consoles);
+  sabotagePanel.updateConsoleAvailability(
+    consoles.length === 0 ? true : renderer.localPlayerNearConsole
+  );
   // Tier 2.5: Slack-Down — clear the task sidebar visually and flag the
   // sabotage panel so chaos buttons gray out.
   state.commsDown = !!payload.commsDown;

@@ -395,6 +395,25 @@ button:hover {
   box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.4);
 }
 
+/* Tier 2.7: when chaos is not at a Sabotage-Console, the whole panel grays
+   out and a hint appears so the player knows WHY the buttons are dead. */
+#sabotage-panel.sabotage-console-out-of-range::before {
+  content: "Stell dich an eine Sabotage-Konsole.";
+  display: block;
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  background: rgba(251, 191, 36, 0.12);
+  border-left: 3px solid #fbbf24;
+  border-radius: 4px;
+  color: #fbbf24;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+#sabotage-panel.sabotage-console-out-of-range .sabotage-btn {
+  opacity: 0.55;
+}
+
 .sabotage-cooldown-fill {
   position: absolute;
   left: 0;

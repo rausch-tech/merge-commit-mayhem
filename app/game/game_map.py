@@ -104,6 +104,19 @@ class Vent(BaseModel):
     connected_to: list[str] = Field(default_factory=list)
 
 
+class SabotageConsole(BaseModel):
+    """Tier 2.7: a control terminal a chaos agent must stand at to trigger any
+    sabotage. Mirrors Among Us — sabotages are physical actions, not
+    instant-from-anywhere. Multiple consoles per map are allowed (and
+    encouraged) so chaos has movement choices.
+    """
+
+    model_config = _camel()
+    id: str
+    x: float
+    y: float
+
+
 class GameMap(BaseModel):
     model_config = _camel()
     name: str
@@ -114,6 +127,7 @@ class GameMap(BaseModel):
     task_anchors: list[TaskAnchor] = Field(default_factory=list)
     sabotage_panels: list[SabotagePanel] = Field(default_factory=list)
     vents: list[Vent] = Field(default_factory=list)
+    sabotage_consoles: list[SabotageConsole] = Field(default_factory=list)
     war_room_id: str
 
 

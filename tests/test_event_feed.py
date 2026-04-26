@@ -27,7 +27,13 @@ def _started_room(player_count: int = 4, seed: int = 0) -> tuple[GameRoom, list[
 
 
 def _chaos_id(room: GameRoom) -> str:
-    return next(p.id for p in room.players.values() if p.team == "chaos_agents")
+    cid = next(p.id for p in room.players.values() if p.team == "chaos_agents")
+    # Tier 2.7: sabotages now require the chaos to stand at a console.
+    # Snap on lookup so existing tests don't need to know about the gate.
+    from tests.conftest import snap_to_first_console
+
+    snap_to_first_console(room, cid)
+    return cid
 
 
 # --- pure buffer behaviour ------------------------------------------------

@@ -4,13 +4,16 @@ import pytest
 
 from app.game.game_room import GameRoom, GameRoomError
 from app.game.sabotages import MEETING_DURATION
+from tests.conftest import snap_to_first_console
 
 
 def _room_with_roles() -> tuple[GameRoom, str, str]:
     """Return (room, chaos_player_id, dev_player_id). Uses seeded rng for determinism.
 
     Tier 1.5 requires 4 players to start; with 4 players (1 chaos + 3 release)
-    the Tier 2.1 chaos-parity rule is also satisfied.
+    the Tier 2.1 chaos-parity rule is also satisfied. Chaos is snapped onto
+    the map's first sabotage console (Tier 2.7) so existing apply_sabotage
+    tests don't need to know about the proximity gate.
     """
     room = GameRoom(code="ABCD")
     p0 = room.add_player("p0")
@@ -21,6 +24,7 @@ def _room_with_roles() -> tuple[GameRoom, str, str]:
     room.start(requesting_player_id=host_id, rng=random.Random(0))
     chaos_id = next(p.id for p in room.players.values() if p.team == "chaos_agents")
     dev_id = next(p.id for p in room.players.values() if p.team == "release_team")
+    snap_to_first_console(room, chaos_id)
     return room, chaos_id, dev_id
 
 
@@ -47,6 +51,31 @@ def test_release_team_cannot_trigger():
     with pytest.raises(GameRoomError) as exc:
         room.apply_sabotage(dev_id, "ci_cd_red")
     assert exc.value.code == "NOT_CHAOS_AGENT"
+
+
+def test_chaos_must_stand_at_a_console_to_trigger():
+    """Tier 2.7: sabotages from anywhere are forbidden — chaos has to walk to
+    a console first. Default map has consoles, so the gate fires."""
+    room, chaos_id, _ = _room_with_roles()
+    # _room_with_roles() snaps chaos onto the console; move them away first.
+    room.players[chaos_id].x = 0.0
+    room.players[chaos_id].y = 0.0
+    with pytest.raises(GameRoomError) as exc:
+        room.apply_sabotage(chaos_id, "ci_cd_red")
+    assert exc.value.code == "NOT_NEAR_CONSOLE"
+
+
+def test_chaos_can_trigger_when_inside_console_radius():
+    """Walk back to the console — allowed again."""
+    from app.game.tasks import SABOTAGE_CONSOLE_INTERACTION_RADIUS
+
+    room, chaos_id, _ = _room_with_roles()
+    console = room.map.sabotage_consoles[0]
+    # Just inside the radius.
+    room.players[chaos_id].x = console.x + SABOTAGE_CONSOLE_INTERACTION_RADIUS - 1
+    room.players[chaos_id].y = console.y
+    room.apply_sabotage(chaos_id, "ci_cd_red")  # should not raise
+    assert room.pipeline_stability == 80
 
 
 def test_cooldown_prevents_retrigger():

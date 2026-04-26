@@ -84,8 +84,10 @@ export class Renderer {
     this.activePanels = []; // [{sabotageId, x, y}] for currently-broken sabotages
     this.lightsOff = false; // toggles the radial vignette (Tier 2.4)
     this.vents = []; // [{id, x, y, connectedTo: [...]}] (Tier 2.3)
+    this.sabotageConsoles = []; // [{id, x, y}] (Tier 2.7)
     this.ownTeam = null; // 'release_team' | 'chaos_agents' | null
     this.localPlayerNearVent = null; // vent object the local chaos player is in reach of, else null
+    this.localPlayerNearConsole = false; // Tier 2.7: chaos in reach of any console
     this._running = false;
     this.map = null; // populated via setMap()
     this._walls = []; // computed when setMap is called
@@ -111,6 +113,9 @@ export class Renderer {
   }
   setVents(vents) {
     this.vents = vents || [];
+  }
+  setSabotageConsoles(consoles) {
+    this.sabotageConsoles = consoles || [];
   }
   setOwnTeam(team) {
     this.ownTeam = team || null;
@@ -356,6 +361,58 @@ export class Renderer {
     }
     this.localPlayerNearVent = nearVent;
 
+    // Sabotage Consoles (Tier 2.7). Visible to everyone — they're physical
+    // map architecture — but only chaos can interact. Visual: amber terminal
+    // with a small screen + indicator LED, distinct from vents (steel grille)
+    // and repair panels (pulsing red diamond).
+    const CONSOLE_INTERACT_RADIUS = 50;
+    let nearConsole = false;
+    for (const console_ of this.sabotageConsoles) {
+      ctx.save();
+      // Body + screen.
+      ctx.fillStyle = "#1f1208";
+      ctx.fillRect(console_.x - 16, console_.y - 14, 32, 28);
+      ctx.strokeStyle = "#fbbf24";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(console_.x - 16, console_.y - 14, 32, 28);
+      // Screen — amber CRT vibe.
+      ctx.fillStyle = "#78350f";
+      ctx.fillRect(console_.x - 12, console_.y - 10, 24, 16);
+      ctx.strokeStyle = "#fbbf24";
+      ctx.lineWidth = 1;
+      // Two scanlines on the screen.
+      ctx.beginPath();
+      ctx.moveTo(console_.x - 10, console_.y - 6);
+      ctx.lineTo(console_.x + 10, console_.y - 6);
+      ctx.moveTo(console_.x - 10, console_.y);
+      ctx.lineTo(console_.x + 10, console_.y);
+      ctx.stroke();
+      // LED that pulses when chaos is nearby (or always on, gently).
+      const ledAlpha =
+        this.ownTeam === "chaos_agents" ? 0.7 + 0.3 * Math.sin(Date.now() / 240) : 0.55;
+      ctx.fillStyle = `rgba(251, 191, 36, ${ledAlpha.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(console_.x + 11, console_.y - 11, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      if (this.ownTeam === "chaos_agents" && local) {
+        const dx = local.x - console_.x;
+        const dy = local.y - console_.y;
+        if (dx * dx + dy * dy <= CONSOLE_INTERACT_RADIUS * CONSOLE_INTERACT_RADIUS) {
+          ctx.beginPath();
+          ctx.arc(console_.x, console_.y, CONSOLE_INTERACT_RADIUS, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(251, 191, 36, 0.85)";
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          nearConsole = true;
+        }
+      }
+    }
+    this.localPlayerNearConsole = nearConsole;
+
     // Bodies (rendered BEFORE players so live players draw on top).
     for (const body of this.bodies) {
       ctx.save();
@@ -541,6 +598,30 @@ export class Renderer {
         ctx.lineWidth = 1;
         ctx.stroke();
       }
+    }
+
+    // Vents — small grey diamonds. Visible to everyone (they're map
+    // architecture); only chaos can interact, but everyone benefits from
+    // knowing where they are spatially.
+    for (const vent of this.vents) {
+      const vx = toX(vent.x);
+      const vy = toY(vent.y);
+      ctx.fillStyle = "#94a3b8";
+      ctx.beginPath();
+      ctx.moveTo(vx, vy - 2.5);
+      ctx.lineTo(vx + 2.5, vy);
+      ctx.lineTo(vx, vy + 2.5);
+      ctx.lineTo(vx - 2.5, vy);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Sabotage Consoles — small amber squares, only highlighted for chaos
+    // (release team also sees them since they're visible architecture, but
+    // the cue is more useful to chaos who actually plans routes around them).
+    for (const console_ of this.sabotageConsoles) {
+      ctx.fillStyle = this.ownTeam === "chaos_agents" ? "#fbbf24" : "#a16207";
+      ctx.fillRect(toX(console_.x) - 2.5, toY(console_.y) - 2.5, 5, 5);
     }
 
     // Local player — bright dot in the player's color with a white halo so
