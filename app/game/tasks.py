@@ -51,6 +51,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         room="server_room",
         required_seconds=6.0,
         pipeline_stability_reward=15,
+        mini_game="cable_pairing",
     ),
     TaskDefinition(
         id="refill_coffee",
@@ -58,6 +59,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         room="kitchen",
         required_seconds=4.0,
         coffee_level_set=100,
+        mini_game="coffee_pour",
     ),
     TaskDefinition(
         id="analyze_logs",

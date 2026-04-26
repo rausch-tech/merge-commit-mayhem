@@ -12,11 +12,11 @@ Dieses Dokument ist der **eine** Plan. Es ist die Wahrheit über den Stand und d
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Repo**                | https://github.com/rausch-tech/merge-commit-mayhem                                                                                                                                                                                                                                                                    |
 | **Live (Test-Server)**  | https://game.prod-is-lava.dev                                                                                                                                                                                                                                                                                         |
-| **Backend-Tests**       | 433 grün (`uv run pytest`)                                                                                                                                                                                                                                                                                            |
-| **Frontend-Tests**      | 27 grün (`npx vitest run`)                                                                                                                                                                                                                                                                                            |
+| **Backend-Tests**       | 448 grün (`uv run pytest`)                                                                                                                                                                                                                                                                                            |
+| **Frontend-Tests**      | 35 grün (`npx vitest run`)                                                                                                                                                                                                                                                                                            |
 | **Stack**               | Python 3.12 + FastAPI + Pydantic v2 + WebSockets, Vanilla JS + Canvas, Map als JSON-Daten, Vitest + happy-dom für Frontend-Smoke                                                                                                                                                                                      |
 | **Geshippte Tier 0–3**  | Foundation cleanup, Mechanik-Komplettierung, Among-Us-Features, Mini-Game-Framework — alles auf Live deployt                                                                                                                                                                                                          |
-| **Geshippte Slice-IDs** | lobby-movement → game-loop → scrolling-camera → spritesheets → character-sprites → walls → voting → map-data → eventfeed → incidents → tasks-1.4 → sabotages-1.4 → multi-chaos → audio-mute → map-editor → multi-map → in-game-menu → take-down → spectator → lights-out → vents → comms-outage → minigames-framework |
+| **Geshippte Slice-IDs** | lobby-movement → game-loop → scrolling-camera → spritesheets → character-sprites → walls → voting → map-data → eventfeed → incidents → tasks-1.4 → sabotages-1.4 → multi-chaos → audio-mute → map-editor → multi-map → in-game-menu → take-down → spectator → lights-out → vents → comms-outage → minigames-framework → mobile-touch-quickhack → mobile-drawers-minimap → cable-pairing → coffee-pour |
 
 **Was funktioniert (Live, Stand 2026-04-26):**
 
@@ -33,7 +33,6 @@ Dieses Dokument ist der **eine** Plan. Es ist die Wahrheit über den Stand und d
 
 **Offen vor dem Godot-Sprint:**
 
-- 0.13 Live-Test mit Team — die einzige Tier-0-Lücke; bestätigt Tier 0–3 in echter Spielsituation.
 - Asset-Pipeline-Entscheidung (Tier 4.0.x) bevor Tier 4 startet.
 
 ---
@@ -75,7 +74,7 @@ Sechs Tier, in der Reihenfolge wie sie gebaut werden sollten. Jedes Tier hat ein
 | 0.10 | **Reconnect** — Server bewahrt Spieler-Identität 30 s nach Disconnect                               | ✅ done   |
 | 0.11 | **Edge-Cases** — Host-Disconnect mid-Meeting etc.                                                   | ✅ done   |
 | 0.12 | **Auto-Deploy auf main** — GitHub-Actions baut Tarball, scp + ssh-restart auf EC2 (Test-Gate davor) | ✅ done\* |
-| 0.13 | **Live-Test mit Team** — 3–5 Runden, Bugs surfacen + fixen                                          | offen     |
+| 0.13 | **Live-Test mit Team** — 3–5 Runden, Bugs surfacen + fixen                                          | ✅ done   |
 
 \*Auto-Deploy steht; braucht zwei GitHub-Secrets (`EC2_SSH_KEY`, `EC2_HOST`) damit's tatsächlich pusht — siehe [`DEPLOY.md`](DEPLOY.md).
 
@@ -133,8 +132,10 @@ Naming-Prinzip: nerdig, dev-thematisch, „kill" wird vermieden zugunsten von ha
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | 3.1 | **Mini-Game-Framework** — Server: Task-Schema kriegt `mini_game: str`. WS: `mini_game_started` / `mini_game_input` / `mini_game_state` / `mini_game_completed`. Client: pluggable Modal. | ✅ done |
 | 3.2 | **Beispiel: „Test-Suite reparieren"** (für `fix_unit_tests`) — Liste aus 5 fehlerhaften Tests, klick die Bugs in der richtigen Reihenfolge weg.                                          | ✅ done |
+| 3.3 | **„Server-Racks neu verkabeln"** (für `repair_deployment`) — Among-Us-Cables im Re-Skin: 4 farbige Source-Stecker links, 4 Buchsen rechts geshufflt, Tap-Pairing, Mismatch = Soft-Reset. | ✅ done |
+| 3.4 | **„Kaffee einschenken"** (für `refill_coffee`) — Tasse fuellt sich zyklisch, Tap STOP im Sweet-Spot 70-100 %, sonst Cycle-Reset. Server-authoritative Timing.                            | ✅ done |
 
-**Done-Kriterium:** Eine Task läuft komplett über ein Mini-Game (Server-validiert), die anderen 7 bleiben Hold-E. Das Mini-Game-API ist dokumentiert und Live-getestet, sodass weitere Mini-Games als eigene Slices folgen können (Code-Review-Simulator, Logs-Filtern, Coffee-Pour-Timing usw.).
+**Done-Kriterium:** Eine Task läuft komplett über ein Mini-Game (Server-validiert), die anderen 7 bleiben Hold-E. Das Mini-Game-API ist dokumentiert und Live-getestet, sodass weitere Mini-Games als eigene Slices folgen können (Code-Review-Simulator, Logs-Filtern, Coffee-Pour-Timing usw.). Mit Tier 3.3 + 3.4 stehen jetzt drei Mechanik-Patterns (Sequencing, Pairing, Timing) als Vorlagen fuer kuenftige Tasks.
 
 ### Tier 4 — Godot-Migration
 
@@ -230,9 +231,9 @@ Diese Tier ist absichtlich vage — was hier passiert hängt davon ab wie das Ga
 
 ## Was als nächstes konkret zu tun ist
 
-**Aktueller Stand (2026-04-26):** Tier 0–3 sind durch (außer 0.13 Live-Test). Browser-Client deckt das gesamte Among-Us-Feature-Set ab + Mini-Game-Framework mit erstem Beispiel.
+**Aktueller Stand (2026-04-26):** Tier 0–3 sind durch. Browser-Client deckt das gesamte Among-Us-Feature-Set ab; drei Mini-Games (Sequencing/Pairing/Timing) decken bereits drei der acht Tasks ab.
 
-**Als nächstes:** **Tier 0.13 Live-Test mit Team** — bestätigt das Bauwerk in echter Spielsituation, surface Bugs bevor wir den Godot-Sprint starten. Plus iterative Mini-Game-Erweiterungen (Tier-3-Slices) je nachdem welche Tasks sich auf Live als platt anfühlen.
+**Als nächstes:** Asset-Pipeline-Entscheidung (Tier 4.0.x) anstossen — Pixel-Art-Pack einkaufen vs. AI-generierte DevOps-Sprites. Parallel weitere Mini-Games (Tier 3) fuer die restlichen 5 Tasks, wann immer eine als zu „flach" auf Live auffaellt.
 
 **Vor Godot:** Asset-Pipeline-Entscheidung (Tier 4.0.x) — Pixel-Art-Pack einkaufen vs. AI-generierte DevOps-Sprites. Sven entscheidet.
 

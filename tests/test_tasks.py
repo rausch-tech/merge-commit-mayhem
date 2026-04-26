@@ -175,7 +175,14 @@ def test_player_leaving_radius_drops_progress():
     assert room.tasks["review_pr"].status == "available"
 
 
-def test_refill_coffee_sets_coffee_to_100():
+def test_refill_coffee_sets_coffee_to_100(monkeypatch):
+    """refill_coffee runs through the coffee_pour mini-game (Tier 3.4). We
+    fake the monotonic clock so the test can land inside the sweet spot."""
+    from app.game.minigames import coffee_pour
+
+    fake = {"t": 1000.0}
+    monkeypatch.setattr(coffee_pour, "_now", lambda: fake["t"])
+
     room, ids = _room_with_players(2)
     pid = ids[0]
     tx, ty = room.task_position("refill_coffee")
@@ -183,12 +190,15 @@ def test_refill_coffee_sets_coffee_to_100():
     room.apply_input(pid, InputState())
     room.coffee_level = 0
     room.apply_task_hold_start(pid, "refill_coffee")
-    for _ in range(60):  # 6s > 4s required
-        room.tick(0.1)
+    # Advance into the sweet spot then stop.
+    fake["t"] += coffee_pour.CYCLE_SECONDS * 0.85
+    room.apply_mini_game_input(pid, "stop", {})
     assert room.coffee_level == 100
 
 
 def test_repair_deployment_raises_pipeline_clamped_at_100():
+    """repair_deployment runs through the cable_pairing mini-game (Tier 3.3).
+    Wire every source to its colour-twin destination to complete it."""
     room, ids = _room_with_players(2)
     pid = ids[0]
     tx, ty = room.task_position("repair_deployment")
@@ -196,8 +206,12 @@ def test_repair_deployment_raises_pipeline_clamped_at_100():
     room.apply_input(pid, InputState())
     room.pipeline_stability = 92  # +15 would overshoot to 107
     room.apply_task_hold_start(pid, "repair_deployment")
-    for _ in range(80):  # > 6s required
-        room.tick(0.1)
+    state = room.active_mini_games[pid].state
+    for src in state["sources"]:
+        dst = next(d for d in state["destinations"] if d["color"] == src["color"])
+        room.apply_mini_game_input(
+            pid, "connect", {"sourceId": src["id"], "destinationId": dst["id"]}
+        )
     assert room.pipeline_stability == 100
 
 
