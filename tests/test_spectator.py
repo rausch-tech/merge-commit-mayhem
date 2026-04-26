@@ -52,8 +52,8 @@ def test_ghost_moves_during_tick():
     p.x, p.y = 100.0, 100.0
     room.apply_input(pid, InputState(right=True))
     room.tick(0.1)
-    # NORMAL_SPEED * 0.1 = 15 px (no slow modifier applies to ghosts).
-    assert p.x == pytest.approx(115.0)
+    # No slow modifier applies to ghosts.
+    assert p.x == pytest.approx(100.0 + NORMAL_SPEED * 0.1)
 
 
 def test_ghost_passes_through_wall():

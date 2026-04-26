@@ -6,8 +6,8 @@ für Meeting / Coffee-Slow-Effekte.
 from dataclasses import dataclass
 from typing import Final
 
-NORMAL_SPEED: Final[float] = 150.0  # px/s, default movement
-COFFEE_SLOW_SPEED: Final[float] = 80.0  # px/s, while coffee_level == 0
+NORMAL_SPEED: Final[float] = 300.0  # px/s, default movement (scaled to 4800×3200 map)
+COFFEE_SLOW_SPEED: Final[float] = 160.0  # px/s, while coffee_level == 0
 MEETING_DURATION: Final[float] = 5.0  # s that mandatory_meeting keeps everyone slowed
 
 
