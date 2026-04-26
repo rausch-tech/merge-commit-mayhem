@@ -42,20 +42,30 @@ func set_map(map: Dictionary) -> void:
 	queue_redraw()
 
 func _fit_camera_to_map() -> void:
-	var camera := get_parent().get_node_or_null("Camera") as Camera2D
-	if camera == null:
+	if not is_inside_tree():
+		return
+	var parent_node := get_parent()
+	if parent_node == null:
+		return
+	var camera_node: Camera2D = parent_node.get_node_or_null("Camera") as Camera2D
+	if camera_node == null:
 		return
 	var size_dict: Dictionary = _map.get("size", {})
-	var map_w := float(size_dict.get("width", 4800))
-	var map_h := float(size_dict.get("height", 3200))
+	var map_w: float = float(size_dict.get("width", 4800))
+	var map_h: float = float(size_dict.get("height", 3200))
 	if map_w <= 0 or map_h <= 0:
 		return
-	var viewport_size := get_viewport_rect().size
+	var viewport := get_viewport()
+	if viewport == null:
+		return
+	var viewport_size: Vector2 = viewport.get_visible_rect().size
+	if viewport_size.x <= 0 or viewport_size.y <= 0:
+		return
 	var fit_x: float = viewport_size.x / map_w
 	var fit_y: float = viewport_size.y / map_h
 	var zoom_factor: float = minf(fit_x, fit_y) * 0.95
-	camera.zoom = Vector2(zoom_factor, zoom_factor)
-	camera.position = Vector2(map_w * 0.5, map_h * 0.5)
+	camera_node.zoom = Vector2(zoom_factor, zoom_factor)
+	camera_node.position = Vector2(map_w * 0.5, map_h * 0.5)
 
 func set_self_player_id(id: String) -> void:
 	_self_player_id = id
