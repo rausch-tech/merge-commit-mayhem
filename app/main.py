@@ -550,6 +550,11 @@ app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
 @app.get("/")
 async def root_index() -> FileResponse:
+    return FileResponse(_static_dir / "landing.html")
+
+
+@app.get("/play")
+async def play_page() -> FileResponse:
     return FileResponse(_static_dir / "index.html")
 
 
