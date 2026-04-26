@@ -15,7 +15,7 @@ laden.
 ```jsonc
 {
   "name": "default-office",
-  "size": { "width": 2400, "height": 1600 },
+  "size": { "width": 4800, "height": 3200 },
   "rooms":         [ ... ],
   "wallLines":     [ ... ],
   "spawnPoints":   [ ... ],
@@ -23,6 +23,11 @@ laden.
   "warRoomId":     "war_room"
 }
 ```
+
+`size` legt die Welt-Bounds in Pixeln fest. Die Default-Map ist seit Tier 1.0
+(Canvas-Vollbild) auf 4800×3200 vergrößert; ältere Maps (z.B. `small.json`)
+können kleiner sein. Server liest `size` aus der Map-JSON und broadcastet sie
+im `room_joined`-Frame an alle Clients.
 
 ## Rooms
 
