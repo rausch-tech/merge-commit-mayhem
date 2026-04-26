@@ -922,6 +922,31 @@ code {
   margin: 0;
 }
 
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.footer-rausch {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.75;
+  transition: opacity 0.15s;
+}
+
+.footer-rausch:hover {
+  opacity: 1;
+  text-decoration: none;
+}
+
+.footer-rausch img {
+  height: 22px;
+  width: auto;
+  display: block;
+}
+
 .footer-links a {
   color: var(--muted);
 }
