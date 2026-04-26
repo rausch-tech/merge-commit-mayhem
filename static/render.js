@@ -459,5 +459,103 @@ export class Renderer {
     }
 
     ctx.restore();
+
+    // Minimap overlay — drawn in screen space, after the camera restore so it
+    // stays glued to the top-right corner instead of moving with the player.
+    this._drawMinimap(viewW, viewH);
+  }
+
+  /**
+   * Top-right minimap. Shows only what the local player is allowed to see:
+   * room layout (dim), own player position, own visible tasks, active
+   * sabotage panels. Other players are intentionally NOT drawn — this is a
+   * social-deduction game and the minimap must not leak position info.
+   */
+  _drawMinimap(viewW, viewH) {
+    if (!this.map) return;
+    const isTouch = document.body.classList.contains("touch-active");
+    const maxSize = isTouch ? 110 : 140;
+    const padding = isTouch ? 8 : 12;
+
+    const mapW = this.map.size.width;
+    const mapH = this.map.size.height;
+    if (mapW <= 0 || mapH <= 0) return;
+    const aspect = mapW / mapH;
+    const mw = aspect >= 1 ? maxSize : maxSize * aspect;
+    const mh = aspect >= 1 ? maxSize / aspect : maxSize;
+
+    const x0 = viewW - mw - padding;
+    const y0 = padding;
+    const sx = mw / mapW;
+    const sy = mh / mapH;
+    const toX = (wx) => x0 + wx * sx;
+    const toY = (wy) => y0 + wy * sy;
+
+    const ctx = this.ctx;
+    ctx.save();
+
+    // Background panel + border.
+    ctx.fillStyle = "rgba(11, 15, 31, 0.78)";
+    ctx.strokeStyle = "rgba(96, 165, 250, 0.4)";
+    ctx.lineWidth = 1;
+    ctx.fillRect(x0 - 4, y0 - 4, mw + 8, mh + 8);
+    ctx.strokeRect(x0 - 4, y0 - 4, mw + 8, mh + 8);
+
+    // Clip remaining content to the minimap rect so room edges don't bleed.
+    ctx.beginPath();
+    ctx.rect(x0, y0, mw, mh);
+    ctx.clip();
+
+    // Rooms (dim, no titles).
+    ctx.globalAlpha = 0.4;
+    for (const room of this.map.rooms) {
+      ctx.fillStyle = room.color;
+      ctx.fillRect(toX(room.x), toY(room.y), room.width * sx, room.height * sy);
+    }
+    ctx.globalAlpha = 1;
+
+    // Walls.
+    ctx.fillStyle = "rgba(11, 15, 31, 0.9)";
+    for (const [wx1, wy1, wx2, wy2] of this._walls) {
+      ctx.fillRect(toX(wx1), toY(wy1), (wx2 - wx1) * sx, (wy2 - wy1) * sy);
+    }
+
+    // Own visible tasks (skip cooldowns — they aren't actionable).
+    for (const task of this.tasks) {
+      if (task.status === "cooldown") continue;
+      ctx.beginPath();
+      ctx.arc(toX(task.x), toY(task.y), 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = task.status === "in_progress" ? "#60a5fa" : "#4ade80";
+      ctx.fill();
+    }
+
+    // Active sabotage panels — pulsing red so they read as "go fix me now".
+    if (this.activePanels.length > 0) {
+      const pulse = 0.55 + 0.45 * Math.sin(Date.now() / 220);
+      for (const panel of this.activePanels) {
+        ctx.beginPath();
+        ctx.arc(toX(panel.x), toY(panel.y), 3, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(239, 68, 68, ${pulse.toFixed(3)})`;
+        ctx.fill();
+        ctx.strokeStyle = "rgba(239, 68, 68, 0.95)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+
+    // Local player — bright dot in the player's color with a white halo so
+    // it's easy to spot at a glance.
+    const local = this._localPlayer();
+    if (local) {
+      ctx.beginPath();
+      ctx.arc(toX(local.x), toY(local.y), 4, 0, Math.PI * 2);
+      ctx.fillStyle = local.color || "#e6ecff";
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    ctx.restore();
   }
 }
