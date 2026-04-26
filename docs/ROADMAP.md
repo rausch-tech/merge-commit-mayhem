@@ -105,92 +105,108 @@ Naming-Prinzip: nerdig, dev-thematisch, „kill" wird vermieden zugunsten von ha
 
 **Done-Kriterium:** Alle 6 Features implementiert + getestet. Game spielt sich „wie Among Us, aber dev-themed". Mit Live-Tests bestätigt.
 
-### Tier 3 — Godot-Migration
+### Tier 3 — Mini-Games (Task-Tiefe)
+
+**Ziel:** Tasks fühlen sich nicht mehr wie „hinlaufen + E drücken" an. Jede Task wird zu einem kleinen Spiel — entscheidende Spannungsquelle, weil ein Spieler an einer Task „sichtbar beschäftigt" sein muss und Saboteure das ausnutzen können.
+
+**Aufwand:** ~3 Tage (für Framework + Beispiel). Erweiterung auf alle Tasks erfolgt iterativ in folgenden Slices, sobald sich das Pattern bewährt hat.
+
+**Reihenfolge:** kommt **vor** Godot, weil das Mini-Game-API die Godot-Migration prägt. Wird das API in Browser ausgereift festgelegt, spart Tier 4 (Godot) doppelte Arbeit.
+
+| #   | Was                                                                                                                                                               | Aufwand |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 3.1 | **Mini-Game-Framework** — Server: Task-Schema kriegt `mini_game: str`. WS: `mini_game_start` / `mini_game_input` / `mini_game_complete`. Client: pluggable Modal. | 2 Tage  |
+| 3.2 | **Beispiel: „Test-Suite reparieren"** (für `fix_unit_tests`) — Liste aus 5 fehlerhaften Tests, klick die Bugs in der richtigen Reihenfolge weg.                   | 1 Tag   |
+
+**Done-Kriterium:** Eine Task läuft komplett über ein Mini-Game (Server-validiert), die anderen 7 bleiben Hold-E. Das Mini-Game-API ist dokumentiert und Live-getestet, sodass weitere Mini-Games als eigene Slices folgen können (Code-Review-Simulator, Logs-Filtern, Coffee-Pour-Timing usw.).
+
+### Tier 4 — Godot-Migration
 
 **Ziel:** Browser-Client bleibt als Web-Fallback und Reference-Implementation. Godot wird der polished primary client mit echten Charakter-Animationen, Tilemaps, Sound-Mixing und Particle-Effects.
 
 **Aufwand:** ~5–7 Wochen.
 
-Der Godot-Sprint kommt **nach** Tier 0–2, weil:
+Der Godot-Sprint kommt **nach** Tier 0–3, weil:
 
 - Mit unfinishedem Browser doppelte Feature-Arbeit
 - Ohne Foundation-Cleanup (Tier 0) keine Test-Sicherheit beim Porten
-- Without Among-Us-Features im Browser (Tier 2) keine klare Spec für Godot
+- Ohne Among-Us-Features im Browser (Tier 2) keine klare Spec für Godot
+- Ohne Mini-Game-API im Browser (Tier 3) doppelte Mini-Game-Arbeit in Godot
 
 #### Vor-Godot-Block (Decisions, ~1 Woche)
 
 | #     | Was                                                                                                                    | Status           |
 | ----- | ---------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| 3.0.1 | Asset-Pipeline-Entscheidung — Pixel-Art-Pack einkaufen + AI-generierte DevOps-Sprites (Coffee-Maschinen, Server-Racks) | Sven entscheidet |
-| 3.0.2 | Asset-Pack-Beschaffung — itch.io / Humble / Synty research + Lizenz-Doku                                               | 1 Tag            |
-| 3.0.3 | DevOps-Theme-Sprites generieren oder commission'en (Coffee, Server, Bug, etc.)                                         | 1–3 Tage         |
+| 4.0.1 | Asset-Pipeline-Entscheidung — Pixel-Art-Pack einkaufen + AI-generierte DevOps-Sprites (Coffee-Maschinen, Server-Racks) | Sven entscheidet |
+| 4.0.2 | Asset-Pack-Beschaffung — itch.io / Humble / Synty research + Lizenz-Doku                                               | 1 Tag            |
+| 4.0.3 | DevOps-Theme-Sprites generieren oder commission'en (Coffee, Server, Bug, etc.)                                         | 1–3 Tage         |
 
 #### Godot-Sprint (~4–6 Wochen)
 
 | #    | Paket                                                                                                                        | Aufwand  |
 | ---- | ---------------------------------------------------------------------------------------------------------------------------- | -------- |
-| 3.1  | Godot 4 Projekt-Setup, Web-Export-Config, WebSocketPeer-Anbindung                                                            | 1 Tag    |
-| 3.2  | Lobby-Scene (UI, Raumcode-Input, Spielerliste, Map-Auswahl, Start)                                                           | 1–2 Tage |
-| 3.3  | Map-Loader: Map-JSON → Tilemap-Layer dynamisch                                                                               | 2 Tage   |
-| 3.4  | Charakter-Scene: Sprites + 4-Richtungs-Idle/Walk-Animation + Movement-Interpolation                                          | 2–3 Tage |
-| 3.5  | HUD + Stat-Pills + Rolle + Timer mit Tween-Animationen                                                                       | 1 Tag    |
-| 3.6  | Task-Interaktion (Hold-E + Progress-Ring + Completion-VFX)                                                                   | 1 Tag    |
-| 3.7  | Sabotage-Buttons mit Cooldown-Anzeige                                                                                        | 1 Tag    |
-| 3.8  | Voting-Overlay + Result-Toast mit Slide-Animationen                                                                          | 1 Tag    |
-| 3.9  | Endscreen mit Rollen-Reveal + Stats + Confetti-Particles                                                                     | 1 Tag    |
-| 3.10 | Among-Us-Features: Vents (Animation + Sound), Body-Discovery + Report, Take-Down-Animation, Lights/Comms-VFX, Spectator-Mode | 5–8 Tage |
-| 3.11 | Sound-Integration (Footsteps, UI-SFX, BGM)                                                                                   | 1 Tag    |
-| 3.12 | Polish + Bug-Fixes                                                                                                           | 3–5 Tage |
-| 3.13 | Web-Export-Deploy auf gleiche EC2                                                                                            | 0.5 Tag  |
+| 4.1  | Godot 4 Projekt-Setup, Web-Export-Config, WebSocketPeer-Anbindung                                                            | 1 Tag    |
+| 4.2  | Lobby-Scene (UI, Raumcode-Input, Spielerliste, Map-Auswahl, Start)                                                           | 1–2 Tage |
+| 4.3  | Map-Loader: Map-JSON → Tilemap-Layer dynamisch                                                                               | 2 Tage   |
+| 4.4  | Charakter-Scene: Sprites + 4-Richtungs-Idle/Walk-Animation + Movement-Interpolation                                          | 2–3 Tage |
+| 4.5  | HUD + Stat-Pills + Rolle + Timer mit Tween-Animationen                                                                       | 1 Tag    |
+| 4.6  | Task-Interaktion (Mini-Game-Modals via Tier-3-API + Progress-Ring + Completion-VFX)                                          | 2 Tage   |
+| 4.7  | Sabotage-Buttons mit Cooldown-Anzeige                                                                                        | 1 Tag    |
+| 4.8  | Voting-Overlay + Result-Toast mit Slide-Animationen                                                                          | 1 Tag    |
+| 4.9  | Endscreen mit Rollen-Reveal + Stats + Confetti-Particles                                                                     | 1 Tag    |
+| 4.10 | Among-Us-Features: Vents (Animation + Sound), Body-Discovery + Report, Take-Down-Animation, Lights/Comms-VFX, Spectator-Mode | 5–8 Tage |
+| 4.11 | Sound-Integration (Footsteps, UI-SFX, BGM)                                                                                   | 1 Tag    |
+| 4.12 | Polish + Bug-Fixes                                                                                                           | 3–5 Tage |
+| 4.13 | Web-Export-Deploy auf gleiche EC2                                                                                            | 0.5 Tag  |
 
 **Done-Kriterium:** Godot-Web-Build läuft auf gleichem Server, fühlt sich „wie Among Us, dev-themed" an, hat mindestens dieselbe Featuredecke wie Browser-Client, plus Tier-2-Animationen + Sound + Particles.
 
-### Tier 4 — Polish + Distribution
+### Tier 5 — Polish + Distribution
 
 **Ziel:** „echt fertig"-Niveau. Was zwischen Beta und „würde ich öffentlich zeigen" liegt.
 
 | #   | Was                                                                                                                                | Aufwand  |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| 4.1 | **BGM** — kuratierte Tracks, Mute-Toggle, Volume-Slider                                                                            | 0.5 Tag  |
-| 4.2 | **Mobile-Layout** (Tablet 1024px) + Touch-Controls (virtual joystick)                                                              | 1 Woche  |
-| 4.3 | **Account-System** (light) — Profil mit Skin-Auswahl, Win-Stats                                                                    | 3–5 Tage |
-| 4.4 | **Custom Skins** — neben Color auch Hat-/Pet-Variationen, kosmetisch                                                               | 2–3 Tage |
-| 4.5 | **Bessere Animationen** — Reaction-Idles, Walking-Wackel, Death-Pose                                                               | ongoing  |
-| 4.6 | **Lobby-Link-Sharing** — URL mit Raumcode, evtl. QR                                                                                | 0.5 Tag  |
-| 4.7 | **Better Error-Handling** — Toast-System mit Severity-Levels                                                                       | 0.5 Tag  |
-| 4.8 | **Settings-Menü** — Sound, Sprache, Tastenkonfiguration                                                                            | 1 Tag    |
-| 4.9 | **Endscreen-Awards** — „Held der Kaffeemaschine", „Pipeline Whisperer", „Most Suspicious Innocent", basierend auf Per-Player-Stats | 1 Tag    |
+| 5.1 | **BGM** — kuratierte Tracks, Mute-Toggle, Volume-Slider                                                                            | 0.5 Tag  |
+| 5.2 | **Mobile-Layout** (Tablet 1024px) + Touch-Controls (virtual joystick)                                                              | 1 Woche  |
+| 5.3 | **Account-System** (light) — Profil mit Skin-Auswahl, Win-Stats                                                                    | 3–5 Tage |
+| 5.4 | **Custom Skins** — neben Color auch Hat-/Pet-Variationen, kosmetisch                                                               | 2–3 Tage |
+| 5.5 | **Bessere Animationen** — Reaction-Idles, Walking-Wackel, Death-Pose                                                               | ongoing  |
+| 5.6 | **Lobby-Link-Sharing** — URL mit Raumcode, evtl. QR                                                                                | 0.5 Tag  |
+| 5.7 | **Better Error-Handling** — Toast-System mit Severity-Levels                                                                       | 0.5 Tag  |
+| 5.8 | **Settings-Menü** — Sound, Sprache, Tastenkonfiguration                                                                            | 1 Tag    |
+| 5.9 | **Endscreen-Awards** — „Held der Kaffeemaschine", „Pipeline Whisperer", „Most Suspicious Innocent", basierend auf Per-Player-Stats | 1 Tag    |
 
 **Done-Kriterium:** Spielt sich auf Desktop + Tablet flüssig. Sieht poliert aus. Es gibt Wiederspielwert (Awards, Skins, Stats).
 
-### Tier 5 — Community + Mod-Support
+### Tier 6 — Community + Mod-Support
 
 **Ziel:** Anderer Devs in deinem Team können Inhalte beitragen ohne Code-Touch.
 
 | #   | Was                                                                                                                                                                                                                                             | Aufwand  |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| 5.1 | **Tasks aus JSON** (`tasks.json`) — Reward-Werte, Räume, Dauern. Code lädt validiert.                                                                                                                                                           | 1 Tag    |
-| 5.2 | **Sabotagen aus JSON** (`sabotages.json`)                                                                                                                                                                                                       | 1 Tag    |
-| 5.3 | **Rollen aus JSON** (`roles.json`) — Team, Description, available Sabotagen, Spezial-Fähigkeiten                                                                                                                                                | 1.5 Tage |
-| 5.4 | **Eventtexte aus JSON** (`event_texts.json`) — Pool pro Event-Typ, zufällig                                                                                                                                                                     | 0.5 Tag  |
-| 5.5 | **Map-Editor Phase 2** — Live-Preview (Map sofort spielen), Validierung visualisieren, mehrere Maps gleichzeitig                                                                                                                                | 2–3 Tage |
-| 5.6 | **Map-Browser** — Liste aller `maps/*.json` mit Vorschau, Hot-Reload                                                                                                                                                                            | 1 Tag    |
-| 5.7 | **Erweiterte Rollen** — Data Wizard, Consultant, Shadow Admin, Incident Commander, Caffeine Collector, Bug Squasher, Legacy Oracle, Scrum Master mit Spezial-Fähigkeiten (Auto-Fix Bot, Distract, Speed Boost, Coffee Run, Scan Logs, Rollback) | 2 Wochen |
-| 5.8 | **Insider-Gags + Memes** — kuratiert von Sven + Team, im Pool                                                                                                                                                                                   | ongoing  |
+| 6.1 | **Tasks aus JSON** (`tasks.json`) — Reward-Werte, Räume, Dauern. Code lädt validiert.                                                                                                                                                           | 1 Tag    |
+| 6.2 | **Sabotagen aus JSON** (`sabotages.json`)                                                                                                                                                                                                       | 1 Tag    |
+| 6.3 | **Rollen aus JSON** (`roles.json`) — Team, Description, available Sabotagen, Spezial-Fähigkeiten                                                                                                                                                | 1.5 Tage |
+| 6.4 | **Eventtexte aus JSON** (`event_texts.json`) — Pool pro Event-Typ, zufällig                                                                                                                                                                     | 0.5 Tag  |
+| 6.5 | **Map-Editor Phase 2** — Live-Preview (Map sofort spielen), Validierung visualisieren, mehrere Maps gleichzeitig                                                                                                                                | 2–3 Tage |
+| 6.6 | **Map-Browser** — Liste aller `maps/*.json` mit Vorschau, Hot-Reload                                                                                                                                                                            | 1 Tag    |
+| 6.7 | **Erweiterte Rollen** — Data Wizard, Consultant, Shadow Admin, Incident Commander, Caffeine Collector, Bug Squasher, Legacy Oracle, Scrum Master mit Spezial-Fähigkeiten (Auto-Fix Bot, Distract, Speed Boost, Coffee Run, Scan Logs, Rollback) | 2 Wochen |
+| 6.8 | **Insider-Gags + Memes** — kuratiert von Sven + Team, im Pool                                                                                                                                                                                   | ongoing  |
 
 **Done-Kriterium:** Person ohne Code-Wissen kann eine neue Sabotage via Pull-Request beitragen. `docs/CONTRIBUTING.md` reicht aus dafür.
 
-### Tier 6 — Live-Service-Phase
+### Tier 7 — Live-Service-Phase
 
 **Ziel:** Das Game lebt. Wir oder Community erweitern es regelmäßig.
 
 | #   | Was                                                                                  |
 | --- | ------------------------------------------------------------------------------------ |
-| 6.1 | **Stable Releases + Versioning** — Server hat Version, Client checkt Kompatibilität  |
-| 6.2 | **Statistik-Backend** — Per-Player-Stats persistieren, Win-Rate, Lieblings-Rolle     |
-| 6.3 | **Saisons / Events** — temporäre Maps, Theme-Roll-outs (Halloween, Christmas-Office) |
-| 6.4 | **Translation-Support** — i18n für Eventtexte, UI                                    |
-| 6.5 | **Public Release** — falls gewünscht: Itch-Page, Discord, etc.                       |
+| 7.1 | **Stable Releases + Versioning** — Server hat Version, Client checkt Kompatibilität  |
+| 7.2 | **Statistik-Backend** — Per-Player-Stats persistieren, Win-Rate, Lieblings-Rolle     |
+| 7.3 | **Saisons / Events** — temporäre Maps, Theme-Roll-outs (Halloween, Christmas-Office) |
+| 7.4 | **Translation-Support** — i18n für Eventtexte, UI                                    |
+| 7.5 | **Public Release** — falls gewünscht: Itch-Page, Discord, etc.                       |
 
 Diese Tier ist absichtlich vage — was hier passiert hängt davon ab wie das Game vom Team angenommen wird.
 
@@ -198,19 +214,17 @@ Diese Tier ist absichtlich vage — was hier passiert hängt davon ab wie das Ga
 
 ## Was als nächstes konkret zu tun ist
 
-**Heute / morgen:** Tier 0.1 (Lint+Format) und 0.2 (CI) — weil die alle nachfolgenden Tiers sauberer machen. Dann 0.4 (`PROTOCOL.md`) damit der Godot-Sprint einen klaren Vertrag hat.
+**Aktueller Stand (2026-04-26):** Tier 0–2 sind durch (außer 0.13 Live-Test). Browser-Client deckt das gesamte Among-Us-Feature-Set ab.
 
-**Diese Woche:** Tier 0 fertig.
+**Als nächstes:** Tier 3 — Mini-Game-Framework + erstes Beispiel (~3 Tage). Pattern-Klarheit vor Godot.
 
-**Nächste 1–2 Wochen:** Tier 1 (Mechanik-Vervollständigung + Map-Editor + Multi-Map).
+**Danach:** Tier 0.13 Live-Test mit Team — bestätigt Tier 0–3 in echter Spielsituation, surfact Bugs vor dem Godot-Sprint.
 
-**Wochen 3–4:** Tier 2 (Among-Us-Features im Browser).
+**Wochen 1–7 ab Godot-Start:** Tier 4 (Godot-Migration mit Polish).
 
-**Wochen 5–11:** Tier 3 (Godot-Migration mit Polish).
+**Anschließend:** Tier 5–7 als ongoing Slices.
 
-**Danach:** Tier 4–6 als ongoing Slices.
-
-Total bis „polished public-fähig": ~3 Monate fokussierte Arbeit. Mit Asset-Pack-Hilfe und ohne Mobile/Account: ~2 Monate.
+Mit Asset-Pack-Hilfe und ohne Mobile/Account: ~2 Monate ab Tier 3 bis „polished public-fähig".
 
 ---
 
@@ -225,7 +239,7 @@ Total bis „polished public-fähig": ~3 Monate fokussierte Arbeit. Mit Asset-Pa
 ## Verwandte Docs
 
 - `docs/maps.md` — Map-JSON-Schema (Referenz für Map-Bauer)
-- `docs/CONTRIBUTING.md` — wie Mitarbeitende beitragen können (kommt mit Tier 5.0)
+- `docs/CONTRIBUTING.md` — wie Mitarbeitende beitragen können (kommt mit Tier 6.0)
 - `docs/PROTOCOL.md` — vollständiger WS-Vertrag (kommt mit Tier 0.4)
 - `docs/ARCHITECTURE.md` — High-Level-Overview (kommt mit Tier 0.5)
 - `docs/DEPLOY.md` — Deploy-Workflow (kommt mit Tier 0.6)
