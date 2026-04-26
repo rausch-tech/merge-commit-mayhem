@@ -217,6 +217,7 @@ class GameStateMsg(BaseModel):
     release_progress: int = 0
     pipeline_stability: int = 100
     coffee_level: int = 100
+    incidents: int = 0
     players: list[dict[str, Any]]
     tasks: list[dict[str, Any]] = Field(default_factory=list)
     sabotages: list[dict[str, Any]] = Field(default_factory=list)

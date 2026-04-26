@@ -209,6 +209,7 @@ ws.on("game_state", (payload) => {
     releaseProgress: payload.releaseProgress,
     pipelineStability: payload.pipelineStability,
     coffeeLevel: payload.coffeeLevel,
+    incidents: payload.incidents,
   });
   sabotagePanel.updateFromGameState(payload.sabotages || [], {
     disabledByOwnDeath: state.amDead,

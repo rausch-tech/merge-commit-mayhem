@@ -10,11 +10,12 @@ export class Hud {
     this.release = document.querySelector("#hud-release .hud-value");
     this.pipeline = document.querySelector("#hud-pipeline .hud-value");
     this.coffee = document.querySelector("#hud-coffee .hud-value");
+    this.incidents = document.querySelector("#hud-incidents .hud-value");
     this.timer = document.querySelector("#hud-timer .hud-value");
     this.roleEl = document.getElementById("hud-role");
   }
 
-  setStats({ releaseProgress, pipelineStability, coffeeLevel }) {
+  setStats({ releaseProgress, pipelineStability, coffeeLevel, incidents }) {
     if (typeof releaseProgress === "number") {
       this.release.textContent = `${releaseProgress}%`;
     }
@@ -23,6 +24,9 @@ export class Hud {
     }
     if (typeof coffeeLevel === "number") {
       this.coffee.textContent = `${coffeeLevel}%`;
+    }
+    if (typeof incidents === "number") {
+      this.incidents.textContent = `${incidents}%`;
     }
   }
 

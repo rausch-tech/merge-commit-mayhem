@@ -20,6 +20,7 @@ class TaskDefinition:
     release_progress_reward: int = 0
     pipeline_stability_reward: int = 0
     coffee_level_set: int | None = None  # if set, coffee_level is clamped to this value
+    incidents_change: int = 0  # negative reduces incidents on completion
 
 
 TASK_DEFINITIONS: Final[list[TaskDefinition]] = [

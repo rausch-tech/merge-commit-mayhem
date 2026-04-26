@@ -313,3 +313,23 @@ def test_game_state_msg_bodies_default_empty_and_round_trip():
     )
     dumped2 = msg2.model_dump(by_alias=True)
     assert dumped2["bodies"] == [body_payload]
+
+
+# --- Tier 1.2: incidents stat on the wire ----------------------------------
+
+
+def test_game_state_msg_incidents_defaults_to_zero():
+    msg = GameStateMsg(phase="playing", remaining_seconds=300, players=[])
+    dumped = msg.model_dump(by_alias=True)
+    assert "incidents" in dumped
+    assert dumped["incidents"] == 0
+
+
+def test_game_state_msg_incidents_round_trips_camel_case():
+    msg = GameStateMsg(phase="playing", remaining_seconds=300, players=[], incidents=42)
+    dumped = msg.model_dump(by_alias=True)
+    assert dumped["incidents"] == 42
+
+    # Re-parse via aliases (camelCase) to confirm the wire field name.
+    rehydrated = GameStateMsg.model_validate(dumped)
+    assert rehydrated.incidents == 42

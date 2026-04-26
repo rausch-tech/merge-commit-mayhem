@@ -94,7 +94,14 @@ def test_tasks_sabotages_events_meeting_identical_across_viewers():
     assert state_alive["events"] == state_ghost["events"]
     assert state_alive["meeting"] == state_ghost["meeting"]
     # Top-level scalars must match too.
-    for key in ("phase", "remainingSeconds", "releaseProgress", "pipelineStability", "coffeeLevel"):
+    for key in (
+        "phase",
+        "remainingSeconds",
+        "releaseProgress",
+        "pipelineStability",
+        "coffeeLevel",
+        "incidents",
+    ):
         assert state_alive[key] == state_ghost[key]
 
 

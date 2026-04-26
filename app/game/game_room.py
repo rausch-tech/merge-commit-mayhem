@@ -36,6 +36,8 @@ PLAYER_RADIUS = 12
 ROUND_SECONDS = 900.0
 RECONNECT_GRACE_SECONDS = 30.0
 
+INCIDENTS_LOSS_THRESHOLD = 100  # chaos wins once incidents reach this
+
 MEETING_DURATION_SECONDS = 60.0
 
 TAKEDOWN_RADIUS = 40.0  # px
@@ -125,6 +127,7 @@ class GameRoom:
         self.release_progress: int = 0
         self.pipeline_stability: int = 100
         self.coffee_level: int = 100
+        self.incidents: int = 0
 
         # Per-player counters for the endscreen. Initialized on start().
         self.completed_tasks_by_player: dict[str, int] = {}
@@ -349,6 +352,7 @@ class GameRoom:
         self.release_progress = 0
         self.pipeline_stability = 100
         self.coffee_level = 100
+        self.incidents = 0
         self.meeting_active_for = 0.0
         self.winner = None
         self.win_reason = None
@@ -471,6 +475,9 @@ class GameRoom:
         if self.pipeline_stability <= 0:
             self._finish_round("chaos_agents", "Die Pipeline ist tot.")
             return
+        if self.incidents >= INCIDENTS_LOSS_THRESHOLD:
+            self._finish_round("chaos_agents", "Zu viele Incidents. Niemand weiß mehr, was läuft.")
+            return
         if all_chaos_eliminated(list(self.players.values())):
             self._finish_round("release_team", "Alle Chaos-Agenten wurden enttarnt.")
             return
@@ -544,6 +551,10 @@ class GameRoom:
         if not task.per_player_progress and task.status == "in_progress":
             task.status = "available"
 
+    def _apply_incidents_delta(self, delta: int) -> None:
+        """Clamp incidents into 0..100 after applying delta. Internal use only."""
+        self.incidents = max(0, min(100, self.incidents + delta))
+
     def _apply_task_reward(self, definition: TaskDefinition) -> None:
         if definition.release_progress_reward:
             self.release_progress = min(
@@ -555,6 +566,8 @@ class GameRoom:
             )
         if definition.coffee_level_set is not None:
             self.coffee_level = definition.coffee_level_set
+        if definition.incidents_change:
+            self._apply_incidents_delta(definition.incidents_change)
 
     def _tick_tasks(self, dt: float) -> None:
         for task in self.tasks.values():
@@ -621,6 +634,9 @@ class GameRoom:
         elif sabotage_id == "mandatory_meeting":
             self.meeting_active_for = MEETING_DURATION
         # Future sabotages: add here.
+
+        if sab.definition.incidents_increase:
+            self._apply_incidents_delta(sab.definition.incidents_increase)
 
         sab.cooldown_remaining = sab.definition.cooldown_seconds
         self.triggered_sabotages_by_player[player_id] = (
@@ -923,6 +939,7 @@ class GameRoom:
             "releaseProgress": int(self.release_progress),
             "pipelineStability": int(self.pipeline_stability),
             "coffeeLevel": int(self.coffee_level),
+            "incidents": int(self.incidents),
             "tasks": [
                 {
                     "id": t.definition.id,
@@ -1074,6 +1091,7 @@ class GameRoom:
         self.release_progress = 0
         self.pipeline_stability = 100
         self.coffee_level = 100
+        self.incidents = 0
         self.meeting_active_for = 0.0
         self.winner = None
         self.win_reason = None

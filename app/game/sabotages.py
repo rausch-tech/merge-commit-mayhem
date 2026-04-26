@@ -16,6 +16,7 @@ class SabotageDefinition:
     id: str
     title: str
     cooldown_seconds: float
+    incidents_increase: int = 0  # added to incidents when triggered
 
 
 SABOTAGE_DEFINITIONS: Final[list[SabotageDefinition]] = [

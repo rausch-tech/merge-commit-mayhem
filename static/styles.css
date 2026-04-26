@@ -185,6 +185,9 @@ button:hover {
 .hud-pill-coffee .hud-value {
   color: #fb923c;
 } /* orange */
+.hud-pill-incidents .hud-value {
+  color: #f87171;
+} /* chaos-red */
 .hud-pill-timer .hud-value {
   color: #facc15;
 } /* yellow */
