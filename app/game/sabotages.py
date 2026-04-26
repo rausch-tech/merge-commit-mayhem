@@ -40,6 +40,7 @@ SABOTAGE_DEFINITIONS: Final[list[SabotageDefinition]] = [
         cooldown_seconds=60.0,
         incidents_increase=30,
     ),
+    SabotageDefinition(id="lights_out", title="PagerDuty-Storm", cooldown_seconds=70.0),
 ]
 
 

@@ -437,7 +437,7 @@ def test_many_rounds_in_a_row_no_collection_growth():
         assert len(room.triggered_sabotages_by_player) == n_players
         assert len(room.players_with_meeting_left) == n_players
         assert len(room.players) == n_players
-        assert len(room.sabotages) == 6  # six sabotage definitions (3 base + 3 from 1.4)
+        assert len(room.sabotages) == 7  # 3 base + 3 (Tier 1.4) + 1 lights_out (Tier 2.4)
 
         room._finish_round("chaos_agents", "test")
         room.reset_for_new_round()

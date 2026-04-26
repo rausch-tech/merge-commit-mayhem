@@ -1,5 +1,5 @@
 import { WsClient } from "./ws.js";
-import { attachInput, attachTaskInteraction } from "./input.js";
+import { attachInput, attachRepairInteraction, attachTaskInteraction } from "./input.js";
 import { Renderer } from "./render.js";
 import { Hud } from "./hud.js";
 import { TaskList } from "./tasks.js";
@@ -289,6 +289,15 @@ ws.on("game_state", (payload) => {
   renderer.setPlayers(payload.players);
   renderer.setTasks(payload.tasks || []);
   renderer.setBodies(state.bodies);
+  // Tier 2.4: lights-out vignette + visible repair panels for active sabotages.
+  const activeSabotageIds = new Set(
+    (payload.sabotages || []).filter((s) => s.active).map((s) => s.id)
+  );
+  const activePanels = (payload.sabotagePanels || []).filter((p) =>
+    activeSabotageIds.has(p.sabotageId)
+  );
+  renderer.setActivePanels(activePanels);
+  renderer.setLightsOff(!!payload.lightsOff);
   taskList.render(payload.tasks || []);
   for (const t of payload.tasks || []) {
     const prev = previousTaskStatus[t.id];
@@ -399,6 +408,7 @@ if (els.mapDropdown) {
 
 attachInput(ws);
 attachTaskInteraction(ws, renderer);
+attachRepairInteraction(ws, renderer);
 ws.onOpen(() => {
   const session = loadSession();
   if (session && session.roomCode && session.playerId) {

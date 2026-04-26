@@ -26,6 +26,7 @@ from app.protocol import (
     PrivateRoleMsg,
     PrivateStateMsg,
     Rejoin,
+    RepairSabotage,
     ReportBody,
     ReturnToLobby,
     RoomJoinedMsg,
@@ -228,6 +229,8 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 await _handle_leave_room(ws)
             elif isinstance(msg, AbortRound):
                 await _handle_abort_round(ws)
+            elif isinstance(msg, RepairSabotage):
+                await _handle_repair_sabotage(ws, msg)
     except WebSocketDisconnect:
         pass
     finally:
@@ -394,6 +397,20 @@ async def _handle_trigger_sabotage(ws: WebSocket, msg: TriggerSabotage) -> None:
         return
     try:
         room.apply_sabotage(session.player_id, msg.payload.sabotage_id)
+    except GameRoomError as exc:
+        await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+
+
+async def _handle_repair_sabotage(ws: WebSocket, msg: RepairSabotage) -> None:
+    """Tier 2.4: a player at the matching panel clears a live sabotage."""
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    try:
+        room.repair_sabotage(session.player_id, msg.payload.sabotage_id)
     except GameRoomError as exc:
         await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
 

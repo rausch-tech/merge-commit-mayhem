@@ -76,6 +76,19 @@ class SpawnPoint(BaseModel):
     y: float
 
 
+class SabotagePanel(BaseModel):
+    """Spatial anchor where a sabotage can be repaired (Tier 2.4+).
+
+    Players have to reach this point to clear the corresponding sabotage.
+    `sabotage_id` matches a SabotageDefinition.id.
+    """
+
+    model_config = _camel()
+    sabotage_id: str
+    x: float
+    y: float
+
+
 class GameMap(BaseModel):
     model_config = _camel()
     name: str
@@ -84,6 +97,7 @@ class GameMap(BaseModel):
     wall_lines: list[WallLine] = Field(default_factory=list)
     spawn_points: list[SpawnPoint] = Field(default_factory=list)
     task_anchors: list[TaskAnchor] = Field(default_factory=list)
+    sabotage_panels: list[SabotagePanel] = Field(default_factory=list)
     war_room_id: str
 
 

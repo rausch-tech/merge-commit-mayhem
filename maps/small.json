@@ -23,5 +23,8 @@
     { "taskId": "refill_coffee",     "x": 300,  "y": 1200 },
     { "taskId": "analyze_logs",      "x": 1800, "y": 1200 }
   ],
+  "sabotagePanels": [
+    { "sabotageId": "lights_out", "x": 1800, "y": 400 }
+  ],
   "warRoomId": "war_room"
 }

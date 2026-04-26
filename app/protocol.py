@@ -195,6 +195,17 @@ class AbortRound(BaseModel):
     payload: AbortRoundPayload = Field(default_factory=AbortRoundPayload)
 
 
+class RepairSabotagePayload(BaseModel):
+    model_config = _camel_config()
+    sabotage_id: str
+
+
+class RepairSabotage(BaseModel):
+    model_config = _camel_config()
+    type: Literal["repair_sabotage"]
+    payload: RepairSabotagePayload
+
+
 IncomingMessage = Annotated[
     JoinRoom
     | Rejoin
@@ -211,7 +222,8 @@ IncomingMessage = Annotated[
     | ReportBody
     | SelectMap
     | LeaveRoom
-    | AbortRound,
+    | AbortRound
+    | RepairSabotage,
     Discriminator("type"),
 ]
 

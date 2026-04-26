@@ -22,6 +22,7 @@ from app.game.sabotages import (
     SabotageDefinition,
 )
 from app.game.tasks import (
+    SABOTAGE_PANEL_INTERACTION_RADIUS,
     TASK_DEFINITIONS,
     TASK_INTERACTION_RADIUS,
     TASK_RESPAWN_COOLDOWN,
@@ -151,6 +152,10 @@ class GameRoom:
 
         # Mandatory-meeting slow-down timer (seconds remaining; 0 = inactive).
         self.meeting_active_for: float = 0.0
+
+        # Tier 2.4: Lights-out flag. Server-authoritative; cleared by repairing
+        # the lights_out panel.
+        self.lights_off: bool = False
 
         # End-of-round state.
         self.winner: str | None = None
@@ -407,6 +412,7 @@ class GameRoom:
         self.coffee_level = 100
         self.incidents = 0
         self.meeting_active_for = 0.0
+        self.lights_off = False
         self.winner = None
         self.win_reason = None
         self.completed_tasks_by_player = {pid: 0 for pid in self.players}
@@ -696,6 +702,8 @@ class GameRoom:
             self.release_progress = max(0, self.release_progress - 15)
         elif sabotage_id == "flaky_tests":
             pass  # Effect lives entirely in incidents_increase.
+        elif sabotage_id == "lights_out":
+            self.lights_off = True
         # Future sabotages: add here.
 
         if sab.definition.incidents_increase:
@@ -718,6 +726,58 @@ class GameRoom:
             self._emit_event("warn", "Eine kleine Kundenänderung. Scope explodiert.")
         elif sabotage_id == "flaky_tests":
             self._emit_event("warn", "Die Tests schlagen fehl, aber nur manchmal.")
+        elif sabotage_id == "lights_out":
+            self._emit_event("danger", "PagerDuty-Storm — alle starren auf ihre Telefone.")
+
+    def repair_sabotage(self, player_id: str, sabotage_id: str) -> None:
+        """Tier 2.4: a player at the matching sabotage panel clears the effect.
+
+        One-shot interact (no hold) — Among Us classic uses a mini-puzzle, but
+        for the MVP we keep the cost a positional one. The chaos agent has to
+        physically reach the panel, which usually means crossing the map and
+        risking detection.
+        """
+        if self.phase not in (Phase.PLAYING, Phase.MEETING):
+            raise GameRoomError(
+                code="WRONG_PHASE", message="Repair only allowed during a running round."
+            )
+        player = self.players.get(player_id)
+        if player is None:
+            raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
+        if not player.is_alive:
+            raise GameRoomError(
+                code="PLAYER_ELIMINATED", message="Eliminated players cannot repair."
+            )
+        sab = self.sabotages.get(sabotage_id)
+        if sab is None:
+            raise GameRoomError(code="UNKNOWN_SABOTAGE", message=f"Unknown {sabotage_id!r}.")
+        # Only currently-active sabotages can be repaired.
+        if sabotage_id == "lights_out":
+            if not self.lights_off:
+                raise GameRoomError(
+                    code="SABOTAGE_NOT_ACTIVE", message="lights_out is not active."
+                )
+        else:
+            raise GameRoomError(
+                code="SABOTAGE_NOT_REPAIRABLE",
+                message=f"{sabotage_id!r} has no repair panel.",
+            )
+        panel = next(
+            (p for p in self.map.sabotage_panels if p.sabotage_id == sabotage_id),
+            None,
+        )
+        if panel is None:
+            raise GameRoomError(
+                code="NO_PANEL", message=f"Map has no panel for {sabotage_id!r}."
+            )
+        dx = player.x - panel.x
+        dy = player.y - panel.y
+        if dx * dx + dy * dy > SABOTAGE_PANEL_INTERACTION_RADIUS * SABOTAGE_PANEL_INTERACTION_RADIUS:
+            raise GameRoomError(code="TOO_FAR", message="Move closer to the panel.")
+
+        if sabotage_id == "lights_out":
+            self.lights_off = False
+            self._emit_event("info", f"{player.name} hat das PagerDuty-Storm beendet.")
 
     def _tick_sabotages(self, dt: float) -> None:
         for sab in self.sabotages.values():
@@ -728,6 +788,8 @@ class GameRoom:
                 sab.active = self.coffee_level == 0
             elif sab.definition.id == "mandatory_meeting":
                 sab.active = self.meeting_active_for > 0
+            elif sab.definition.id == "lights_out":
+                sab.active = self.lights_off
             else:
                 sab.active = False
         if self.meeting_active_for > 0:
@@ -1060,6 +1122,11 @@ class GameRoom:
                 }
                 for b in self.bodies.values()
             ],
+            "lightsOff": self.lights_off,
+            "sabotagePanels": [
+                {"sabotageId": p.sabotage_id, "x": p.x, "y": p.y}
+                for p in self.map.sabotage_panels
+            ],
         }
 
     def public_state(self) -> dict:
@@ -1162,6 +1229,7 @@ class GameRoom:
         self.coffee_level = 100
         self.incidents = 0
         self.meeting_active_for = 0.0
+        self.lights_off = False
         self.winner = None
         self.win_reason = None
         self.has_broadcast_end = False

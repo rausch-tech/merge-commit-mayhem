@@ -86,3 +86,20 @@ export function attachTaskInteraction(wsClient, renderer) {
 
   window.addEventListener("blur", stop);
 }
+
+/**
+ * F-key triggers a one-shot repair on the sabotage panel the local player is
+ * currently next to. The renderer exposes that target via
+ * `localPlayerNearPanel` (set during _draw), so the input layer stays free of
+ * world-state knowledge.
+ */
+export function attachRepairInteraction(wsClient, renderer) {
+  window.addEventListener("keydown", (e) => {
+    if (e.code !== "KeyF") return;
+    if (e.repeat) return;
+    const sabotageId = renderer.localPlayerNearPanel;
+    if (!sabotageId) return;
+    e.preventDefault();
+    wsClient.send("repair_sabotage", { sabotageId });
+  });
+}
