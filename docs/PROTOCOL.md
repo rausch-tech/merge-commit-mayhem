@@ -106,6 +106,28 @@ Erste Aktion nach Connect. Erzeugt den Raum wenn der Code neu ist, sonst Beitrit
 - `ROOM_FULL` (>6 Spieler)
 - `NAME_TAKEN`
 
+### `rejoin`
+
+Reconnect nach Disconnect. Server hält Spieler-Identität 30 s vor (`RECONNECT_GRACE_SECONDS`); innerhalb dieses Fensters reaktiviert `rejoin` die Session. Nach Ablauf gibt es nur noch `join_room` als neuer Spieler.
+
+```jsonc
+{
+  "type": "rejoin",
+  "payload": {
+    "roomCode": "ABCD",
+    "playerId": "abc1234567890def", // aus dem letzten room_joined
+  },
+}
+```
+
+Client-Empfehlung: `playerId` nach jedem `room_joined` lokal speichern (z.B. in localStorage / Godot `user://`-Datei). Bei Verbindungsverlust → reconnect → `rejoin` mit dem gespeicherten Wert. Wenn Server `REJOIN_NOT_AVAILABLE` meldet, Fallback auf `join_room` mit dem alten Namen.
+
+**Server antwortet** bei Erfolg mit dem üblichen Trio (`room_joined`, dann `private_role` falls mitten in einer Runde, dann phasenpassend `lobby_state` ODER `game_state`). Die `playerId` im neuen `room_joined` ist dieselbe wie vorher.
+
+Errors:
+
+- `REJOIN_NOT_AVAILABLE` — Sammelcode für: Raum existiert nicht (mehr), Player-ID unbekannt, Spieler ist bereits verbunden (Doppelsession), Grace-Periode (30 s) abgelaufen. Der Client darf in allen Fällen auf `join_room` mit dem alten Namen zurückfallen.
+
 ### `start_game`
 
 Nur vom Host akzeptiert. Wechselt Phase `LOBBY` → `PLAYING`.
@@ -255,11 +277,21 @@ Errors:
   "payload": {
     "roomCode": "ABCD",
     "players": [{ "id": "abc...", "name": "Sven", "color": "#4ade80", "isHost": true }],
+    "availableMaps": [
+      { "id": "default", "name": "default-office" },
+      { "id": "small",   "name": "small-office" }
+    ],
+    "selectedMapId": "default",
+    "map": {
+      /* GameMap, gleiches Schema wie in room_joined.map — siehe docs/maps.md */
+    },
   },
 }
 ```
 
-Wird gesendet bei: jedem Join, jedem Disconnect, `return_to_lobby`.
+Wird gesendet bei: jedem Join, jedem Disconnect, `return_to_lobby`, jedem `select_map` (Multi-Map seit Tier 1.8).
+
+`availableMaps` ist die sortierte Liste aller `maps/*.json` mit `{id, name}`. `selectedMapId` referenziert den aktuell aktiven Map-Eintrag, `map` ist die volle GameMap-Payload. Non-Host-Clients re-rendern Geometrie aus `map`, sobald der Host gewechselt hat.
 
 ### `private_role` (privat, einmal beim Spielstart)
 
@@ -288,6 +320,7 @@ Wird gesendet bei: jedem Join, jedem Disconnect, `return_to_lobby`.
     "releaseProgress": 38,
     "pipelineStability": 80,
     "coffeeLevel": 100,
+    "incidents": 25, // 0..100, ab 100 gewinnt Chaos (siehe Win-Conditions)
     "players": [
       {
         "id": "abc...",
@@ -297,6 +330,7 @@ Wird gesendet bei: jedem Join, jedem Disconnect, `return_to_lobby`.
         "color": "#4ade80",
         "isHost": true,
         "isAlive": true,
+        "isConnected": true, // false während Reconnect-Grace-Periode (30 s)
       },
     ],
     "tasks": [
@@ -320,10 +354,24 @@ Wird gesendet bei: jedem Join, jedem Disconnect, `return_to_lobby`.
         "active": false,
       },
     ],
+    "events": [
+      // Eventfeed-Einträge (Tier 1.1), max. 20 zurückgehalten, älteste zuerst
+      { "seq": 17, "severity": "info", "message": "Sven hat einen Task abgeschlossen." },
+      { "seq": 18, "severity": "danger", "message": "Pipeline ist rot." }
+    ],
+    "bodies": [
+      // Tier-2.2-Vorbereitung: Body-Discovery. Im aktuellen Stand bleibt
+      // diese Liste leer, weil Take-Down (Tier 2.1) noch nicht ausliefert.
+      // Schema steht aber: { id, x, y, color, victimName }.
+    ],
     "meeting": null, // null außer in Phase MEETING — siehe unten
   },
 }
 ```
+
+**Personalisierung:** lebende Spieler sehen nur lebende Mitspieler in `players` (Spectator-Mode, Tier 2.6). Geister und unbekannte Viewer sehen die volle Roster inkl. eliminierter Spieler. Alle anderen Felder (`tasks`/`sabotages`/`events`/`bodies`/`meeting`) sind identisch für alle Viewer im selben Tick.
+
+**`isConnected`:** wird `false` sobald ein Spieler die WebSocket schließt; wenn er innerhalb 30 s via `rejoin` zurückkommt, geht es wieder auf `true`. Nach Ablauf der Grace-Periode bleibt der Spieler im Roster (mit `isConnected=false`), aber `rejoin` wird nicht mehr akzeptiert.
 
 ### Meeting-Sub-Payload (während Phase `MEETING`)
 
@@ -384,6 +432,19 @@ Win-Conditions in Reihenfolge (First-To-Fire):
 3. `release_progress >= 100` → `release_team` gewinnt, Reason `"Release deployed."`
 4. `remaining_seconds <= 0` → `chaos_agents` gewinnt, Reason `"Das Release-Fenster ist geschlossen."`
 
+### `private_state` (privat pro Chaos-Agent, jeden Tick während PLAYING/MEETING)
+
+Per-Player-Daten, die nur die Chaos-Seite betreffen — aktuell der Take-Down-Cooldown (Tier 2.1-Vorbereitung). Release-Team-Spieler bekommen diese Message nicht.
+
+```jsonc
+{
+  "type": "private_state",
+  "payload": {
+    "takedownCooldownRemaining": 12.5, // Sekunden, 0.0 = Take-Down verfügbar
+  },
+}
+```
+
 ### `error` (privat, an den Sender der ursprünglichen Message)
 
 ```jsonc
@@ -402,6 +463,7 @@ Win-Conditions in Reihenfolge (First-To-Fire):
 | `BAD_MESSAGE`          | jeder Handler                                             | Pydantic-Validation fehlgeschlagen — Payload entspricht nicht dem Schema |
 | `ROOM_FULL`            | join_room                                                 | Mehr als 6 Spieler im Raum                                               |
 | `NAME_TAKEN`           | join_room                                                 | Name in diesem Raum bereits vergeben                                     |
+| `REJOIN_NOT_AVAILABLE` | rejoin                                                    | Sammelcode: Raum unbekannt, Player-ID unbekannt, Doppelsession, Grace-Periode (30 s) abgelaufen |
 | `NOT_HOST`             | start_game, return_to_lobby                               | Aktion erfordert Host                                                    |
 | `WRONG_PHASE`          | viele                                                     | Aktion in falscher Phase versucht                                        |
 | `NOT_ENOUGH_PLAYERS`   | start_game                                                | <2 Spieler ohne `demo`-Flag                                              |
