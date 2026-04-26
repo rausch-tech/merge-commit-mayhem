@@ -7,12 +7,16 @@ match ``MiniGamePlugin.id`` and the value used in TaskDefinition.mini_game.
 from app.game.minigames.base import MiniGamePlugin
 from app.game.minigames.cable_pairing import CablePairing
 from app.game.minigames.coffee_pour import CoffeePour
+from app.game.minigames.log_filter import LogFilter
+from app.game.minigames.sprint_trim import SprintTrim
 from app.game.minigames.test_suite_repair import TestSuiteRepair
 
 MINI_GAME_PLUGINS: dict[str, MiniGamePlugin] = {
     "test_suite_repair": TestSuiteRepair(),
     "cable_pairing": CablePairing(),
     "coffee_pour": CoffeePour(),
+    "log_filter": LogFilter(),
+    "sprint_trim": SprintTrim(),
 }
 
 

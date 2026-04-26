@@ -24,6 +24,8 @@ const modules = [
   "../static/minigames/test_suite_repair.js",
   "../static/minigames/cable_pairing.js",
   "../static/minigames/coffee_pour.js",
+  "../static/minigames/log_filter.js",
+  "../static/minigames/sprint_trim.js",
   "../static/touch-controls.js",
 ];
 

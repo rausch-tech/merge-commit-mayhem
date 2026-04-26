@@ -67,6 +67,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         room="server_room",
         required_seconds=7.0,
         incidents_change=-15,
+        mini_game="log_filter",
     ),
     TaskDefinition(
         id="calm_legacy_service",
@@ -81,6 +82,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         room="meeting_room",
         required_seconds=5.0,
         release_progress_reward=12,
+        mini_game="sprint_trim",
     ),
     TaskDefinition(
         id="write_release_notes",

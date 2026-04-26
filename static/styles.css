@@ -1152,6 +1152,145 @@ button:hover {
   font-weight: 700;
 }
 
+/* --- Tier 3.5 log_filter ------------------------------------------------- */
+
+.mini-game-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.mini-game-log-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #10152a;
+  border-left: 4px solid #475569;
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.mini-game-log-tag {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: #1f2937;
+  color: #94a3b8;
+  flex: 0 0 auto;
+}
+
+.mini-game-log-error {
+  border-left-color: #f87171;
+}
+.mini-game-log-error .mini-game-log-tag {
+  background: #7f1d1d;
+  color: #fecaca;
+}
+.mini-game-log-warn {
+  border-left-color: #fbbf24;
+}
+.mini-game-log-warn .mini-game-log-tag {
+  background: #78350f;
+  color: #fde68a;
+}
+.mini-game-log-info {
+  border-left-color: #60a5fa;
+}
+.mini-game-log-info .mini-game-log-tag {
+  background: #1e3a8a;
+  color: #bfdbfe;
+}
+
+.mini-game-log-line.marked {
+  background: #163d2c;
+  cursor: default;
+  opacity: 0.85;
+}
+.mini-game-log-line.marked .mini-game-log-tag {
+  background: #166534;
+  color: #bbf7d0;
+}
+
+.mini-game-log-msg {
+  flex: 1 1 auto;
+  word-break: break-word;
+}
+
+/* --- Tier 3.6 sprint_trim ----------------------------------------------- */
+
+.mini-game-sprint-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mini-game-sprint-ticket {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #10152a;
+  border: 2px solid #1f2937;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.mini-game-sprint-points {
+  font-weight: 700;
+  background: #1f2937;
+  border-radius: 999px;
+  padding: 2px 10px;
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-game-sprint-title {
+  flex: 1 1 auto;
+}
+
+.mini-game-sprint-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: #1f2937;
+  color: #94a3b8;
+}
+
+.mini-game-sprint-ticket.priority {
+  border-color: #7f1d1d;
+}
+.mini-game-sprint-ticket.priority .mini-game-sprint-tag {
+  background: #7f1d1d;
+  color: #fecaca;
+}
+
+.mini-game-sprint-ticket.removed {
+  opacity: 0.5;
+  background: #1f2937;
+  text-decoration: line-through;
+}
+.mini-game-sprint-ticket.removed .mini-game-sprint-tag {
+  background: #475569;
+  color: #cbd5e1;
+}
+
 #touch-controls {
   position: fixed;
   inset: 0;
