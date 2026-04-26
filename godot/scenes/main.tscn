@@ -28,8 +28,8 @@ text = "MCM Godot Spike — Connect"
 text = "WebSocket URL:"
 
 [node name="UrlField" type="LineEdit" parent="Panel/VBox"]
-text = "ws://localhost:8000/ws"
-placeholder_text = "ws://localhost:8000/ws"
+text = "ws://127.0.0.1:8000/ws"
+placeholder_text = "ws://127.0.0.1:8000/ws"
 
 [node name="RoomLabel" type="Label" parent="Panel/VBox"]
 text = "Room Code:"
