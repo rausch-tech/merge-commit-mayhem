@@ -1290,6 +1290,91 @@ button:hover {
   color: #bbf7d0;
 }
 
+/* --- Tier 3.7 stability_balance ---------------------------------------- */
+
+.mini-game-stability-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.mini-game-stability-row {
+  display: grid;
+  grid-template-columns: 36px 100px 1fr 36px;
+  align-items: center;
+  gap: 12px;
+}
+
+.mini-game-stability-btn {
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid #475569;
+  background: #1f2937;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.mini-game-stability-btn:hover {
+  background: #334155;
+}
+
+.mini-game-stability-labelwrap {
+  display: flex;
+  flex-direction: column;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.85rem;
+}
+
+.mini-game-stability-label {
+  color: #94a3b8;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.mini-game-stability-value {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.mini-game-stability-bar {
+  position: relative;
+  height: 22px;
+  border-radius: 6px;
+  background: #10152a;
+  border: 1px solid #1f2937;
+  overflow: hidden;
+}
+
+.mini-game-stability-green {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(52, 211, 153, 0.18);
+  border-left: 1px dashed rgba(52, 211, 153, 0.5);
+  border-right: 1px dashed rgba(52, 211, 153, 0.5);
+  pointer-events: none;
+}
+
+.mini-game-stability-fill {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  border-radius: 4px;
+  background: #f87171;
+  transition:
+    width 0.15s linear,
+    background 0.15s linear;
+}
+
+.mini-game-stability-fill.in-green {
+  background: #34d399;
+}
+
 /* --- Tier 3.6 sprint_trim ----------------------------------------------- */
 
 .mini-game-sprint-list {
