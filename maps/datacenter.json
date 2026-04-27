@@ -1,0 +1,372 @@
+{
+  "name": "datacenter",
+  "size": {
+    "width": 4800,
+    "height": 3200
+  },
+  "rooms": [
+    {
+      "id": "reception",
+      "title": "Reception",
+      "x": 0,
+      "y": 0,
+      "width": 600,
+      "height": 1100,
+      "color": "#3a4a5a",
+      "floorMaterial": "office",
+      "wallHeightM": 2.6,
+      "lightingProfile": "neutral",
+      "ambientSound": null
+    },
+    {
+      "id": "noc",
+      "title": "NOC",
+      "x": 600,
+      "y": 0,
+      "width": 900,
+      "height": 1100,
+      "color": "#2a4a70",
+      "floorMaterial": "server",
+      "wallHeightM": 2.6,
+      "lightingProfile": "neutral",
+      "ambientSound": null
+    },
+    {
+      "id": "meeting_room",
+      "title": "Meeting Room",
+      "x": 1500,
+      "y": 0,
+      "width": 700,
+      "height": 1100,
+      "color": "#5a3a70",
+      "floorMaterial": "office",
+      "wallHeightM": 2.6,
+      "lightingProfile": "neutral",
+      "ambientSound": null
+    },
+    {
+      "id": "break_room",
+      "title": "Break Room",
+      "x": 2200,
+      "y": 0,
+      "width": 700,
+      "height": 1100,
+      "color": "#7a5030",
+      "floorMaterial": "kitchen",
+      "wallHeightM": 2.6,
+      "lightingProfile": "neutral",
+      "ambientSound": null
+    },
+    {
+      "id": "tape_archive",
+      "title": "Tape Archive",
+      "x": 2900,
+      "y": 0,
+      "width": 700,
+      "height": 1100,
+      "color": "#3a6a3a",
+      "floorMaterial": "legacy",
+      "wallHeightM": 2.6,
+      "lightingProfile": "neutral",
+      "ambientSound": null
+    },
+    {
+      "id": "loading_bay",
+      "title": "Loading Bay",
+      "x": 3600,
+      "y": 0,
+      "width": 1200,
+      "height": 1100,
+      "color": "#3f4754",
+      "floorMaterial": "server",
+      "wallHeightM": 2.6,
+      "lightingProfile": "neutral",
+      "ambientSound": null
+    },
+    {
+      "id": "corridor",
+      "title": "Corridor",
+      "x": 0,
+      "y": 1100,
+      "width": 4800,
+      "height": 600,
+      "color": "#26303c",
+      "floorMaterial": "office",
+      "wallHeightM": 2.6,
+      "lightingProfile": "neutral",
+      "ambientSound": null
+    },
+    {
+      "id": "cooling_plant",
+      "title": "Cooling Plant",
+      "x": 0,
+      "y": 1700,
+      "width": 1200,
+      "height": 1500,
+      "color": "#2a607a",
+      "floorMaterial": "server",
+      "wallHeightM": 2.6,
+      "lightingProfile": "neutral",
+      "ambientSound": null
+    },
+    {
+      "id": "server_hall_a",
+      "title": "Server Hall A",
+      "x": 1200,
+      "y": 1700,
+      "width": 1600,
+      "height": 1500,
+      "color": "#2a4a70",
+      "floorMaterial": "server",
+      "wallHeightM": 2.6,
+      "lightingProfile": "neutral",
+      "ambientSound": null
+    },
+    {
+      "id": "server_hall_b",
+      "title": "Server Hall B",
+      "x": 2800,
+      "y": 1700,
+      "width": 2000,
+      "height": 1500,
+      "color": "#2a4a70",
+      "floorMaterial": "server",
+      "wallHeightM": 2.6,
+      "lightingProfile": "neutral",
+      "ambientSound": null
+    }
+  ],
+  "doors": [
+    {
+      "id": "d_recep_corr",
+      "betweenRoomA": "reception",
+      "betweenRoomB": "corridor",
+      "position": 300,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d_noc_corr",
+      "betweenRoomA": "noc",
+      "betweenRoomB": "corridor",
+      "position": 1050,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d_meet_corr",
+      "betweenRoomA": "meeting_room",
+      "betweenRoomB": "corridor",
+      "position": 1850,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d_break_corr",
+      "betweenRoomA": "break_room",
+      "betweenRoomB": "corridor",
+      "position": 2550,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d_tape_corr",
+      "betweenRoomA": "tape_archive",
+      "betweenRoomB": "corridor",
+      "position": 3250,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d_load_corr",
+      "betweenRoomA": "loading_bay",
+      "betweenRoomB": "corridor",
+      "position": 4200,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d_cool_corr",
+      "betweenRoomA": "corridor",
+      "betweenRoomB": "cooling_plant",
+      "position": 600,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d_sa_corr",
+      "betweenRoomA": "corridor",
+      "betweenRoomB": "server_hall_a",
+      "position": 2000,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d_sb_corr",
+      "betweenRoomA": "corridor",
+      "betweenRoomB": "server_hall_b",
+      "position": 3800,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d_sa_sb",
+      "betweenRoomA": "server_hall_a",
+      "betweenRoomB": "server_hall_b",
+      "position": 2400,
+      "width": 240,
+      "doorKind": "vault"
+    },
+    {
+      "id": "d_cool_sa",
+      "betweenRoomA": "cooling_plant",
+      "betweenRoomB": "server_hall_a",
+      "position": 2300,
+      "width": 240,
+      "doorKind": "glass_panel"
+    }
+  ],
+  "spawnPoints": [
+    {
+      "x": 300.0,
+      "y": 550.0
+    },
+    {
+      "x": 850.0,
+      "y": 350.0
+    },
+    {
+      "x": 1050.0,
+      "y": 750.0
+    },
+    {
+      "x": 1700.0,
+      "y": 550.0
+    },
+    {
+      "x": 1850.0,
+      "y": 350.0
+    },
+    {
+      "x": 2400.0,
+      "y": 350.0
+    },
+    {
+      "x": 2550.0,
+      "y": 750.0
+    },
+    {
+      "x": 3100.0,
+      "y": 550.0
+    },
+    {
+      "x": 3250.0,
+      "y": 350.0
+    },
+    {
+      "x": 4000.0,
+      "y": 550.0
+    },
+    {
+      "x": 4200.0,
+      "y": 750.0
+    },
+    {
+      "x": 600.0,
+      "y": 1400.0
+    }
+  ],
+  "taskAnchors": [
+    {
+      "taskId": "analyze_logs",
+      "x": 850.0,
+      "y": 600.0,
+      "objectType": "monitoring_panel"
+    },
+    {
+      "taskId": "repair_deployment",
+      "x": 1200.0,
+      "y": 800.0,
+      "objectType": "ci_console"
+    },
+    {
+      "taskId": "reduce_scope",
+      "x": 1850.0,
+      "y": 600.0,
+      "objectType": "meeting_screen"
+    },
+    {
+      "taskId": "refill_coffee",
+      "x": 2550.0,
+      "y": 600.0,
+      "objectType": "coffee_machine"
+    },
+    {
+      "taskId": "calm_legacy_service",
+      "x": 3250.0,
+      "y": 600.0,
+      "objectType": "legacy_terminal"
+    },
+    {
+      "taskId": "write_release_notes",
+      "x": 2000.0,
+      "y": 2400.0,
+      "objectType": "release_console"
+    },
+    {
+      "taskId": "fix_unit_tests",
+      "x": 3500.0,
+      "y": 2200.0,
+      "objectType": "qa_terminal"
+    },
+    {
+      "taskId": "review_pr",
+      "x": 4400.0,
+      "y": 2700.0,
+      "objectType": "git_terminal"
+    }
+  ],
+  "sabotagePanels": [
+    {
+      "sabotageId": "lights_out",
+      "x": 800.0,
+      "y": 900.0
+    },
+    {
+      "sabotageId": "comms_outage",
+      "x": 1800.0,
+      "y": 2400.0
+    }
+  ],
+  "vents": [
+    {
+      "id": "v_noc",
+      "x": 850.0,
+      "y": 400.0,
+      "connectedTo": [
+        "v_servers",
+        "v_archive"
+      ]
+    },
+    {
+      "id": "v_servers",
+      "x": 2300.0,
+      "y": 2300.0,
+      "connectedTo": [
+        "v_noc",
+        "v_archive"
+      ]
+    },
+    {
+      "id": "v_archive",
+      "x": 3250.0,
+      "y": 400.0,
+      "connectedTo": [
+        "v_noc",
+        "v_servers"
+      ]
+    }
+  ],
+  "mapObjects": [],
+  "warRoomId": "meeting_room"
+}
