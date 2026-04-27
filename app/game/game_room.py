@@ -16,7 +16,6 @@ from app.game.roles import (
     RoleInfo,
     movement_speed_multiplier,
     role_by_id,
-    task_speed_multiplier,
 )
 from app.game.roles import assign as assign_roles
 from app.game.roles import (
@@ -41,8 +40,6 @@ from app.game.sabotages import (
 )
 from app.game.tasks import (
     TASK_DEFINITIONS,
-    TASK_INTERACTION_RADIUS,
-    TASK_RESPAWN_COOLDOWN,
     VENT_INTERACTION_RADIUS,
     TaskDefinition,
 )
@@ -175,9 +172,11 @@ class GameRoom:
         # reward).
         from app.game.controllers.mini_game import MiniGameController
         from app.game.controllers.sabotages import SabotagesController
+        from app.game.controllers.tasks import TasksController
 
         self._mini_games = MiniGameController(self)
         self._sabotages_ctl = SabotagesController(self)
+        self._tasks_ctl = TasksController(self)
 
     def _emit_event(self, severity: str, message: str) -> None:
         """Append an event to the rolling buffer. Internal use only."""
@@ -640,88 +639,18 @@ class GameRoom:
     # --- personal-task allocation (Tier 3.5) -------------------------------
 
     def _allocate_personal_tasks(self, rng: random.Random) -> None:
-        """Pick 3 task ids per player. Release players favour their role's
-        strength categories; chaos players get a plausible cover-persona
-        list. Stored on Player.assigned_task_ids for the wire."""
-        all_task_ids = [t.id for t in TASK_DEFINITIONS]
-        for player in self.players.values():
-            rd = role_by_id(player.role)
-            strong_pool = [t.id for t in TASK_DEFINITIONS if t.category in rd.strength_categories]
-            other_pool = [t.id for t in TASK_DEFINITIONS if t.id not in strong_pool]
-            picks: list[str] = []
-            shuffled_strong = list(strong_pool)
-            rng.shuffle(shuffled_strong)
-            shuffled_other = list(other_pool)
-            rng.shuffle(shuffled_other)
-            # Two from strengths if possible, then fill with others. Chaos
-            # roles have empty strength_categories → falls through to random.
-            for tid in shuffled_strong[:2]:
-                picks.append(tid)
-            for tid in shuffled_other:
-                if len(picks) >= 3:
-                    break
-                if tid not in picks:
-                    picks.append(tid)
-            # Defensive: if a role somehow has zero strengths AND zero others
-            # (impossible today), fall back to all_task_ids.
-            if not picks:
-                picks = list(all_task_ids[:3])
-            player.assigned_task_ids = picks[:3]
+        self._tasks_ctl.allocate_personal(rng)
 
-    # --- tasks -------------------------------------------------------------
+    # --- tasks (delegators to TasksController) ----------------------------
 
     def _task_in_range(self, player_id: str, task: "TaskRuntime") -> bool:
-        player = self.players.get(player_id)
-        if player is None:
-            return False
-        dx = player.x - task.x
-        dy = player.y - task.y
-        return (dx * dx + dy * dy) <= (TASK_INTERACTION_RADIUS * TASK_INTERACTION_RADIUS)
+        return self._tasks_ctl.in_range(player_id, task)
 
     def apply_task_hold_start(self, player_id: str, task_id: str) -> None:
-        if self.phase is not Phase.PLAYING:
-            raise GameRoomError(code="WRONG_PHASE", message="Tasks only during playing.")
-        # Tier 2.5: Slack-Down — release team can't see or progress tasks.
-        if self.comms_down:
-            raise GameRoomError(code="COMMS_DOWN", message="Slack ist down — keine Tasks.")
-        # Ghosts may complete tasks — they help the release-team win.
-        player = self.players.get(player_id)
-        if player is None:
-            raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
-        task = self.tasks.get(task_id)
-        if task is None:
-            raise GameRoomError(code="UNKNOWN_TASK", message=f"Unknown task {task_id!r}.")
-        if task.status == "cooldown":
-            raise GameRoomError(code="TASK_ON_COOLDOWN", message="Task in cooldown.")
-        if not self._task_in_range(player_id, task):
-            raise GameRoomError(code="TASK_TOO_FAR", message="Too far from task.")
-        # Tier 3.1: when the task has an associated mini-game, switch into the
-        # mini-game flow instead of starting hold-E progress. Hold-E remains
-        # the default for tasks without mini_game set.
-        if task.definition.mini_game:
-            if player_id in self.active_mini_games:
-                raise GameRoomError(
-                    code="MINI_GAME_ALREADY_ACTIVE",
-                    message="Finish the current mini-game first.",
-                )
-            self._start_mini_game(player_id, task_id, task.definition.mini_game)
-            return
-        task.status = "in_progress"
-        task.per_player_progress.setdefault(player_id, 0.0)
+        self._tasks_ctl.hold_start(player_id, task_id)
 
     def apply_task_hold_stop(self, player_id: str, task_id: str) -> None:
-        # Tier 3.1: a stop on a mini-game-bearing task cancels the mini-game.
-        if player_id in self.active_mini_games:
-            session = self.active_mini_games[player_id]
-            if session.task_id == task_id:
-                self._cancel_mini_game(player_id, "cancelled")
-                return
-        task = self.tasks.get(task_id)
-        if task is None:
-            return
-        task.per_player_progress.pop(player_id, None)
-        if not task.per_player_progress and task.status == "in_progress":
-            task.status = "available"
+        self._tasks_ctl.hold_stop(player_id, task_id)
 
     # --- mini-game framework (Tier 3.1) -----------------------------------
 
@@ -752,83 +681,15 @@ class GameRoom:
     def _apply_task_reward(
         self, definition: TaskDefinition, completed_by: str | None = None
     ) -> None:
-        if definition.release_progress_reward:
-            self.release_progress = min(
-                100, self.release_progress + definition.release_progress_reward
-            )
-        if definition.pipeline_stability_reward:
-            self.pipeline_stability = min(
-                100, self.pipeline_stability + definition.pipeline_stability_reward
-            )
-        if definition.coffee_level_set is not None:
-            self.coffee_level = definition.coffee_level_set
-            # Tier 3.5: refilling the team coffee also tops up the player's
-            # own coffee_energy fully (and a small splash to nearby teammates).
-            if completed_by and completed_by in self.players:
-                p = self.players[completed_by]
-                p.coffee_energy = p.max_coffee
-                self._splash_coffee_to_neighbours(completed_by, amount=15.0, radius=180.0)
-        if definition.incidents_change:
-            self._apply_incidents_delta(definition.incidents_change)
+        self._tasks_ctl.apply_reward(definition, completed_by=completed_by)
 
     def _splash_coffee_to_neighbours(
         self, source_player_id: str, amount: float, radius: float
     ) -> None:
-        """Tier 3.5: small per-task coffee splash to nearby teammates so the
-        kitchen is a real social hub. Used by refill_coffee + Coffee-Run."""
-        source = self.players.get(source_player_id)
-        if source is None:
-            return
-        r2 = radius * radius
-        for pid, p in self.players.items():
-            if pid == source_player_id or not p.is_alive:
-                continue
-            dx = p.x - source.x
-            dy = p.y - source.y
-            if dx * dx + dy * dy <= r2:
-                p.coffee_energy = min(p.max_coffee, p.coffee_energy + amount)
+        self._tasks_ctl.splash_coffee(source_player_id, amount, radius)
 
     def _tick_tasks(self, dt: float) -> None:
-        for task in self.tasks.values():
-            if task.status == "cooldown":
-                task.cooldown_remaining -= dt
-                if task.cooldown_remaining <= 0:
-                    task.cooldown_remaining = 0.0
-                    task.status = "available"
-            elif task.status == "in_progress":
-                finishers: list[str] = []
-                still_progressing: dict[str, float] = {}
-                for pid, progress in task.per_player_progress.items():
-                    if not self._task_in_range(pid, task):
-                        continue  # player left the radius; drop their progress
-                    # Tier 3.5: role + coffee speed up / slow down task work.
-                    player = self.players.get(pid)
-                    if player is not None:
-                        mult = task_speed_multiplier(
-                            player.role, task.definition.category, player.coffee_energy
-                        )
-                    else:
-                        mult = 1.0
-                    new_progress = progress + dt * mult
-                    if new_progress >= task.definition.required_seconds:
-                        finishers.append(pid)
-                    else:
-                        still_progressing[pid] = new_progress
-                if finishers:
-                    # Deterministic tiebreak: lexicographically smallest player id.
-                    winner_pid = sorted(finishers)[0]
-                    self._apply_task_reward(task.definition, completed_by=winner_pid)
-                    self.completed_tasks_by_player[winner_pid] = (
-                        self.completed_tasks_by_player.get(winner_pid, 0) + 1
-                    )
-                    self._emit_event("info", f"{task.definition.title} erledigt.")
-                    task.per_player_progress = {}
-                    task.status = "cooldown"
-                    task.cooldown_remaining = TASK_RESPAWN_COOLDOWN
-                else:
-                    task.per_player_progress = still_progressing
-                    if not still_progressing:
-                        task.status = "available"
+        self._tasks_ctl.tick(dt)
 
     # --- sabotages ---------------------------------------------------------
 
@@ -1626,31 +1487,7 @@ class GameRoom:
         )
 
     def assigned_tasks_for(self, player_id: str) -> list[dict]:
-        """Return [{taskId, title, room, category, isFake}] for the player.
-        For chaos players the same shape is used but isFake=True so the UI
-        can render them with a 'Cover' badge."""
-        p = self.players.get(player_id)
-        if p is None or not p.assigned_task_ids:
-            return []
-        is_chaos = p.team == "chaos_agents"
-        out = []
-        from app.game.tasks import TASK_DEFINITIONS as _TD
-
-        by_id = {t.id: t for t in _TD}
-        for tid in p.assigned_task_ids:
-            td = by_id.get(tid)
-            if td is None:
-                continue
-            out.append(
-                {
-                    "taskId": tid,
-                    "title": td.title,
-                    "room": td.room,
-                    "category": td.category,
-                    "isFake": is_chaos,
-                }
-            )
-        return out
+        return self._tasks_ctl.assigned_for(player_id)
 
     def reset_for_new_round(self) -> None:
         """
