@@ -12,9 +12,6 @@ from app.game.game_map import (
     task_position_map,
     war_room_bounds_for,
 )
-from app.game.minigames.base import MiniGamePluginError
-from app.game.minigames.registry import get_plugin as get_mini_game_plugin
-from app.game.minigames.registry import is_known as mini_game_is_known
 from app.game.models import InputState, Phase, Player
 from app.game.roles import (
     RoleInfo,
@@ -222,6 +219,14 @@ class GameRoom:
         # by the WS layer once per tick / on_input. Each entry is a tuple
         # (player_id, kind, payload) where kind is 'started'|'state'|'completed'.
         self.pending_mini_game_events: list[tuple[str, str, dict]] = []
+
+        # Slice 2 refactor: domain controllers. The room owns the data; each
+        # controller owns its rules. Controllers reach back via self._room
+        # for cross-domain reads (e.g. mini-game completion triggers a task
+        # reward).
+        from app.game.controllers.mini_game import MiniGameController
+
+        self._mini_games = MiniGameController(self)
 
     def _emit_event(self, severity: str, message: str) -> None:
         """Append an event to the rolling buffer. Internal use only."""
@@ -769,116 +774,25 @@ class GameRoom:
 
     # --- mini-game framework (Tier 3.1) -----------------------------------
 
-    def _start_mini_game(self, player_id: str, task_id: str, mini_game_id: str) -> None:
-        """Internal: open a mini-game session for ``player_id`` on ``task_id``.
+    # --- mini-game delegators ---------------------------------------------
+    # Real implementation lives in ``MiniGameController``; these thin shims
+    # preserve the WS-facing API and the internal call sites. Tests still
+    # call ``room.apply_mini_game_input`` etc. directly.
 
-        Called from apply_task_hold_start when the task carries a mini_game
-        field. Emits a 'started' event for the WS layer.
-        """
-        if not mini_game_is_known(mini_game_id):
-            raise GameRoomError(
-                code="UNKNOWN_MINI_GAME", message=f"Unknown mini-game {mini_game_id!r}."
-            )
-        plugin = get_mini_game_plugin(mini_game_id)
-        seed = random.getrandbits(31)
-        state = plugin.init_state(seed)
-        session = MiniGameSession(plugin_id=mini_game_id, task_id=task_id, state=state)
-        self.active_mini_games[player_id] = session
-        # Mark the task as in_progress so other players see "Sven is at the
-        # task" through the same UI affordances as hold-E.
-        task = self.tasks.get(task_id)
-        if task is not None and task.status == "available":
-            task.status = "in_progress"
-        self.pending_mini_game_events.append(
-            (
-                player_id,
-                "started",
-                {
-                    "taskId": task_id,
-                    "miniGameId": mini_game_id,
-                    "title": plugin.title,
-                    "view": plugin.public_view(state),
-                },
-            )
-        )
+    def _start_mini_game(self, player_id: str, task_id: str, mini_game_id: str) -> None:
+        self._mini_games.start(player_id, task_id, mini_game_id)
 
     def apply_mini_game_input(self, player_id: str, action: str, params: dict) -> None:
-        """WS-facing entry point for a player's mini-game action."""
-        session = self.active_mini_games.get(player_id)
-        if session is None:
-            raise GameRoomError(
-                code="NO_ACTIVE_MINI_GAME", message="No mini-game running for this player."
-            )
-        plugin = get_mini_game_plugin(session.plugin_id)
-        try:
-            session.state = plugin.handle_input(session.state, action, params)
-        except MiniGamePluginError as exc:
-            # Translate plugin-level cheat/format errors to GameRoomError so
-            # the WS layer surfaces them consistently with other guards.
-            raise GameRoomError(code=exc.code, message=exc.message) from exc
-        # Echo the new public view back to the player.
-        self.pending_mini_game_events.append(
-            (
-                player_id,
-                "state",
-                {"taskId": session.task_id, "view": plugin.public_view(session.state)},
-            )
-        )
-        # Completion check.
-        if plugin.is_complete(session.state):
-            self._complete_mini_game(player_id)
-
-    def _complete_mini_game(self, player_id: str) -> None:
-        session = self.active_mini_games.pop(player_id, None)
-        if session is None:
-            return
-        # Apply the same reward + cooldown the hold-E path uses.
-        task = self.tasks.get(session.task_id)
-        if task is not None:
-            self._apply_task_reward(task.definition, completed_by=player_id)
-            self.completed_tasks_by_player[player_id] = (
-                self.completed_tasks_by_player.get(player_id, 0) + 1
-            )
-            task.per_player_progress.clear()
-            task.status = "cooldown"
-            task.cooldown_remaining = TASK_RESPAWN_COOLDOWN
-        self.pending_mini_game_events.append(
-            (
-                player_id,
-                "completed",
-                {"taskId": session.task_id, "success": True, "reason": "solved"},
-            )
-        )
+        self._mini_games.apply_input(player_id, action, params)
 
     def _cancel_mini_game(self, player_id: str, reason: str) -> None:
-        """Drop a player's active mini-game without applying the reward."""
-        session = self.active_mini_games.pop(player_id, None)
-        if session is None:
-            return
-        # Release the task back to "available" — kein Cooldown bei Cancel.
-        task = self.tasks.get(session.task_id)
-        if task is not None and task.status == "in_progress":
-            task.per_player_progress.pop(player_id, None)
-            if not task.per_player_progress:
-                task.status = "available"
-        self.pending_mini_game_events.append(
-            (
-                player_id,
-                "completed",
-                {"taskId": session.task_id, "success": False, "reason": reason},
-            )
-        )
+        self._mini_games.cancel(player_id, reason)
 
     def _cancel_all_mini_games(self, reason: str) -> None:
-        """Used on round end / meeting start / reset to drop every session."""
-        for pid in list(self.active_mini_games.keys()):
-            self._cancel_mini_game(pid, reason)
+        self._mini_games.cancel_all(reason)
 
     def drain_pending_mini_game_events(self) -> list[tuple[str, str, dict]]:
-        """WS layer pulls events here once per tick / after each input."""
-        events = self.pending_mini_game_events
-        self.pending_mini_game_events = []
-        return events
+        return self._mini_games.drain_events()
 
     def _apply_incidents_delta(self, delta: int) -> None:
         """Clamp incidents into 0..100 after applying delta. Internal use only."""
