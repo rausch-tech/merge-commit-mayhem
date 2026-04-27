@@ -848,6 +848,19 @@ button:hover {
   text-align: center;
 }
 
+#voting-result-text .voting-result-verdict {
+  /* Verdict stays the loud yellow headline. */
+}
+
+#voting-result-text .voting-result-lastwords {
+  /* "Last words" subtitle — dimmer + italic so it reads as a quote. */
+  margin-top: 8px;
+  color: #d4d4aa;
+  font-size: 0.95rem;
+  font-style: italic;
+  opacity: 0.85;
+}
+
 @keyframes votingToastFadeIn {
   from {
     opacity: 0;
