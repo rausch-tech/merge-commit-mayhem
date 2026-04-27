@@ -122,10 +122,11 @@ def test_walls_dont_break_existing_movement_in_open_space():
 
 
 def test_wall_segment_count_matches_design():
-    """Defensive: 10 wall_lines-derived rects (3 per vertical wall × 2, plus
-    4 horizontal segments) plus one AABB per blocking MapObject in the
-    default map (Tier 4 props)."""
+    """Slice-3 schema: walls auto-derived from room edges + doors. Default
+    map has 7 shared room-pair edges, each split into 2 segments by a
+    single door → 14 room-derived walls. Plus one AABB per blocking
+    MapObject (Tier 4 props)."""
     from app.game.game_map import DEFAULT_MAP
 
     blocking = sum(1 for o in DEFAULT_MAP.map_objects if o.blocks_movement)
-    assert len(WALLS) == 10 + blocking
+    assert len(WALLS) == 14 + blocking

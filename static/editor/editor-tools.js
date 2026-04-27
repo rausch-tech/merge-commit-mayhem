@@ -37,20 +37,6 @@ export function hitTest(map, mx, my) {
       return { kind: "object", index: i };
     }
   }
-  // Wall lines: hit a thin band around the line.
-  const bandHalf = 12;
-  for (let i = (map.wallLines || []).length - 1; i >= 0; i--) {
-    const wl = map.wallLines[i];
-    if (wl.axis === "x") {
-      if (Math.abs(mx - wl.position) <= bandHalf && my >= 0 && my <= map.size.height) {
-        return { kind: "wall", index: i };
-      }
-    } else {
-      if (Math.abs(my - wl.position) <= bandHalf && mx >= 0 && mx <= map.size.width) {
-        return { kind: "wall", index: i };
-      }
-    }
-  }
   // Rooms last (largest).
   for (let i = (map.rooms || []).length - 1; i >= 0; i--) {
     const r = map.rooms[i];
@@ -156,73 +142,6 @@ function defaultRoomColor(index) {
   return palette[index % palette.length];
 }
 
-// --- Wall tool: click two points (snaps to nearest axis) -------------------
-
-export class WallTool {
-  constructor() {
-    this.firstX = null;
-    this.firstY = null;
-    this.curX = null;
-    this.curY = null;
-  }
-  onDown(ctx, mx, my) {
-    if (this.firstX === null) {
-      this.firstX = mx;
-      this.firstY = my;
-      this.curX = mx;
-      this.curY = my;
-      ctx.requestRender();
-    } else {
-      // Decide axis from dominant delta.
-      const dx = Math.abs(mx - this.firstX);
-      const dy = Math.abs(my - this.firstY);
-      let axis;
-      let position;
-      if (dy > dx) {
-        // Vertical wall — runs along Y, fixed X position.
-        axis = "x";
-        position = this.firstX;
-      } else {
-        axis = "y";
-        position = this.firstY;
-      }
-      this.firstX = null;
-      this.firstY = null;
-      this.curX = null;
-      this.curY = null;
-      ctx.map.wallLines.push({ axis, position, doors: [] });
-      ctx.markDirty();
-      ctx.setSelection({ kind: "wall", index: ctx.map.wallLines.length - 1 });
-    }
-  }
-  onMove(ctx, mx, my) {
-    if (this.firstX === null) return;
-    this.curX = mx;
-    this.curY = my;
-    ctx.requestRender();
-  }
-  onUp() {}
-  drawPreview(ctx2d, ctx) {
-    if (this.firstX === null) return;
-    const dx = Math.abs((this.curX || 0) - this.firstX);
-    const dy = Math.abs((this.curY || 0) - this.firstY);
-    ctx2d.save();
-    ctx2d.strokeStyle = "#88ccff";
-    ctx2d.lineWidth = 2;
-    ctx2d.setLineDash([6, 4]);
-    ctx2d.beginPath();
-    if (dy > dx) {
-      ctx2d.moveTo(this.firstX, 0);
-      ctx2d.lineTo(this.firstX, ctx.map.size.height);
-    } else {
-      ctx2d.moveTo(0, this.firstY);
-      ctx2d.lineTo(ctx.map.size.width, this.firstY);
-    }
-    ctx2d.stroke();
-    ctx2d.restore();
-  }
-}
-
 // --- Spawn tool: click to add a point --------------------------------------
 
 export class SpawnTool {
@@ -287,7 +206,6 @@ export class ObjectTool {
 export const TOOLS = {
   select: SelectTool,
   room: RoomTool,
-  wall: WallTool,
   spawn: SpawnTool,
   task: TaskAnchorTool,
   object: ObjectTool,

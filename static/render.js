@@ -26,41 +26,95 @@ const WALL_THICKNESS = 8;
 
 /**
  * Mirror of the server-side compute_walls() in app/game/game_map.py.
- * Accepts the map JSON received in room_joined and returns wall rectangles
- * as [x1, y1, x2, y2] arrays.
+ * Slice-3 schema: walls are auto-derived from adjacent room edges minus
+ * door cutouts. Map-perimeter edges are NOT walled (player-clamp handles
+ * map boundaries on the server). Returns rectangles as [x1, y1, x2, y2].
  */
 function computeWallsClient(map) {
-  if (!map || !map.wallLines) return [];
-  const out = [];
+  if (!map || !Array.isArray(map.rooms)) return [];
+  const rooms = map.rooms;
+  const doors = Array.isArray(map.doors) ? map.doors : [];
   const mapW = map.size?.width ?? 0;
   const mapH = map.size?.height ?? 0;
-  for (const line of map.wallLines) {
-    const doors = [...(line.doors || [])].sort((a, b) => a.center - b.center);
-    if (line.axis === "x") {
-      // Vertical wall line at x=line.position
-      let lastY = 0;
-      for (const d of doors) {
-        const top = d.center - Math.floor(d.width / 2);
-        if (top > lastY) {
-          out.push([line.position - WALL_THICKNESS, lastY, line.position + WALL_THICKNESS, top]);
+  const out = [];
+  const processed = new Set();
+
+  const wallRect = (axis, edgePos, segStart, segEnd) =>
+    axis === "x"
+      ? [edgePos - WALL_THICKNESS, segStart, edgePos + WALL_THICKNESS, segEnd]
+      : [segStart, edgePos - WALL_THICKNESS, segEnd, edgePos + WALL_THICKNESS];
+
+  const isMapEdge = (axis, edgePos) =>
+    axis === "x" ? edgePos === 0 || edgePos === mapW : edgePos === 0 || edgePos === mapH;
+
+  const intervalSubtract = (start, end, cutouts) => {
+    if (start >= end) return [];
+    if (!cutouts.length) return [[start, end]];
+    const clipped = cutouts
+      .map(([a, b]) => [Math.max(a, start), Math.min(b, end)])
+      .filter(([a, b]) => a < b)
+      .sort((p, q) => p[0] - q[0]);
+    const result = [];
+    let cursor = start;
+    for (const [a, b] of clipped) {
+      if (a > cursor) result.push([cursor, a]);
+      cursor = Math.max(cursor, b);
+    }
+    if (cursor < end) result.push([cursor, end]);
+    return result;
+  };
+
+  const edgeOverlap = (other, axis, edgePos, start, end) => {
+    if (axis === "x") {
+      if (other.x !== edgePos && other.x + other.width !== edgePos) return null;
+      const a = Math.max(start, other.y);
+      const b = Math.min(end, other.y + other.height);
+      return a < b ? [a, b] : null;
+    }
+    if (other.y !== edgePos && other.y + other.height !== edgePos) return null;
+    const a = Math.max(start, other.x);
+    const b = Math.min(end, other.x + other.width);
+    return a < b ? [a, b] : null;
+  };
+
+  for (const room of rooms) {
+    const edges = [
+      ["y", room.y, room.x, room.x + room.width],
+      ["y", room.y + room.height, room.x, room.x + room.width],
+      ["x", room.x, room.y, room.y + room.height],
+      ["x", room.x + room.width, room.y, room.y + room.height],
+    ];
+    for (const [axis, edgePos, start, end] of edges) {
+      const sharedList = [];
+      for (const other of rooms) {
+        if (other.id === room.id) continue;
+        const ovl = edgeOverlap(other, axis, edgePos, start, end);
+        if (ovl) sharedList.push([other.id, ovl]);
+      }
+      // Shared portions, dedup per pair.
+      for (const [otherId, ovl] of sharedList) {
+        const pairKey = [room.id, otherId].sort();
+        const key = `${axis}|${edgePos}|${pairKey[0]}|${pairKey[1]}|${ovl[0]}|${ovl[1]}`;
+        if (processed.has(key)) continue;
+        processed.add(key);
+        const cutouts = [];
+        for (const door of doors) {
+          const dPair = [door.betweenRoomA, door.betweenRoomB].sort();
+          if (dPair[0] !== pairKey[0] || dPair[1] !== pairKey[1]) continue;
+          if (door.position < ovl[0] || door.position > ovl[1]) continue;
+          const half = Math.floor((door.width ?? 240) / 2);
+          cutouts.push([door.position - half, door.position + half]);
         }
-        lastY = d.center + Math.floor(d.width / 2);
-      }
-      if (lastY < mapH) {
-        out.push([line.position - WALL_THICKNESS, lastY, line.position + WALL_THICKNESS, mapH]);
-      }
-    } else {
-      // Horizontal wall line at y=line.position
-      let lastX = 0;
-      for (const d of doors) {
-        const left = d.center - Math.floor(d.width / 2);
-        if (left > lastX) {
-          out.push([lastX, line.position - WALL_THICKNESS, left, line.position + WALL_THICKNESS]);
+        for (const [segStart, segEnd] of intervalSubtract(ovl[0], ovl[1], cutouts)) {
+          out.push(wallRect(axis, edgePos, segStart, segEnd));
         }
-        lastX = d.center + Math.floor(d.width / 2);
       }
-      if (lastX < mapW) {
-        out.push([lastX, line.position - WALL_THICKNESS, mapW, line.position + WALL_THICKNESS]);
+      // Perimeter portions — skip if the edge is on the map outer boundary.
+      if (!isMapEdge(axis, edgePos)) {
+        const sharedCuts = sharedList.map(([, ovl]) => ovl);
+        for (const [segStart, segEnd] of intervalSubtract(start, end, sharedCuts)) {
+          out.push(wallRect(axis, edgePos, segStart, segEnd));
+        }
       }
     }
   }
