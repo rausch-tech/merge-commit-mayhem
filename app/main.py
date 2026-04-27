@@ -15,6 +15,7 @@ from app.game.game_map import (
     save_map,
 )
 from app.game.game_room import GameRoom, GameRoomError
+from app.game.kinds_registry import get_kinds_registry
 from app.game.models import InputState, Phase
 from app.game.sabotages import SABOTAGE_DEFINITIONS
 from app.protocol import (
@@ -791,6 +792,23 @@ async def spielprinzip_page() -> FileResponse:
 async def api_list_maps() -> dict[str, list[dict[str, str]]]:
     """List all available maps as ``{id, name}`` records, sorted by id."""
     return {"maps": _available_maps_payload()}
+
+
+@app.get("/api/kinds")
+async def api_list_kinds() -> dict[str, object]:
+    """Return the full ``maps/kinds.json`` registry (incl. ``_meta``).
+
+    Single source of truth for MapObject kinds — Editor, browser-renderer,
+    and Godot all read this. Server-side, it backs the ``MapObject.kind``
+    Pydantic-validator that rejects unknown kinds at load-time.
+
+    Raw passthrough: consumers pick the fields they need (``browser_2d``
+    for the browser, ``godot_asset`` for Godot, ``default_size`` +
+    ``blocks_movement`` for the editor palette). Keeps this endpoint a
+    thin pass-through so future schema additions don't require server
+    changes.
+    """
+    return get_kinds_registry()
 
 
 @app.get("/api/maps/{map_id}")
