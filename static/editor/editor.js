@@ -218,6 +218,77 @@ function render() {
     }
   }
 
+  // Sabotage panels (Tier 2.4 — repair points). Read-only marker for now;
+  // no edit tool yet, but at least visible so the data isn't invisible
+  // when authoring a map.
+  if (Array.isArray(state.map.sabotagePanels)) {
+    for (const p of state.map.sabotagePanels) {
+      ctx2d.save();
+      ctx2d.fillStyle = "#dc2626";
+      ctx2d.beginPath();
+      ctx2d.arc(p.x, p.y, 14, 0, Math.PI * 2);
+      ctx2d.fill();
+      ctx2d.strokeStyle = "#7f1d1d";
+      ctx2d.lineWidth = 2 / state.view.scale;
+      ctx2d.stroke();
+      ctx2d.fillStyle = "#fef2f2";
+      ctx2d.font = `${Math.max(9, 11 / state.view.scale)}px monospace`;
+      ctx2d.textAlign = "left";
+      ctx2d.textBaseline = "middle";
+      ctx2d.fillText("PANEL " + p.sabotageId, p.x + 18, p.y);
+      ctx2d.restore();
+    }
+  }
+
+  // Vents (Tier 2.3 — chaos teleport). Read-only diamond marker plus
+  // dotted lines to connected destinations, so the network is visible.
+  if (Array.isArray(state.map.vents)) {
+    const ventById = new Map(state.map.vents.map((v) => [v.id, v]));
+    // Draw connection lines first so the diamonds sit on top.
+    ctx2d.save();
+    ctx2d.strokeStyle = "rgba(96, 165, 250, 0.45)";
+    ctx2d.lineWidth = 2 / state.view.scale;
+    ctx2d.setLineDash([10 / state.view.scale, 6 / state.view.scale]);
+    for (const v of state.map.vents) {
+      for (const targetId of v.connectedTo || []) {
+        const target = ventById.get(targetId);
+        if (!target) continue;
+        // Draw each edge once (compare ids lexicographically so we don't
+        // double-draw the symmetric pair).
+        if (v.id >= targetId) continue;
+        ctx2d.beginPath();
+        ctx2d.moveTo(v.x, v.y);
+        ctx2d.lineTo(target.x, target.y);
+        ctx2d.stroke();
+      }
+    }
+    ctx2d.setLineDash([]);
+    ctx2d.restore();
+    for (const v of state.map.vents) {
+      ctx2d.save();
+      ctx2d.fillStyle = "#94a3b8";
+      ctx2d.beginPath();
+      ctx2d.moveTo(v.x, v.y - 16);
+      ctx2d.lineTo(v.x + 16, v.y);
+      ctx2d.lineTo(v.x, v.y + 16);
+      ctx2d.lineTo(v.x - 16, v.y);
+      ctx2d.closePath();
+      ctx2d.fill();
+      ctx2d.strokeStyle = "#475569";
+      ctx2d.lineWidth = 2 / state.view.scale;
+      ctx2d.stroke();
+      ctx2d.fillStyle = "#0b0f1f";
+      ctx2d.font = `${Math.max(9, 11 / state.view.scale)}px monospace`;
+      ctx2d.textAlign = "center";
+      ctx2d.textBaseline = "middle";
+      ctx2d.fillText("V", v.x, v.y);
+      ctx2d.fillStyle = "#cbd5e1";
+      ctx2d.textAlign = "left";
+      ctx2d.fillText(v.id, v.x + 22, v.y);
+      ctx2d.restore();
+    }
+  }
+
   // Selection highlight.
   drawSelectionHighlight();
 

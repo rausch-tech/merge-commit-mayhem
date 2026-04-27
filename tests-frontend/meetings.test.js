@@ -59,13 +59,13 @@ describe("MeetingOverlay", () => {
       ownPlayerId: "p1",
     });
     overlay.update(payload({}));
-    const firstBtn = root.querySelector('.meeting-vote-row button.meeting-vote-btn');
+    const firstBtn = root.querySelector(".meeting-vote-row button.meeting-vote-btn");
     expect(firstBtn).not.toBeNull();
     // Simulate many ticks with changing vote counts.
     for (let i = 1; i <= 5; i++) {
       overlay.update(payload({ p1: i }));
     }
-    const sameBtn = root.querySelector('.meeting-vote-row button.meeting-vote-btn');
+    const sameBtn = root.querySelector(".meeting-vote-row button.meeting-vote-btn");
     expect(sameBtn).toBe(firstBtn); // SAME node, not a recreated one
     expect(sameBtn.textContent).toContain("5"); // text updated in place
   });
