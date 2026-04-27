@@ -45,6 +45,7 @@ from app.game.tasks import (
 from app.game.voting import SKIP_TARGET, all_chaos_eliminated
 from app.game.voting import tally as _tally_votes
 from app.game.walls import resolve_wall_collision
+from app.protocol import MeetingAlive, MeetingBody, MeetingContext, MeetingRecentEvent
 
 MAX_PLAYERS = 12
 MIN_PLAYERS_TO_START = 4
@@ -198,8 +199,10 @@ class GameRoom:
         self.players_with_meeting_left: dict[str, bool] = {}  # player_id -> True if can still call
         self.last_voting_result: dict | None = None
         # Tier 3.6: meeting context snapshot taken when the round flips to
-        # MEETING. Lets the overlay show body location, recent events, etc.
-        self.meeting_context: dict | None = None
+        # MEETING. Modeled via Pydantic (`MeetingContext`) so camelCase on the
+        # wire is enforced by the same alias generator as the rest of the
+        # protocol. Lets the overlay show body location, recent events, etc.
+        self.meeting_context: MeetingContext | None = None
         # Tier 3.7: per-round endscreen summary (Awards + AI postmortem text).
         self.final_summary: dict | None = None
 
@@ -1594,25 +1597,25 @@ class GameRoom:
             reporter_name = self.players[reporter_id].name
 
         recent = [
-            {"severity": e.severity, "message": e.message, "seq": e.seq}
+            MeetingRecentEvent(severity=e.severity, message=e.message, seq=e.seq)
             for e in list(self.events)[-6:]
         ]
 
-        body_block: dict | None = None
+        body_block: MeetingBody | None = None
         if body is not None:
-            body_block = {
-                "victimName": body.victim_name,
-                "x": round(body.x, 1),
-                "y": round(body.y, 1),
-                "room": self._room_label_for(body.x, body.y),
-            }
+            body_block = MeetingBody(
+                victim_name=body.victim_name,
+                x=round(body.x, 1),
+                y=round(body.y, 1),
+                room=self._room_label_for(body.x, body.y),
+            )
 
-        self.meeting_context = {
-            "reporterName": reporter_name,
-            "body": body_block,
-            "recentEvents": recent,
-            "alive": [{"id": p.id, "name": p.name} for p in self.players.values() if p.is_alive],
-        }
+        self.meeting_context = MeetingContext(
+            reporter_name=reporter_name,
+            body=body_block,
+            recent_events=recent,
+            alive=[MeetingAlive(id=p.id, name=p.name) for p in self.players.values() if p.is_alive],
+        )
 
     def _room_label_for(self, x: float, y: float) -> str:
         """Best-effort lookup of which room a coordinate falls in. Used by
@@ -1782,8 +1785,13 @@ class GameRoom:
                     "votesCount": self._aggregate_vote_counts(),
                     "alreadyVoted": list(self.votes.keys()),
                     # Tier 3.6: discussion fuel — reporter, body location,
-                    # recent events. Hints, never proofs.
-                    "context": self.meeting_context,
+                    # recent events. Hints, never proofs. Pydantic serialises
+                    # the model with `by_alias=True` so the wire stays camelCase.
+                    "context": (
+                        self.meeting_context.model_dump(by_alias=True)
+                        if self.meeting_context is not None
+                        else None
+                    ),
                 }
                 if self.phase is Phase.MEETING
                 else None
@@ -1910,8 +1918,12 @@ class GameRoom:
             p.preferred_role = None
 
     def private_role_for(self, player_id: str) -> RoleInfo:
-        p = self.players[player_id]
-        if p.role is None or p.team is None:
+        # Caller-side guards (`main.py`) already check `player.role and team`
+        # before invoking this. The defensive lookup here lets us return a
+        # clean GameRoomError instead of a bare KeyError if a stale ws frame
+        # arrives mid-disconnect-sweep.
+        p = self.players.get(player_id)
+        if p is None or p.role is None or p.team is None:
             raise GameRoomError(
                 code="NO_ROLE",
                 message="Player has no role assigned yet.",
