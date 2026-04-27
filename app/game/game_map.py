@@ -23,9 +23,10 @@ import re
 from pathlib import Path
 from typing import Any, Final, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
 
+from app.game.kinds_registry import is_known_kind, known_kinds
 from app.game.walls import DOOR_WIDTH_DEFAULT, WALL_THICKNESS
 
 
@@ -169,6 +170,23 @@ class MapObject(BaseModel):
     task_id: str | None = None
     sabotage_repair_id: str | None = None
     object_type: str | None = None  # Tier 2.7 sabotage trigger binding
+
+    @field_validator("kind")
+    @classmethod
+    def _kind_must_be_registered(cls, value: str) -> str:
+        """Reject any kind that isn't in maps/kinds.json.
+
+        Same severity as ``extra=forbid`` on the map level: a kind that
+        no consumer knows about cannot render correctly anywhere, so we
+        catch it at load-time rather than letting it ship to clients.
+        """
+        if not is_known_kind(value):
+            known = ", ".join(sorted(known_kinds())) or "(registry empty)"
+            raise ValueError(
+                f"Unknown MapObject kind {value!r}: not in maps/kinds.json. "
+                f"Add it to the registry first. Known kinds: {known}"
+            )
+        return value
 
 
 class GameMap(BaseModel):
