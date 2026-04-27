@@ -39,9 +39,8 @@ from app.game.tasks import (
     TASK_DEFINITIONS,
     TaskDefinition,
 )
-from app.game.voting import SKIP_TARGET, all_chaos_eliminated
-from app.game.voting import tally as _tally_votes
-from app.protocol import MeetingAlive, MeetingBody, MeetingContext, MeetingRecentEvent
+from app.game.voting import all_chaos_eliminated
+from app.protocol import MeetingContext
 
 MAX_PLAYERS = 12
 MIN_PLAYERS_TO_START = 4
@@ -165,6 +164,7 @@ class GameRoom:
         # controller owns its rules. Controllers reach back via self._room
         # for cross-domain reads (e.g. mini-game completion triggers a task
         # reward).
+        from app.game.controllers.meeting import MeetingController
         from app.game.controllers.mini_game import MiniGameController
         from app.game.controllers.movement import MovementController
         from app.game.controllers.sabotages import SabotagesController
@@ -174,6 +174,7 @@ class GameRoom:
         self._sabotages_ctl = SabotagesController(self)
         self._tasks_ctl = TasksController(self)
         self._movement_ctl = MovementController(self)
+        self._meeting_ctl = MeetingController(self)
 
     def _emit_event(self, severity: str, message: str) -> None:
         """Append an event to the rolling buffer. Internal use only."""
@@ -635,117 +636,10 @@ class GameRoom:
         self._movement_ctl.tick_takedown_cooldowns(dt)
 
     def apply_takedown(self, killer_id: str, target_id: str) -> Body:
-        """
-        Eliminate the target via stealth take-down. Authoritative.
-        No event emission -- a take-down must not leak to the public feed.
-        """
-        if self.phase is not Phase.PLAYING:
-            raise GameRoomError(code="WRONG_PHASE", message="Take-Down nur im PLAYING.")
-        killer = self.players.get(killer_id)
-        if killer is None or not killer.is_connected:
-            raise GameRoomError(code="UNKNOWN_PLAYER", message="Killer nicht im Raum.")
-        if not killer.is_alive:
-            raise GameRoomError(
-                code="PLAYER_ELIMINATED", message="Eliminierte Spieler koennen nichts tun."
-            )
-        if killer.team != "chaos_agents":
-            raise GameRoomError(
-                code="NOT_CHAOS_AGENT", message="Nur Chaos-Agenten koennen Take-Down nutzen."
-            )
-        target = self.players.get(target_id)
-        if target is None:
-            raise GameRoomError(code="UNKNOWN_TARGET", message="Ziel nicht im Raum.")
-        if not target.is_connected:
-            raise GameRoomError(code="UNKNOWN_TARGET", message="Ziel nicht verbunden.")
-        if not target.is_alive:
-            raise GameRoomError(code="TARGET_ELIMINATED", message="Ziel ist bereits ausgeschaltet.")
-        if target_id == killer_id:
-            raise GameRoomError(
-                code="INVALID_TARGET", message="Du kannst dich nicht selbst killen."
-            )
-        if target.team == "chaos_agents":
-            raise GameRoomError(
-                code="INVALID_TARGET",
-                message="Chaos-Agenten koennen sich nicht gegenseitig ausschalten.",
-            )
-        dx = killer.x - target.x
-        dy = killer.y - target.y
-        if (dx * dx + dy * dy) > (TAKEDOWN_RADIUS * TAKEDOWN_RADIUS):
-            raise GameRoomError(code="OUT_OF_RANGE", message="Ziel ist zu weit weg.")
-        if self.takedown_cooldowns.get(killer_id, 0.0) > 0:
-            raise GameRoomError(code="TAKEDOWN_ON_COOLDOWN", message="Take-Down auf Cooldown.")
-
-        # Snapshot the victim's position before any state mutation.
-        body = Body(
-            id=uuid.uuid4().hex,
-            x=target.x,
-            y=target.y,
-            victim_player_id=target.id,
-            victim_name=target.name,
-            color=target.color,
-        )
-        target.is_alive = False
-        target.input_state = InputState()
-        # Drop any task holds the target had (mirror mark_disconnected cleanup).
-        for task in self.tasks.values():
-            if target_id in task.per_player_progress:
-                task.per_player_progress.pop(target_id)
-                if not task.per_player_progress and task.status == "in_progress":
-                    task.status = "available"
-        # Tier 3.1: a take-down victim drops their mini-game (and the modal
-        # snaps shut on the client when the framework forwards 'killed').
-        if target_id in self.active_mini_games:
-            self._cancel_mini_game(target_id, "killed")
-        self.bodies[body.id] = body
-        self.takedown_cooldowns[killer_id] = TAKEDOWN_COOLDOWN
-        return body
+        return self._meeting_ctl.apply_takedown(killer_id, target_id)
 
     def apply_report_body(self, reporter_id: str, body_id: str, rng=None) -> None:
-        """
-        Reporter discovers a body. Triggers a meeting that bypasses the
-        war-room requirement and the per-round emergency meeting quota.
-        """
-        if self.phase is not Phase.PLAYING:
-            raise GameRoomError(code="WRONG_PHASE", message="Report nur im PLAYING.")
-        reporter = self.players.get(reporter_id)
-        if reporter is None or not reporter.is_connected:
-            raise GameRoomError(code="UNKNOWN_PLAYER", message="Reporter nicht im Raum.")
-        if not reporter.is_alive:
-            raise GameRoomError(
-                code="PLAYER_ELIMINATED", message="Eliminierte Spieler koennen nichts melden."
-            )
-        body = self.bodies.get(body_id)
-        if body is None:
-            raise GameRoomError(code="UNKNOWN_BODY", message="Unbekannter Body.")
-        dx = reporter.x - body.x
-        dy = reporter.y - body.y
-        if (dx * dx + dy * dy) > (REPORT_RADIUS * REPORT_RADIUS):
-            raise GameRoomError(code="OUT_OF_RANGE", message="Body ist zu weit weg.")
-
-        # Pop the body and emit the public danger event.
-        self.bodies.pop(body_id, None)
-        self._emit_event(
-            "danger",
-            f"{reporter.name} hat einen Body gefunden: {body.victim_name}.",
-        )
-
-        # Direct transition into MEETING. Bypass war-room + meeting quota.
-        self.meeting_caller_id = reporter_id
-        self.meeting_remaining_seconds = MEETING_DURATION_SECONDS
-        self.votes = {}
-        self.meeting_title = f"Body Report: {body.victim_name}"
-        self.phase = Phase.MEETING
-        # Cancel ongoing task holds -- frozen during meeting.
-        for task in self.tasks.values():
-            task.per_player_progress = {}
-            if task.status == "in_progress":
-                task.status = "available"
-        # Tier 3.1: end any active mini-games — modals snap shut as players
-        # are pulled into the meeting overlay.
-        self._cancel_all_mini_games("meeting_started")
-        # Tier 3.6: snapshot meeting context (reporter, body location, recent
-        # events) so the UI can give people something concrete to discuss.
-        self._snapshot_meeting_context(reporter_id=reporter_id, body=body)
+        self._meeting_ctl.apply_report_body(reporter_id, body_id, rng=rng)
 
     def private_state_for(self, player_id: str) -> dict:
         """Per-viewer private state (Tier 3.5 expanded). Includes own coffee
@@ -872,43 +766,7 @@ class GameRoom:
         requesting_player_id: str,
         rng: random.Random | None = None,
     ) -> None:
-        if self.phase is not Phase.PLAYING:
-            raise GameRoomError(code="WRONG_PHASE", message="Meetings only during playing.")
-        player = self.players.get(requesting_player_id)
-        if player is None:
-            raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
-        if not player.is_alive:
-            raise GameRoomError(
-                code="PLAYER_ELIMINATED", message="Eliminated players cannot call meetings."
-            )
-        if not self._is_in_war_room(player):
-            raise GameRoomError(
-                code="NOT_IN_WAR_ROOM",
-                message="Emergency meetings can only be called from the War Room.",
-            )
-        if not self.players_with_meeting_left.get(requesting_player_id, False):
-            raise GameRoomError(
-                code="NO_MEETING_LEFT",
-                message="You already used your emergency meeting this round.",
-            )
-
-        # Transition to MEETING.
-        self.players_with_meeting_left[requesting_player_id] = False
-        self.meeting_caller_id = requesting_player_id
-        self.meeting_remaining_seconds = MEETING_DURATION_SECONDS
-        self.votes = {}
-        r = rng or random.SystemRandom()
-        self.meeting_title = r.choice(_MEETING_TITLES)
-        self.phase = Phase.MEETING
-        # Cancel ongoing task holds -- frozen during meeting.
-        for task in self.tasks.values():
-            task.per_player_progress = {}
-            if task.status == "in_progress":
-                task.status = "available"
-        # Tier 3.1: end any active mini-games when the round flips to MEETING.
-        self._cancel_all_mini_games("meeting_started")
-        # Tier 3.6: meeting context snapshot.
-        self._snapshot_meeting_context(reporter_id=requesting_player_id, body=None)
+        self._meeting_ctl.call_emergency_meeting(requesting_player_id, rng=rng)
 
     # --- endscreen + summary (Tier 3.7) ------------------------------------
 
@@ -1010,127 +868,28 @@ class GameRoom:
         return awards
 
     def _snapshot_meeting_context(self, reporter_id: str | None, body: "Body | None") -> None:
-        """Tier 3.6: capture context for the meeting overlay. Hints, never
-        proofs — list of recent events, body location, reporter name,
-        approximate death window. The client renders this verbatim."""
-        reporter_name = ""
-        if reporter_id and reporter_id in self.players:
-            reporter_name = self.players[reporter_id].name
-
-        recent = [
-            MeetingRecentEvent(severity=e.severity, message=e.message, seq=e.seq)
-            for e in list(self.events)[-6:]
-        ]
-
-        body_block: MeetingBody | None = None
-        if body is not None:
-            body_block = MeetingBody(
-                victim_name=body.victim_name,
-                x=round(body.x, 1),
-                y=round(body.y, 1),
-                room=self._room_label_for(body.x, body.y),
-            )
-
-        self.meeting_context = MeetingContext(
-            reporter_name=reporter_name,
-            body=body_block,
-            recent_events=recent,
-            alive=[MeetingAlive(id=p.id, name=p.name) for p in self.players.values() if p.is_alive],
-        )
+        self._meeting_ctl.snapshot_context(reporter_id, body)
 
     def _room_label_for(self, x: float, y: float) -> str:
-        """Best-effort lookup of which room a coordinate falls in. Used by
-        meeting context so the body's location is human-friendly ('Server
-        Room' instead of '(800, 2400)')."""
-        for room in self.map.rooms:
-            if room.x <= x <= room.x + room.width and room.y <= y <= room.y + room.height:
-                return room.title
-        return "irgendwo"
+        return self._meeting_ctl._room_label_for(x, y)
 
     def cast_vote(self, voter_id: str, target_id: str) -> None:
-        if self.phase is not Phase.MEETING:
-            raise GameRoomError(code="WRONG_PHASE", message="No meeting active.")
-        voter = self.players.get(voter_id)
-        if voter is None or not voter.is_alive:
-            raise GameRoomError(code="CANNOT_VOTE", message="Only living players can vote.")
-        target = self.players.get(target_id)
-        if target is None or not target.is_alive:
-            raise GameRoomError(
-                code="INVALID_TARGET", message="Vote target must be a living player."
-            )
-        self.votes[voter_id] = target_id
+        self._meeting_ctl.cast_vote(voter_id, target_id)
 
     def skip_vote(self, voter_id: str) -> None:
-        if self.phase is not Phase.MEETING:
-            raise GameRoomError(code="WRONG_PHASE", message="No meeting active.")
-        voter = self.players.get(voter_id)
-        if voter is None or not voter.is_alive:
-            raise GameRoomError(code="CANNOT_VOTE", message="Only living players can vote.")
-        self.votes[voter_id] = SKIP_TARGET
+        self._meeting_ctl.skip_vote(voter_id)
 
     def _living_player_ids(self) -> list[str]:
-        return [pid for pid, p in self.players.items() if p.is_alive]
+        return self._meeting_ctl._living_player_ids()
 
     def _all_alive_voted(self) -> bool:
-        living = set(self._living_player_ids())
-        return living.issubset(set(self.votes.keys()))
+        return self._meeting_ctl.all_alive_voted()
 
     def _resolve_meeting(self) -> str | None:
-        """Tally votes, eliminate the loser if any, transition back to PLAYING.
-        Returns the eliminated player_id or None.
-        """
-        eliminated_id = _tally_votes(self.votes)
-        # Compute extra fields the client needs in voting_result.
-        counts: dict[str, int] = {}
-        for target in self.votes.values():
-            counts[target] = counts.get(target, 0) + 1
-        max_count = max(counts.values()) if counts else 0
-        winners = [t for t, c in counts.items() if c == max_count]
-        skip_won = (eliminated_id is None) and (
-            counts.get(SKIP_TARGET, 0) == max_count and max_count > 0
-        )
-        named_tie = (
-            eliminated_id is None and len(winners) > 1 and all(w != SKIP_TARGET for w in winners)
-        )
-
-        was_chaos = False
-        removed_name = ""
-        if eliminated_id and eliminated_id in self.players:
-            self.players[eliminated_id].is_alive = False
-            was_chaos = self.players[eliminated_id].team == "chaos_agents"
-            removed_name = self.players[eliminated_id].name
-
-        self.last_voting_result = {
-            "removed_player_id": eliminated_id or "",
-            "removed_player_name": removed_name,
-            "was_chaos_agent": was_chaos,
-            "tie": named_tie,
-            "skipped": skip_won,
-        }
-
-        # Emit a public, role-neutral event. The text MUST NOT depend on
-        # was_chaos -- doing so would leak role info to spectators.
-        if eliminated_id:
-            self._emit_event("info", f"{removed_name} wurde aus dem Team entfernt.")
-        elif named_tie:
-            self._emit_event("warn", "Patt — niemand wurde entfernt.")
-        elif skip_won:
-            self._emit_event("info", "Niemand wurde entfernt.")
-
-        # Reset meeting state and return to PLAYING.
-        self.meeting_remaining_seconds = 0.0
-        self.meeting_caller_id = None
-        self.meeting_title = ""
-        self.votes = {}
-        self.phase = Phase.PLAYING
-        return eliminated_id
+        return self._meeting_ctl.resolve_meeting()
 
     def _aggregate_vote_counts(self) -> dict[str, int]:
-        """Return {target_id: count} aggregating cast votes; SKIP_TARGET stays as ''."""
-        counts: dict[str, int] = {}
-        for target in self.votes.values():
-            counts[target] = counts.get(target, 0) + 1
-        return counts
+        return self._meeting_ctl.aggregate_vote_counts()
 
     # --- helper accessors -------------------------------------------------
 
