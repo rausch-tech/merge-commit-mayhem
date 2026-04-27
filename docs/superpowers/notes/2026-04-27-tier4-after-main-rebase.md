@@ -9,18 +9,18 @@ Plus: Sven fragt zur Map-Komplexität (Korridore, mehr als 6 Räume).
 
 ## 1. Was sich auf main geändert hat (relevante Highlights)
 
-| Commit    | Was                                                              | Tier-4-Impact                                              |
-| --------- | ---------------------------------------------------------------- | ---------------------------------------------------------- |
-| `b4374f7` | **Persona-System:** Rollen + persönliche Tasks + Coffee-Energie  | `private_role`/`private_state`-Felder erweitert; HUD-Update |
-| `5ad79c6` | **Sabotage-Object-Binding** — Chaos muss an Console stehen       | Out-of-scope für Demo (keine Sabotagen in Tier-4-Demo)     |
-| `4c456a0` `7f669b9` | 4 neue **Mini-Games** (cable_pairing, coffee_pour, log_filter, sprint_trim) | Out-of-scope (Tier 4.6 später) |
-| `2242ddb` | **Minimap-Overlay** im Browser-HUD                              | Idee fürs Tier-4-HUD übernehmen                            |
-| `aad6d8a` | **Mobile**: off-canvas drawers + compact HUD                    | Out-of-scope                                                |
-| `802ff81` | **PROTOCOL.md rewrite** (post-Tier-3.4)                          | Mein Vor-Spike-Doku-Fix obsolet, neue Wahrheit nutzen      |
-| `1da8da2` | fix(meetings): vote-button DOM preserve                         | Backend-only, kein Tier-4-Impact                            |
-| `f141208` | docs(overview): GAME_OVERVIEW.md                                | Lese-Material, kein Code                                   |
-| `9b55b39` | docs: AGENTS.md SSOT für AI-Agents                              | Lese-Material                                              |
-| `3f80905` | docs(landing): /spielprinzip subpage                             | Browser-Frontend, kein Tier-4-Impact                       |
+| Commit              | Was                                                                         | Tier-4-Impact                                               |
+| ------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `b4374f7`           | **Persona-System:** Rollen + persönliche Tasks + Coffee-Energie             | `private_role`/`private_state`-Felder erweitert; HUD-Update |
+| `5ad79c6`           | **Sabotage-Object-Binding** — Chaos muss an Console stehen                  | Out-of-scope für Demo (keine Sabotagen in Tier-4-Demo)      |
+| `4c456a0` `7f669b9` | 4 neue **Mini-Games** (cable_pairing, coffee_pour, log_filter, sprint_trim) | Out-of-scope (Tier 4.6 später)                              |
+| `2242ddb`           | **Minimap-Overlay** im Browser-HUD                                          | Idee fürs Tier-4-HUD übernehmen                             |
+| `aad6d8a`           | **Mobile**: off-canvas drawers + compact HUD                                | Out-of-scope                                                |
+| `802ff81`           | **PROTOCOL.md rewrite** (post-Tier-3.4)                                     | Mein Vor-Spike-Doku-Fix obsolet, neue Wahrheit nutzen       |
+| `1da8da2`           | fix(meetings): vote-button DOM preserve                                     | Backend-only, kein Tier-4-Impact                            |
+| `f141208`           | docs(overview): GAME_OVERVIEW.md                                            | Lese-Material, kein Code                                    |
+| `9b55b39`           | docs: AGENTS.md SSOT für AI-Agents                                          | Lese-Material                                               |
+| `3f80905`           | docs(landing): /spielprinzip subpage                                        | Browser-Frontend, kein Tier-4-Impact                        |
 
 ## 2. Was tatsächlich für die Demo angepasst werden muss
 
@@ -32,12 +32,12 @@ Plus: Sven fragt zur Map-Komplexität (Korridore, mehr als 6 Räume).
 
 **Konkrete Aktionen für die Demo:**
 
-| Prio  | Aktion                                                                                                                  |
-| ----- | ----------------------------------------------------------------------------------------------------------------------- |
-| Low   | HUD-Erweiterung: Persona-Titel anzeigen (z.B. "Prinzipal-Engineer" statt nur "Developer")                              |
-| Low   | HUD-Erweiterung: persönliche Coffee-Energy aus `private_state` als zweite kleine Bar                                   |
-| Low   | Minimap-Overlay (Tier-3.5-Pattern aus `static/render.js`) als zweites HUD-Element bringen — wäre echt nice für die Demo |
-| Optional | Persona-Cover für Chaos: "Prinzipal-Engineer" als Camouflage-Rolle anzeigen — aber nur falls Spec passt                |
+| Prio     | Aktion                                                                                                                  |
+| -------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Low      | HUD-Erweiterung: Persona-Titel anzeigen (z.B. "Prinzipal-Engineer" statt nur "Developer")                               |
+| Low      | HUD-Erweiterung: persönliche Coffee-Energy aus `private_state` als zweite kleine Bar                                    |
+| Low      | Minimap-Overlay (Tier-3.5-Pattern aus `static/render.js`) als zweites HUD-Element bringen — wäre echt nice für die Demo |
+| Optional | Persona-Cover für Chaos: "Prinzipal-Engineer" als Camouflage-Rolle anzeigen — aber nur falls Spec passt                 |
 
 Keine davon sind blocking für die Demo — der aktuelle Tier-4-Stand läuft auch ohne. Nice-to-have wenn Zeit ist.
 
@@ -46,6 +46,7 @@ Keine davon sind blocking für die Demo — der aktuelle Tier-4-Stand läuft auc
 ## 3. Map-Komplexität — Bewertung und Empfehlung
 
 ### Sven's Frage in einem Satz
+
 > Können wir komplexere Karten als nur 6 Räume? Korridore? Das muss vom Server kommen, oder?
 
 ### Antwort: Ja, vom Server. Drei Komplexitäts-Stufen.
@@ -88,39 +89,43 @@ Beispiel: 12-Räume-Map mit Korridoren
     {
       "id": "open_space",
       "title": "Open Space",
-      "shape": "polygon",        // statt nur Rectangle
+      "shape": "polygon", // statt nur Rectangle
       "polygon": [
-        {"x": 0,    "y": 0},
-        {"x": 1600, "y": 0},
-        {"x": 1600, "y": 800},
-        {"x": 800,  "y": 800},
-        {"x": 800,  "y": 1600},
-        {"x": 0,    "y": 1600}
+        { "x": 0, "y": 0 },
+        { "x": 1600, "y": 0 },
+        { "x": 1600, "y": 800 },
+        { "x": 800, "y": 800 },
+        { "x": 800, "y": 1600 },
+        { "x": 0, "y": 1600 },
       ],
       "color": "#3a4560",
-      "decorationStyle": "office"  // Hint für Möbel-Auswahl
-    }
+      "decorationStyle": "office", // Hint für Möbel-Auswahl
+    },
   ],
   "wallLines": [
     // bestehende axis-aligned wallLines bleiben
     // PLUS: explizite Wall-Polygone für komplexe Geometrie
     {
       "axis": "polygon",
-      "points": [{"x": 800, "y": 800}, {"x": 1200, "y": 800}, {"x": 1200, "y": 1200}],
-      "doors": [{"position": 0.5, "width": 240}]  // 50% entlang der Linie
-    }
+      "points": [
+        { "x": 800, "y": 800 },
+        { "x": 1200, "y": 800 },
+        { "x": 1200, "y": 1200 },
+      ],
+      "doors": [{ "position": 0.5, "width": 240 }], // 50% entlang der Linie
+    },
   ],
   "decorations": [
-    {"type": "plant_large", "x": 200, "y": 200, "rotation": 0},
-    {"type": "poster",      "x": 800, "y": 0,   "rotation": 0, "wall": true}
+    { "type": "plant_large", "x": 200, "y": 200, "rotation": 0 },
+    { "type": "poster", "x": 800, "y": 0, "rotation": 0, "wall": true },
   ],
   "lighting": {
     "ambient": "#5a6b85",
     "warmth": 0.7,
     "rooms": {
-      "server_room": {"tint": "#0066ff", "energy": 0.3}
-    }
-  }
+      "server_room": { "tint": "#0066ff", "energy": 0.3 },
+    },
+  },
 }
 ```
 
@@ -143,14 +148,13 @@ Beispiel: 12-Räume-Map mit Korridoren
 ### Empfehlung: Stufe 1 jetzt, Stufe 2 nach der Demo
 
 **Heute/morgen (vor Demo):**
+
 1. Eine zweite, deutlich größere Map (`maps/office_complex.json` o.ä.) mit ~10-12 Räumen + Korridoren, alles im aktuellen Schema. Host kann sie via Multi-Map-Dropdown wählen.
 2. KayKit Furniture-Vielfalt: aktuell drei Möbel-Typen, könnte auf 8-10 erweitert werden (`bed`, `couch`, `armchair`, `cabinet`, `shelf`, `pictureframe` aus dem Bundle). Server nicht betroffen, nur `map_builder.gd::_decorate_rooms` erweitern.
 
-**Tier-4-Folge-Slice:**
-3. Schema-Erweiterung Stufe 2 (Polygon-Räume + Decorations). Browser-Editor und Godot-Map-Builder synchron erweitern.
+**Tier-4-Folge-Slice:** 3. Schema-Erweiterung Stufe 2 (Polygon-Räume + Decorations). Browser-Editor und Godot-Map-Builder synchron erweitern.
 
-**Später:**
-4. Stufe 3 nur wenn Multi-Floor-Game-Design (Treppen-Mechanik, Sicht-Mechanik) zustimmt — das ist eine grosse Game-Design-Entscheidung.
+**Später:** 4. Stufe 3 nur wenn Multi-Floor-Game-Design (Treppen-Mechanik, Sicht-Mechanik) zustimmt — das ist eine grosse Game-Design-Entscheidung.
 
 ---
 

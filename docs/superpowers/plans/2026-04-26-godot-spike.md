@@ -14,7 +14,7 @@
 
 ## Vorbemerkung: Test-Strategie
 
-Der Spike testet **manuell visuell**, nicht via GUT-Framework. Begründung steht in der Spec (§7). Pro Task gibt es eine *Manual Acceptance*-Sektion mit konkreten Schritten und beobachtbarem Erwartungsergebnis. Keine Task gilt als done, bevor die Acceptance grün ist.
+Der Spike testet **manuell visuell**, nicht via GUT-Framework. Begründung steht in der Spec (§7). Pro Task gibt es eine _Manual Acceptance_-Sektion mit konkreten Schritten und beobachtbarem Erwartungsergebnis. Keine Task gilt als done, bevor die Acceptance grün ist.
 
 Lokales Backend muss laufen für jede Acceptance:
 
@@ -32,6 +32,7 @@ Server hört dann auf `http://localhost:8000`, WebSocket auf `ws://localhost:800
 ### Task 1: Worktree und Branch anlegen
 
 **Files:**
+
 - Modify: working tree wechselt zu `.worktrees/godot-spike/`
 
 - [ ] **Step 1: Worktree erstellen**
@@ -68,6 +69,7 @@ Browser-Tab: `http://localhost:8000/` öffnen, prüfen dass die Lobby-Maske ersc
 ### Task 2: Godot-Projekt-Skelett anlegen
 
 **Files:**
+
 - Create: `godot/project.godot`
 - Create: `godot/icon.svg`
 - Create: `godot/scenes/.gitkeep`
@@ -140,6 +142,7 @@ Damit `.godot/`-Cache geschrieben wird (das ist gewollt, der gehört in .gitigno
 ### Task 3: `.gitignore` erweitern
 
 **Files:**
+
 - Modify: `/home/sr/se/mcm/.gitignore`
 
 - [ ] **Step 1: Top-Level `.gitignore` ergänzen**
@@ -182,6 +185,7 @@ Spec: docs/superpowers/specs/2026-04-26-godot-spike-design.md"
 ### Task 4: `docs/CLIENT.md` mit Initial-Werten anlegen
 
 **Files:**
+
 - Create: `docs/CLIENT.md`
 
 - [ ] **Step 1: CLIENT.md schreiben**
@@ -191,12 +195,12 @@ Datei `docs/CLIENT.md`:
 ```markdown
 # Client Expectations
 
-> Server-seitige Erwartungen an *jeden* Client (Browser jetzt, Godot ab Tier 3).
+> Server-seitige Erwartungen an _jeden_ Client (Browser jetzt, Godot ab Tier 3).
 > Diese Doku ist normativ. Wenn Client-Verhalten widerspricht, ist eines von beiden
 > falsch — wir entscheiden bewusst, welches angepasst wird.
 >
 > Diese Datei wird durch den Godot-Spike (siehe `docs/superpowers/specs/2026-04-26-godot-spike-design.md`)
-> mit *real gemessenen* Werten gefüllt. Sektionen mit `[VERIFY:Step-X]` werden im Spike validiert.
+> mit _real gemessenen_ Werten gefüllt. Sektionen mit `[VERIFY:Step-X]` werden im Spike validiert.
 
 ## 1. Koordinaten- und Skalierungs-Konvention
 
@@ -241,7 +245,7 @@ Pre-Spike wurden bereits folgende Lücken in `docs/PROTOCOL.md` und `docs/maps.m
 - `private_state`-Message neu dokumentiert.
 - `REJOIN_NOT_AVAILABLE` in der Error-Code-Tabelle ergänzt.
 
-Weitere Lücken, die der Spike *neu* entdeckt, werden hier aufgelistet (Task 14 füllt das nach Spike-Ende).
+Weitere Lücken, die der Spike _neu_ entdeckt, werden hier aufgelistet (Task 14 füllt das nach Spike-Ende).
 ```
 
 - [ ] **Step 2: Commit**
@@ -264,6 +268,7 @@ Initial backend-doku-gap list based on spec recherche."
 ### Task 5: `protocol.gd` — Konstanten und Message-Types
 
 **Files:**
+
 - Create: `godot/scripts/protocol.gd`
 
 - [ ] **Step 1: protocol.gd schreiben**
@@ -314,6 +319,7 @@ git commit -m "feat(godot): add protocol constants and message-type names"
 ### Task 6: `ws_client.gd` — WebSocket-Wrapper
 
 **Files:**
+
 - Create: `godot/scripts/ws_client.gd`
 
 - [ ] **Step 1: ws_client.gd schreiben**
@@ -399,6 +405,7 @@ git commit -m "feat(godot): add WebSocketPeer wrapper with connection signals"
 ### Task 7: `main.tscn` und `main.gd` — Connect-UI
 
 **Files:**
+
 - Create: `godot/scenes/main.tscn`
 - Create: `godot/scripts/main.gd`
 
@@ -548,6 +555,7 @@ Falls Editor offen war: einmal schließen + neu öffnen, damit `main.tscn` als F
 - [ ] **Step 4: Manual Acceptance — Connect-Test**
 
 Voraussetzungen:
+
 - Backend läuft: `uv run uvicorn app.main:app --reload`
 - Browser-Tab offen: `http://localhost:8000/`, Browser-Lobby mit Name "Browser" + Room "ABCD" gejoined.
 
@@ -593,6 +601,7 @@ lobby_state laufen durch. Reines Log-UI, kein Render."
 ### Task 8: `debug_renderer.gd` — Map als Linien zeichnen
 
 **Files:**
+
 - Create: `godot/scripts/debug_renderer.gd`
 
 - [ ] **Step 1: debug_renderer.gd schreiben**
@@ -697,6 +706,7 @@ git commit -m "feat(godot): add Node2D debug renderer for rooms/walls/spawns/tas
 ### Task 9: `debug_world.tscn` — Scene mit Camera und Renderer
 
 **Files:**
+
 - Create: `godot/scenes/debug_world.tscn`
 
 - [ ] **Step 1: debug_world.tscn schreiben**
@@ -793,6 +803,7 @@ Spike Schritt 2: rooms, wall lines, spawn points, task anchors als
 ### Task 10: Player aus `game_state` als farbige Boxen rendern
 
 **Files:**
+
 - Modify: `godot/scripts/debug_renderer.gd`
 - Modify: `godot/scripts/main.gd`
 
@@ -869,6 +880,7 @@ In `_switch_to_world()` ans Ende anfügen:
 - [ ] **Step 3: Manual Acceptance — Player-Render**
 
 Voraussetzungen:
+
 - Backend läuft.
 - Browser-Tab: Browser-Spieler joint Raum "ABCD", Host. Klick "Demo-Mode starten" (oder Browser-zu-Browser falls 2 Tabs offen, dann "Spiel starten" im Host-Tab).
 - Wichtig: Solange das Spiel in `LOBBY` ist, kommt kein `game_state`. Demo-Mode oder echter Start sind nötig.
@@ -897,6 +909,7 @@ git commit -m "feat(godot): render game_state players as colored boxes with self
 ### Task 11: Input-Capture mit 20-Hz-Throttle
 
 **Files:**
+
 - Create: `godot/scripts/input_sender.gd`
 - Modify: `godot/scripts/main.gd`
 - Modify: `godot/scenes/debug_world.tscn`
@@ -1004,6 +1017,7 @@ ist absichtlich ruckelig, Smoothing kommt im nächsten Commit."
 ### Task 12: Snapshot-Buffer + Interpolation
 
 **Files:**
+
 - Modify: `godot/scripts/debug_renderer.gd`
 - Modify: `godot/scripts/main.gd`
 
@@ -1074,7 +1088,7 @@ func _draw_players() -> void:
         draw_string(ThemeDB.fallback_font, pos + Vector2(-30, -28), name_, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 1, 1, 0.95))
 ```
 
-Erläuterung der Alpha-Formel: `(now - curr_t) / dt + 1.0` — wir rendern mit einem Tick Verzögerung. Wenn `now == curr_t`, alpha = 1.0 (zeige curr). Wenn `now == curr_t + dt`, alpha hätte 2.0 (clamped auf 1.0 — wir extrapolieren nicht, sondern stehen einfach auf curr bis das nächste snapshot kommt). Klingt counterintuitiv aber: wir interpolieren *zwischen* prev und curr, mit der Annahme dass curr "jetzt" ist. Bei 50 ms Lücken zwischen Snapshots ist das sauber.
+Erläuterung der Alpha-Formel: `(now - curr_t) / dt + 1.0` — wir rendern mit einem Tick Verzögerung. Wenn `now == curr_t`, alpha = 1.0 (zeige curr). Wenn `now == curr_t + dt`, alpha hätte 2.0 (clamped auf 1.0 — wir extrapolieren nicht, sondern stehen einfach auf curr bis das nächste snapshot kommt). Klingt counterintuitiv aber: wir interpolieren _zwischen_ prev und curr, mit der Annahme dass curr "jetzt" ist. Bei 50 ms Lücken zwischen Snapshots ist das sauber.
 
 - [ ] **Step 2: `main.gd` — `set_players` durch `push_snapshot` ersetzen**
 
@@ -1096,6 +1110,7 @@ Voraussetzungen wie Task 11.
 F5, Connect, Spielstart, WASD halten.
 
 **Erwartung:**
+
 - Eigene Box bewegt sich **smooth** (kein 50-ms-Ruckeln mehr).
 - Browser-Spieler-Box im Spike bewegt sich auch **smooth**.
 - Beide Browser-Tab und Spike zeigen identische Spieler-Positionen mit minimaler Latenz.
@@ -1121,6 +1136,7 @@ lerp zwischen ihnen. Bewegung wird smooth bei 20-Hz-Server-Tick."
 ### Task 13: Reconnect-Verhalten manuell testen und dokumentieren
 
 **Files:**
+
 - Modify: `docs/CLIENT.md` (nur Sektion 3)
 
 - [ ] **Step 1: `rejoin`-Handler in main.gd vorbereiten**
@@ -1128,6 +1144,7 @@ lerp zwischen ihnen. Bewegung wird smooth bei 20-Hz-Server-Tick."
 Damit wir Reconnect testen können, müssen wir wissen, was `app/protocol.py:RejoinPayload` erwartet: `roomCode` + `playerId`. In `main.gd` eine Manual-Reconnect-Methode (für jetzt einfach: Spike neu starten und mit alter playerId rejoin'en — dafür müssen wir die playerId persistieren).
 
 Einfachstes Vorgehen für den Test (kein Code-Change nötig):
+
 1. Spike laufen lassen, mit Name "Godot" joinen.
 2. Im Log `playerId=<X>` ablesen und notieren.
 3. Spike-Fenster schließen (= simuliert Disconnect).
@@ -1180,7 +1197,7 @@ Beobachtung dokumentieren.
 
 - [ ] **Step 5: `docs/CLIENT.md` Sektion 3 aktualisieren**
 
-In `docs/CLIENT.md` Sektion 3 (Reconnect-Verhalten) ersetzen durch die *gemessenen* Werte. Beispiel-Vorlage (die echten Werte hängen vom Test ab):
+In `docs/CLIENT.md` Sektion 3 (Reconnect-Verhalten) ersetzen durch die _gemessenen_ Werte. Beispiel-Vorlage (die echten Werte hängen vom Test ab):
 
 ```markdown
 ## 3. Reconnect-Verhalten
@@ -1213,6 +1230,7 @@ post-30s disconnect recovery."
 ### Task 14: `docs/CLIENT.md` mit gemessenen Werten + Doku-Lücken finalisieren
 
 **Files:**
+
 - Modify: `docs/CLIENT.md`
 
 - [ ] **Step 1: Sektion 1 (Koordinaten) `[VERIFY:Task-12]` ersetzen**
@@ -1271,6 +1289,7 @@ Backend-doku-gap list compiled for follow-up slices."
 ### Task 15: `godot/README.md` und finaler Commit
 
 **Files:**
+
 - Create: `godot/README.md`
 
 - [ ] **Step 1: README schreiben**
@@ -1362,6 +1381,7 @@ git commit -m "docs(godot): add README explaining spike scope and how to run"
 ### Task 16: ROADMAP-Update und finale Übersicht
 
 **Files:**
+
 - Modify: `docs/ROADMAP.md`
 
 - [ ] **Step 1: ROADMAP.md um Spike-Erkenntnisse-Sektion erweitern**
@@ -1375,16 +1395,16 @@ In `docs/ROADMAP.md` direkt **vor** "### Tier 3 — Godot-Migration" eine neue S
 
 **Aufwand (real):** [TODO: nach Spike-Ende eintragen]
 
-| #     | Was                                                                                                         | Status      |
-| ----- | ----------------------------------------------------------------------------------------------------------- | ----------- |
-| P3.0  | `godot/`-Subfolder, `project.godot`, Branch `slice/godot-spike`, `.gitignore`                              | done        |
-| P3.1  | `docs/CLIENT.md` mit Koordinaten/Tick/Reconnect-Sektionen, validiert + gemessen                            | done        |
-| P3.2  | Spike Schritt 1: Connect + Lobby, `join_room` → `room_joined` → `lobby_state`                              | done        |
-| P3.3  | Spike Schritt 2: Map-Debug-Render (Räume, Walls, Spawns, Task-Anchors)                                     | done        |
-| P3.4  | Spike Schritt 3: Player-Boxen mit Self-Highlight                                                           | done        |
-| P3.5  | Spike Schritt 4: Input + Snapshot-Interpolation                                                            | done        |
-| P3.6  | Reconnect-Tests dokumentiert in `docs/CLIENT.md` Sektion 3                                                 | done        |
-| P3.7  | Backend-Doku-Lücken-Liste in `docs/CLIENT.md` Sektion 5 — werden vor Tier 3 als eigene Slices abgearbeitet | done (Liste) |
+| #    | Was                                                                                                        | Status       |
+| ---- | ---------------------------------------------------------------------------------------------------------- | ------------ |
+| P3.0 | `godot/`-Subfolder, `project.godot`, Branch `slice/godot-spike`, `.gitignore`                              | done         |
+| P3.1 | `docs/CLIENT.md` mit Koordinaten/Tick/Reconnect-Sektionen, validiert + gemessen                            | done         |
+| P3.2 | Spike Schritt 1: Connect + Lobby, `join_room` → `room_joined` → `lobby_state`                              | done         |
+| P3.3 | Spike Schritt 2: Map-Debug-Render (Räume, Walls, Spawns, Task-Anchors)                                     | done         |
+| P3.4 | Spike Schritt 3: Player-Boxen mit Self-Highlight                                                           | done         |
+| P3.5 | Spike Schritt 4: Input + Snapshot-Interpolation                                                            | done         |
+| P3.6 | Reconnect-Tests dokumentiert in `docs/CLIENT.md` Sektion 3                                                 | done         |
+| P3.7 | Backend-Doku-Lücken-Liste in `docs/CLIENT.md` Sektion 5 — werden vor Tier 3 als eigene Slices abgearbeitet | done (Liste) |
 
 Spec: `docs/superpowers/specs/2026-04-26-godot-spike-design.md`. Plan: `docs/superpowers/plans/2026-04-26-godot-spike.md`.
 

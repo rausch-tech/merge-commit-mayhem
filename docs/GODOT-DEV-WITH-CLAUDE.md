@@ -12,17 +12,17 @@
 
 ## Quick-Map: Was liegt wo
 
-| Pfad | Was |
-|---|---|
-| `godot-3d/` | Godot 4.6 Mobile-Renderer Projekt (Tier-4 Client) |
-| `godot-3d/scripts/` | GDScripts — alle Spielobjekte (character, world, hud, …) |
-| `godot-3d/scenes/` | `.tscn`-Dateien — meist nur Root-Node + Script-Anhang |
-| `godot-3d/assets/` | KayKit + Kenney CC0 Assets (siehe `ASSET_LICENSE.md`) |
-| `godot-3d/maps/` | Kopien von `maps/` für Demo-Szenen ohne Backend |
-| `app/` | Server (FastAPI, Pydantic v2) — **autoritativ für allen Spielstate** |
-| `maps/` | Server-side Map-JSONs (Schema in `docs/maps.md`) |
-| `static/` | 2D HTML/Canvas-Frontend (Referenz, was der Server-Output rendert) |
-| `scripts/godot-check.sh` | Headless GDScript-Parse-Check (CI + lokal) |
+| Pfad                     | Was                                                                  |
+| ------------------------ | -------------------------------------------------------------------- |
+| `godot-3d/`              | Godot 4.6 Mobile-Renderer Projekt (Tier-4 Client)                    |
+| `godot-3d/scripts/`      | GDScripts — alle Spielobjekte (character, world, hud, …)             |
+| `godot-3d/scenes/`       | `.tscn`-Dateien — meist nur Root-Node + Script-Anhang                |
+| `godot-3d/assets/`       | KayKit + Kenney CC0 Assets (siehe `ASSET_LICENSE.md`)                |
+| `godot-3d/maps/`         | Kopien von `maps/` für Demo-Szenen ohne Backend                      |
+| `app/`                   | Server (FastAPI, Pydantic v2) — **autoritativ für allen Spielstate** |
+| `maps/`                  | Server-side Map-JSONs (Schema in `docs/maps.md`)                     |
+| `static/`                | 2D HTML/Canvas-Frontend (Referenz, was der Server-Output rendert)    |
+| `scripts/godot-check.sh` | Headless GDScript-Parse-Check (CI + lokal)                           |
 
 **Wichtig:** Server schickt Map und State an den Client per WebSocket. Im
 realen Spiel gibt's also keine lokale Map-Datei im Godot-Client. Die Files
@@ -99,7 +99,7 @@ Was hier passiert:
   **Vulkan funktioniert in xvfb nicht.** Mobile-Renderer kommt mit OpenGL3 klar.
 - `--scene <path>` — startet eine spezifische Szene (Demo-Szene siehe unten).
 - `--write-movie path.png` — speichert jeden Frame als `frameNNNNNNNN.png`
-  + `.wav` mit Audio. Gut zum Vergleichen mehrerer Frames (Animation prüfen).
+  - `.wav` mit Audio. Gut zum Vergleichen mehrerer Frames (Animation prüfen).
 - `--quit-after N --fixed-fps F` — N Frames bei F fps, dann sauber beenden.
 - `timeout 30` — Sicherheitsnetz (z.B. wenn das Script ein nicht-quittendes
   `_process` hat).
@@ -139,10 +139,10 @@ Positionen sampeln, mit Erwartung vergleichen.
 Da du kein laufendes FastAPI brauchst, gibt's vorgefertigte Demo-Szenen mit
 Mock-Players + Mock-State:
 
-| Szene | Was sie zeigt |
-|---|---|
-| `scenes/demo_world.tscn` | Aerial Top-Down (orthographic, ganze Map sichtbar) |
-| `scenes/demo_world_followcam.tscn` | Follow-Cam wie im echten Spiel |
+| Szene                              | Was sie zeigt                                      |
+| ---------------------------------- | -------------------------------------------------- |
+| `scenes/demo_world.tscn`           | Aerial Top-Down (orthographic, ganze Map sichtbar) |
+| `scenes/demo_world_followcam.tscn` | Follow-Cam wie im echten Spiel                     |
 
 Beide laden per Default `res://maps/default.json`. Möchtest du office_complex
 testen, in `demo_world.gd` den Pfad anpassen — oder eine neue Demo-Szene
@@ -206,15 +206,15 @@ einbauen.)
 
 Lookup-Tabelle für Iteration:
 
-| Was geändert | Erst testen mit |
-|---|---|
-| GDScript-Syntax/Logik | `scripts/godot-check.sh` |
-| HUD/UI-Layout | Headless Render + `Read` auf Frame |
-| 3D-Scene/Char-Position | Headless Render + `Read` auf Frame |
-| Animation-Mapping | Render mit Bewegung (Demo-Szene mit oszillierenden Coords) + Frame-Stripe |
-| Server-Code | `uv run pytest -q` |
-| Map-JSON | Demo-Szene mit dem geänderten Map laden, render, Visual prüfen |
-| Audio | Lokal in Editor — Headless rendert WAV mit aber Sven muss hören |
+| Was geändert           | Erst testen mit                                                           |
+| ---------------------- | ------------------------------------------------------------------------- |
+| GDScript-Syntax/Logik  | `scripts/godot-check.sh`                                                  |
+| HUD/UI-Layout          | Headless Render + `Read` auf Frame                                        |
+| 3D-Scene/Char-Position | Headless Render + `Read` auf Frame                                        |
+| Animation-Mapping      | Render mit Bewegung (Demo-Szene mit oszillierenden Coords) + Frame-Stripe |
+| Server-Code            | `uv run pytest -q`                                                        |
+| Map-JSON               | Demo-Szene mit dem geänderten Map laden, render, Visual prüfen            |
+| Audio                  | Lokal in Editor — Headless rendert WAV mit aber Sven muss hören           |
 
 ---
 

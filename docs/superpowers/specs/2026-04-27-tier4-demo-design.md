@@ -87,10 +87,13 @@ Wir nutzen die bereits dokumentierten Messages aus `docs/PROTOCOL.md`:
 ## 5. Wichtige Tech-Entscheidungen
 
 ### Animation-Setup
+
 Godot 4.6 unterstützt `AnimationLibrary`-Import via `.import`-File-Setting `import_as_skeleton_bones=false` und `animation/import_as_animation_library=true`. Wir setzen das per Hand für `Rig_Medium_MovementBasic.glb`, dann lädt Godot die Animations als reine `AnimationLibrary` ohne neue Mesh-Skeleton-Hierarchie. Die Library wird auf den `AnimationPlayer` der `Dummy.glb`-Scene angebunden via Code.
 
 ### Wall-Extrusion aus Map-JSON
+
 `wallLines` definieren `axis: x|y, position: int, doors: [{center, width}]`. Algorithmus pro WallLine:
+
 1. Volle Wand als ein Box-Mesh erzeugen (Höhe = 2.5 Units, Dicke = 0.2 Units).
 2. Pro Door eine Sub-Box ausgeschnitten via `CSGCombiner3D` mit `OPERATION_SUBTRACTION`.
 3. Resultat ins `world.tscn` als Wall-Container packen.
@@ -98,10 +101,13 @@ Godot 4.6 unterstützt `AnimationLibrary`-Import via `.import`-File-Setting `imp
 Alternativ einfacher: Wand als 3 Segmente zwischen den Doors rendern (kein CSG nötig). Wir gehen mit Variante 2 für Speed of Implementation und Reliability.
 
 ### Floor-Tiling pro Raum
+
 Jeder Raum bekommt eine eigene Plane mit eigener Material/Texture. Eine zentrale Textur (`furniturebits_texture.png` oder Custom) reicht für den ersten Wurf; Differenzierung via Modulate-Color pro Raum.
 
 ### Character-Sync
+
 Auf jedem `game_state` mit phase=playing iterieren wir `payload.players`:
+
 - Neuer Player → instantiate `character.tscn`, store in `_players_by_id` Dict
 - Bestehender Player → push_snapshot mit Position + isAlive
 - Player nicht mehr in Liste → free Node, remove aus Dict
@@ -109,9 +115,11 @@ Auf jedem `game_state` mit phase=playing iterieren wir `payload.players`:
 Lerp-Interpolation läuft pro Character-Instance basierend auf prev/curr Snapshot (50ms-Tick analog Spike-1).
 
 ### Camera
+
 Camera3D als Kind eines `CameraRig` Node3D, das jeden Frame zur Player-Position interpoliert (smooth follow, nicht hart). Camera-Offset von Player: `Vector3(0, 30, 25)` (Welt-Units), `look_at(player.position)`.
 
 ### HUD
+
 HUD ist `CanvasLayer` über der `world.tscn`. Reine 2D-UI, separater Render-Layer von 3D-Welt. Updates kommen aus `game_state` via Signal vom `world.gd`.
 
 ---
@@ -119,6 +127,7 @@ HUD ist `CanvasLayer` über der `world.tscn`. Reine 2D-UI, separater Render-Laye
 ## 6. Demo-Strategie
 
 Sven zeigt morgen:
+
 1. **Lobby:** Browser-Tab + Spike-Client beide joinen `ABCD`. Beide Spielerliste live synced.
 2. **Spielstart** mit Demo-Mode (1-Spieler-Modus). Wechsel zu 3D-World.
 3. **Map-Render:** alle 6 Räume sichtbar von oben, Möbel platziert, Charakter steht in einem Spawn-Punkt.
@@ -128,6 +137,7 @@ Sven zeigt morgen:
 7. **Web-Build:** `http://<wsl-ip>:8080/tier4.html` läuft im Browser, gleicher Look-and-Feel.
 
 **Wow-Highlights:**
+
 - KayKit-Charakter mit Walk-Animation (nicht T-Pose-Slide)
 - Vollständiges Office mit allen 6 Räumen
 - Smooth Camera-Follow
@@ -148,6 +158,7 @@ Sven zeigt morgen:
 ## 8. Done-Kriterium
 
 Sven kann morgen früh:
+
 1. `cd .worktrees/tier4-3d-demo && uv run uvicorn app.main:app --reload` (Backend, gleicher main wie heute)
 2. Browser-Tab `http://localhost:8000/` → joinen Raum „DEMO"
 3. Windows-Godot-Editor → Project öffnen unter `\\wsl.localhost\FedoraLinux-43\home\sr\se\mcm\.worktrees\tier4-3d-demo\godot-3d\project.godot`, F5

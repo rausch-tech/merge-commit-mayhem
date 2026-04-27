@@ -50,32 +50,39 @@ Alles auf Branch `slice/tier4-3d-demo` — gepusht, CI grün-erwartet.
 Empfohlene Reihenfolge zum „Aufmerksam-Halten":
 
 ### Schritt 1 — Lobby zeigen
+
 Im Browser-Tab `http://localhost:8000/` joinen mit Raum `DEMO`, Name `Sven`. Zwei oder drei weitere Tabs als „Ada", „Linus", „Grace" mit gleichem Raum joinen.
 
 Im Godot-Editor 4.6 (Windows): Project öffnen unter
+
 ```
 \\wsl.localhost\FedoraLinux-43\home\sr\se\mcm\.worktrees\tier4-3d-demo\godot-3d\project.godot
 ```
+
 F5 → Spike-Fenster öffnet sich mit der Cyber-Lobby. **Das ist Wow-Moment 1**: schöne UI, klares Branding.
 
 Connect mit Default-Werten (`ws://127.0.0.1:8000/ws` / `DEMO` / `Player`) → switcht zur Lobby-Card mit Live-Spielerliste, alle Browser-Spieler erscheinen sofort.
 
 ### Schritt 2 — Spielstart in 3D
+
 Im Browser-Host: Demo-Mode ✓, Spielstart. Spike-Fenster wechselt zur 3D-World.
 
 **Wow-Moment 2**: Office mit allen 6 Räumen (Open Space, Meeting, Kitchen, Server Room, War Room, Legacy Basement), 5 KayKit-Charaktere mit unterschiedlichen Farben, Camera schräg-oben Follow-View. Möbel sichtbar (Desks, Chairs, Monitors, Server-Racks).
 
 ### Schritt 3 — Movement
+
 WASD/Pfeiltasten halten. **Wow-Moment 3**: Charakter läuft mit Walk-Animation, Camera folgt smooth, andere Spieler bewegen sich live mit (Browser-Tabs als Ada/Linus/Grace bewegen ihre Charaktere mit, Spike sieht's smooth via Snapshot-Interpolation).
 
 Vom Open Space zum Meeting Room durch die Tür gehen — zeigt dass das Welt-Layout korrekt ist und Door-Cutouts funktionieren.
 
 ### Schritt 4 — HUD + Pause
+
 Stats-Bars oben (Release-Progress läuft langsam hoch, Pipeline-Stability, Coffee, Incidents), Timer rechts oben, Rolle unten links, Player-Roster rechts.
 
 ESC drücken → Pause-Menü öffnet sich mit Weiter/Verlassen/Runde-Beenden. Klick auf „Weiter" → Spiel läuft wieder.
 
 ### Schritt 5 — Web-Build (optional, falls Zeit)
+
 **Wow-Moment 4**: Browser-Tab öffnen unter `http://localhost:8090/tier4.html` (oder `http://172.22.231.154:8090/tier4.html`). Gleiche 3D-Welt läuft im Browser via WebAssembly. ~40 MB Initial-Load, danach 60 FPS.
 
 ---
@@ -178,6 +185,7 @@ Caveat: llvmpipe (CPU-Render in WSL) ist deutlich dunkler/clipper als auf Sven's
 ## Folge-Slices nach der Demo (Backlog für Tier-4-Sprint)
 
 Aus dem Master-Plan (Roadmap Tier 4) noch offen:
+
 - 4.6 Task-Interaktion (Mini-Game-Modals via Tier-3-API)
 - 4.7 Sabotage-Buttons mit Cooldown
 - 4.8 Voting-Overlay + Result-Toast
@@ -188,6 +196,7 @@ Aus dem Master-Plan (Roadmap Tier 4) noch offen:
 - 4.13 Web-Export-Deploy auf EC2
 
 Plus aus den Lessons-Learned:
+
 - Camera-Polish: 3/4-Isometric statt straight-down im Aerial-Mode
 - Floor-Differenzierung: PBR-Materials statt einfache Color-Tints
 - Animation-Library-Setup: per-Editor-Klickerei für AnimationLibrary-only-Import konfigurieren
@@ -224,6 +233,7 @@ Geplant: 8-11h für vollen Tier-4-Demo-Durchstich.
 Tatsächlich: ~6-7h für alle Code + Headless-Validation + Doku.
 
 Faktoren die's beschleunigt haben:
+
 - Spike-1 als WSClient/Protocol-Quelle (keine Neuimplementation)
 - Spike-2 als 3D-Setup-Erfahrung (kein Trial-and-Error für Camera/Mobile-Renderer)
 - Headless-Screenshots via xvfb (keine Sven-im-Loop-Latenz)

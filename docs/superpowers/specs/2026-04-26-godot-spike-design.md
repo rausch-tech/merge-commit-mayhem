@@ -28,7 +28,7 @@ Kein Production-Client, keine Sprites, kein Gameplay-Feature. Bewusst minimal.
 
 > Python entscheidet. Der Client zeigt nur an.
 
-Der Spike erweitert *nicht* das Backend. Er konsumiert das existierende WebSocket-Protokoll als zweiter Client neben dem Browser. Server bleibt autoritativ; Godot rendert empfangene Snapshots, sendet Inputs.
+Der Spike erweitert _nicht_ das Backend. Er konsumiert das existierende WebSocket-Protokoll als zweiter Client neben dem Browser. Server bleibt autoritativ; Godot rendert empfangene Snapshots, sendet Inputs.
 
 ## 4. Repo-Layout
 
@@ -56,7 +56,7 @@ godot/
 
 ## 5. `docs/CLIENT.md` — neue Doku
 
-**Name:** `CLIENT.md`, nicht `GODOT.md`. Inhalte sind Server-Erwartungen an *jeden* Client. Der Browser-Client soll auch gegen diese Doku verifizierbar sein; eine Godot-spezifische Doku würde fragmentieren.
+**Name:** `CLIENT.md`, nicht `GODOT.md`. Inhalte sind Server-Erwartungen an _jeden_ Client. Der Browser-Client soll auch gegen diese Doku verifizierbar sein; eine Godot-spezifische Doku würde fragmentieren.
 
 **Inhalt im Spike-Scope:**
 
@@ -73,7 +73,7 @@ godot/
 - Server tickt 20 Hz: ein `game_state` alle ~50 ms.
 - Client darf Bewegung **nicht** simulieren. Server ist autoritativ.
 - Render-Strategie: Buffer der letzten 2 Snapshots, lerp zwischen ihnen über die 50-ms-Lücke.
-- `player_input` darf max. 20 Hz raus (Throttle). Senden bei Input-Change *oder* spätestens jeden 50-ms-Tick.
+- `player_input` darf max. 20 Hz raus (Throttle). Senden bei Input-Change _oder_ spätestens jeden 50-ms-Tick.
 
 ### 5.3 Reconnect-Verhalten
 
@@ -149,15 +149,17 @@ Jeder Schritt einzeln testbar, jeder eigener Commit, jeder muss grün gegen loka
 
 Nach Spike-Abschluss im Repo:
 
-1. **`docs/CLIENT.md`** populiert mit *real validierten* Werten:
+1. **`docs/CLIENT.md`** populiert mit _real validierten_ Werten:
+
    - Bestätigte Camera2D-Zoom-Werte für 4800×3200 → typische Viewport-Größen.
    - Tatsächlich gemessene Throttle-Frequenz für `player_input`.
    - Reconnect-Verhalten innerhalb 30 s und nach 30+ s, in beiden Fällen verifiziert.
    - Liste der **Backend-Doku-Lücken**, die der Spike aufgedeckt hat, als Folge-Slices vorgeschlagen.
 
 2. **`godot/`** funktionierendes Skelett:
+
    - Öffnet in Godot 4.3 Editor ohne Fehler.
-   - `scenes/main.tscn` als Entry-Point, Connect-Flow funktioniert lokal *und* gegen Live.
+   - `scenes/main.tscn` als Entry-Point, Connect-Flow funktioniert lokal _und_ gegen Live.
    - Code-Dokumentation auf einem Niveau, dass ein anderer Dev die Anbindung versteht.
 
 3. **`godot/README.md`** — fünfzeiler: Projekt öffnen, Connect lokal/live, Tasten-Bindings im Spike, aktuelle Limitationen.
@@ -182,6 +184,6 @@ Nach Spike-Abschluss im Repo:
 
 ## 11. Risiken und offene Fragen
 
-- **Risiko:** Camera2D-Zoom-Strategie könnte bei späterer Tilemap-Migration (Tier 3.3) nicht 1:1 übernehmbar sein. *Mitigation:* In `docs/CLIENT.md` notieren, dass Spike-Strategie debug-only ist, Tilemap-Strategie offen.
-- **Risiko:** Reconnect-Test übersieht Edge-Case (z.B. Reconnect während Phase MEETING). *Mitigation:* Spike testet Reconnect explizit in PLAYING-Phase, MEETING-Phase als Folge-Slice.
+- **Risiko:** Camera2D-Zoom-Strategie könnte bei späterer Tilemap-Migration (Tier 3.3) nicht 1:1 übernehmbar sein. _Mitigation:_ In `docs/CLIENT.md` notieren, dass Spike-Strategie debug-only ist, Tilemap-Strategie offen.
+- **Risiko:** Reconnect-Test übersieht Edge-Case (z.B. Reconnect während Phase MEETING). _Mitigation:_ Spike testet Reconnect explizit in PLAYING-Phase, MEETING-Phase als Folge-Slice.
 - **Offen:** WebSocketPeer-API hat in Godot 4.x mehrere Iterationen durchlaufen. Der GDScript-Beispielcode in `docs/PROTOCOL.md §10` muss gegen 4.3 verifiziert werden — falls API-Drift, Beispiel im Spike aktualisieren und PROTOCOL.md fixen.
