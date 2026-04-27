@@ -57,7 +57,7 @@ static func build(map: Dictionary) -> Node3D:
 	var walls := Node3D.new()
 	walls.name = "Walls"
 	root.add_child(walls)
-	_build_walls(walls, map.get("wallLines", []), map_w, map_h)
+	_build_walls(walls, map.get("rooms", []), map.get("doors", []), map.get("size", {}))
 
 	var perimeter := Node3D.new()
 	perimeter.name = "Perimeter"
@@ -196,43 +196,147 @@ static func _build_room_floor(room_data: Dictionary) -> Node3D:
 	return holder
 
 # -- Walls -------------------------------------------------------------------
+#
+# Walls werden aus Room-Edges + Door-Cutouts abgeleitet — Mirror von
+# app/game/game_map.compute_walls() (Slice 3, "Wand-Modell C").
+#
+# Pro Room-Edge: shared portion mit Nachbarn → Wand minus matching Doors
+# (Pair-dedup); non-shared portion → Wand, außer auf Map-Boundary. Outer-
+# Map-Perimeter wird separat in _build_perimeter() gerendert, damit die
+# Welt in 3D geschlossen wirkt (Server clamped Movement an der Boundary).
+# Map-Objects (blocks_movement) werden hier NICHT als Walls gerendert —
+# die kommen als eigene 3D-Meshes in einem späteren Slice.
 
-static func _build_walls(parent: Node3D, lines: Array, map_w: float, map_h: float) -> void:
+static func _build_walls(parent: Node3D, rooms: Array, doors: Array, map_size: Dictionary) -> void:
+	var segments := _compute_wall_segments(rooms, doors, map_size)
 	var idx: int = 0
-	for line in lines:
-		var axis := str(line.get("axis", "x"))
-		var pos: float = float(line.get("position", 0))
-		var doors_raw: Array = line.get("doors", [])
-		var max_pos: float = map_h if axis == "x" else map_w
-		var segments := _wall_segments(doors_raw, max_pos)
-		for seg in segments:
-			var seg_start: float = seg[0]
-			var seg_end: float = seg[1]
-			if seg_end <= seg_start:
-				continue
-			var wall := _make_wall_box(axis, pos, seg_start, seg_end)
-			wall.name = "Wall_%d" % idx
-			parent.add_child(wall)
-			idx += 1
+	for seg in segments:
+		if seg.end <= seg.start:
+			continue
+		var wall := _make_wall_box(seg.axis, seg.pos, seg.start, seg.end)
+		wall.name = "Wall_%d" % idx
+		parent.add_child(wall)
+		idx += 1
 
-# Computes wall segments between doors along a single wall line.
-# Doors are sorted by center; segments cover the gaps.
-static func _wall_segments(doors_raw: Array, max_pos: float) -> Array:
-	var doors: Array = []
-	for d in doors_raw:
-		var center: float = float(d.get("center", 0))
-		var width: float = float(d.get("width", 120))
-		doors.append({"start": center - width * 0.5, "end": center + width * 0.5})
-	doors.sort_custom(func(a, b): return a.start < b.start)
-	var segments: Array = []
-	var cursor: float = 0.0
-	for door in doors:
-		if door.start > cursor:
-			segments.append([cursor, door.start])
-		cursor = max(cursor, door.end)
-	if cursor < max_pos:
-		segments.append([cursor, max_pos])
-	return segments
+static func _compute_wall_segments(rooms: Array, doors: Array, map_size: Dictionary) -> Array:
+	var out: Array = []
+	# Dedup: each shared edge (room_a ↔ room_b at axis/edge_pos/overlap)
+	# darf nur einmal in Segmente umgesetzt werden — sonst doppelte Box-Meshes.
+	var processed: Dictionary = {}
+
+	for room in rooms:
+		var rid: String = str(room.get("id", ""))
+		var rx: float = float(room.get("x", 0))
+		var ry: float = float(room.get("y", 0))
+		var rw: float = float(room.get("width", 0))
+		var rh: float = float(room.get("height", 0))
+
+		var edges: Array = [
+			{"axis": "y", "edge_pos": ry, "start": rx, "end": rx + rw},        # top
+			{"axis": "y", "edge_pos": ry + rh, "start": rx, "end": rx + rw},   # bottom
+			{"axis": "x", "edge_pos": rx, "start": ry, "end": ry + rh},        # left
+			{"axis": "x", "edge_pos": rx + rw, "start": ry, "end": ry + rh},   # right
+		]
+
+		for edge in edges:
+			var axis: String = edge.axis
+			var edge_pos: float = edge.edge_pos
+			var start: float = edge.start
+			var end: float = edge.end
+
+			var shared: Array = []
+			for other in rooms:
+				if str(other.get("id", "")) == rid:
+					continue
+				var ovl = _edge_overlap(other, axis, edge_pos, start, end)
+				if ovl != null:
+					shared.append({"other_id": str(other.get("id", "")), "ovl": ovl})
+
+			# Shared portions: walls minus door cutouts (dedup pro Pair).
+			for s in shared:
+				var pair_key: Array = [rid, s.other_id]
+				pair_key.sort()
+				var key: String = "%s|%s|%s|%s|%s|%s" % [axis, edge_pos, pair_key[0], pair_key[1], s.ovl[0], s.ovl[1]]
+				if processed.has(key):
+					continue
+				processed[key] = true
+
+				var cutouts: Array = []
+				for door in doors:
+					var door_pair: Array = [str(door.get("betweenRoomA", "")), str(door.get("betweenRoomB", ""))]
+					door_pair.sort()
+					if door_pair[0] != pair_key[0] or door_pair[1] != pair_key[1]:
+						continue
+					var dpos: float = float(door.get("position", 0))
+					if dpos < s.ovl[0] or dpos > s.ovl[1]:
+						continue
+					var dwidth: float = float(door.get("width", 120))
+					var half: float = dwidth * 0.5
+					cutouts.append([dpos - half, dpos + half])
+
+				for seg_pair in _interval_subtract(s.ovl[0], s.ovl[1], cutouts):
+					out.append({"axis": axis, "pos": edge_pos, "start": seg_pair[0], "end": seg_pair[1]})
+
+			# Perimeter portions (kein Nachbar) — nur wenn Edge nicht auf Map-Boundary.
+			if not _is_map_edge(axis, edge_pos, map_size):
+				var shared_cuts: Array = []
+				for s in shared:
+					shared_cuts.append(s.ovl)
+				for seg_pair in _interval_subtract(start, end, shared_cuts):
+					out.append({"axis": axis, "pos": edge_pos, "start": seg_pair[0], "end": seg_pair[1]})
+
+	return out
+
+# Returns [a, b] overlap-interval entlang der perpendikulären Achse, oder
+# null wenn other keine Edge an (axis, edge_pos) hat oder kein Overlap.
+static func _edge_overlap(other: Dictionary, axis: String, edge_pos: float, start: float, end: float):
+	var ox: float = float(other.get("x", 0))
+	var oy: float = float(other.get("y", 0))
+	var ow: float = float(other.get("width", 0))
+	var oh: float = float(other.get("height", 0))
+	var a: float
+	var b: float
+	if axis == "x":
+		if ox != edge_pos and ox + ow != edge_pos:
+			return null
+		a = max(start, oy)
+		b = min(end, oy + oh)
+	else:
+		if oy != edge_pos and oy + oh != edge_pos:
+			return null
+		a = max(start, ox)
+		b = min(end, ox + ow)
+	if a < b:
+		return [a, b]
+	return null
+
+# [start, end] minus union der cutouts. Sortiertes Ergebnis.
+static func _interval_subtract(start: float, end: float, cutouts: Array) -> Array:
+	if cutouts.is_empty():
+		return [[start, end]] if start < end else []
+	var clipped: Array = []
+	for c in cutouts:
+		var sa: float = max(c[0], start)
+		var sb: float = min(c[1], end)
+		if sa < sb:
+			clipped.append([sa, sb])
+	clipped.sort_custom(func(a, b): return a[0] < b[0])
+	var out: Array = []
+	var cursor: float = start
+	for c in clipped:
+		if c[0] > cursor:
+			out.append([cursor, c[0]])
+		cursor = max(cursor, c[1])
+	if cursor < end:
+		out.append([cursor, end])
+	return out
+
+static func _is_map_edge(axis: String, edge_pos: float, map_size: Dictionary) -> bool:
+	var w: float = float(map_size.get("width", 4800))
+	var h: float = float(map_size.get("height", 3200))
+	if axis == "x":
+		return edge_pos == 0.0 or edge_pos == w
+	return edge_pos == 0.0 or edge_pos == h
 
 static func _make_wall_box(axis: String, pos: float, seg_start: float, seg_end: float) -> Node3D:
 	var node := MeshInstance3D.new()
