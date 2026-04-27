@@ -97,10 +97,14 @@ func _ready() -> void:
 	_dummy.scale = Vector3(CHARACTER_SCALE, CHARACTER_SCALE, CHARACTER_SCALE)
 
 	# Kenney Mini Characters ship with their own AnimationPlayer + walk/idle.
+	# Their default loop_mode is "none" though — force LOOP_LINEAR so the
+	# clip keeps repeating instead of freezing after one cycle.
 	_anim_player = _dummy.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	if _anim_player != null:
 		_walk_anim = _pick_animation(ANIM_WALK_PRIORITY)
 		_idle_anim = _pick_animation(ANIM_IDLE_PRIORITY)
+		_force_loop(_walk_anim)
+		_force_loop(_idle_anim)
 		if _idle_anim != "":
 			_play_anim(_idle_anim)
 
@@ -191,6 +195,13 @@ func _play_anim(name: String) -> void:
 		return
 	_anim_player.play(name, 0.2)
 	_current_anim = name
+
+func _force_loop(qualified_name: String) -> void:
+	if qualified_name == "" or _anim_player == null:
+		return
+	var anim: Animation = _anim_player.get_animation(qualified_name)
+	if anim != null:
+		anim.loop_mode = Animation.LOOP_LINEAR
 
 # -- Visual decoration -------------------------------------------------------
 
