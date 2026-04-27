@@ -9,12 +9,8 @@ import random
 
 import pytest
 
-from app.game.game_room import (
-    TAKEDOWN_COOLDOWN,
-    TAKEDOWN_RADIUS,
-    GameRoom,
-    GameRoomError,
-)
+from app.game.controllers.meeting import TAKEDOWN_COOLDOWN, TAKEDOWN_RADIUS
+from app.game.game_room import GameRoom, GameRoomError
 from app.game.models import Phase
 
 

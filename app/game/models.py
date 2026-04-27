@@ -35,8 +35,11 @@ class Player(BaseModel):
     # Tier 3.5: lobby preference (one of the release-team role ids, or None).
     # Server respects best-effort during _assign_roles; ignored for chaos.
     preferred_role: str | None = None
-    # Tier 3.5: per-player coffee energy (0..max_coffee from role). Defaults
-    # to 100 so legacy code paths that don't init it stay sensible.
+    # Tier 3.5: PER-PLAYER coffee energy (0..max_coffee from role). NOT to
+    # be confused with the room-level ``coffee_level`` (int 0..100) used for
+    # team-wide UI signals + the coffee_outage sabotage gate. coffee_energy
+    # drives this player's movement penalty and task-speed bonus only.
+    # Defaults to 100 so legacy code paths that don't init it stay sensible.
     coffee_energy: float = 100.0
     max_coffee: float = 100.0
     # Tier 3.5: ability used this round (single-use for now). Reset on round.

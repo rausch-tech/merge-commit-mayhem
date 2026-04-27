@@ -12,18 +12,15 @@ Public surface:
     - apply_takedown(killer_id, target_id) -> Body
     - apply_report_body(reporter_id, body_id, rng=None)
     - call_emergency_meeting(requesting_player_id, rng=None)
+    - begin_meeting(caller_id, title, body, consume_quota) — shared
+      PLAYING -> MEETING transition, also used by the Scrum-Master
+      'standup' ability
     - cast_vote(voter_id, target_id)
     - skip_vote(voter_id)
     - resolve_meeting() -> eliminated player id or None
     - all_alive_voted()
     - aggregate_vote_counts()
     - snapshot_context(reporter_id, body)
-
-Private:
-    - _living_player_ids()
-    - _room_label_for(x, y)
-    - _begin_meeting(caller_id, title, rng_for_random_title=None,
-                     body=None, consume_quota=False)
 """
 
 from __future__ import annotations
@@ -48,10 +45,17 @@ if TYPE_CHECKING:
 
 
 TAKEDOWN_RADIUS = 40.0  # px
+"""Max distance between killer and victim for ``apply_takedown``."""
+
 TAKEDOWN_COOLDOWN = 25.0  # seconds
+"""Cooldown between successive take-downs by the same chaos agent."""
+
 REPORT_RADIUS = 40.0  # px
+"""Max distance between reporter and body for ``apply_report_body``."""
 
 MEETING_DURATION_SECONDS = 60.0
+"""Voting window after a meeting starts. Resolves earlier if every alive
+player has voted."""
 
 _MEETING_TITLES = [
     "Wer hat auf main gepusht?",
@@ -162,7 +166,7 @@ class MeetingController:
         )
 
         # Direct transition into MEETING. Bypass war-room + meeting quota.
-        self._begin_meeting(
+        self.begin_meeting(
             caller_id=reporter_id,
             title=f"Body Report: {body.victim_name}",
             body=body,
@@ -198,7 +202,7 @@ class MeetingController:
             )
 
         r = rng or random.SystemRandom()
-        self._begin_meeting(
+        self.begin_meeting(
             caller_id=requesting_player_id,
             title=r.choice(_MEETING_TITLES),
             body=None,
@@ -323,9 +327,9 @@ class MeetingController:
             alive=[MeetingAlive(id=p.id, name=p.name) for p in room.players.values() if p.is_alive],
         )
 
-    # --- private -------------------------------------------------------------
+    # --- shared transition ---------------------------------------------------
 
-    def _begin_meeting(
+    def begin_meeting(
         self,
         caller_id: str,
         title: str,
@@ -334,8 +338,7 @@ class MeetingController:
     ) -> None:
         """Shared transition: PLAYING -> MEETING. Resets task holds, cancels
         all mini-games, snapshots discussion context. Used by emergency
-        meetings, body reports, and the Scrum-Master 'standup' ability via
-        the room-level apply_use_ability shim."""
+        meetings, body reports, and the Scrum-Master 'standup' ability."""
         room = self._room
         if consume_quota:
             room.players_with_meeting_left[caller_id] = False

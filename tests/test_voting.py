@@ -2,7 +2,8 @@ import random
 
 import pytest
 
-from app.game.game_room import MEETING_DURATION_SECONDS, GameRoom, GameRoomError
+from app.game.controllers.meeting import MEETING_DURATION_SECONDS
+from app.game.game_room import GameRoom, GameRoomError
 from app.game.models import InputState, Phase
 from app.game.voting import SKIP_TARGET, all_chaos_eliminated, tally
 

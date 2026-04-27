@@ -43,26 +43,24 @@ from app.game.voting import all_chaos_eliminated
 from app.protocol import MeetingContext
 
 MAX_PLAYERS = 12
+"""Hard cap per room. Tier 1.5 raised this from 8."""
+
 MIN_PLAYERS_TO_START = 4
+"""Below this count ``start()`` raises NOT_ENOUGH_PLAYERS unless demo=True."""
+
 PLAYER_RADIUS = 12
+"""Hitbox radius (px) used for movement and interaction tests."""
+
 ROUND_SECONDS = 900.0
+"""Default time-budget per round (15 minutes). Once expired the chaos
+team wins by exhaustion."""
+
 RECONNECT_GRACE_SECONDS = 30.0
+"""How long a disconnected player keeps their seat before
+``_sweep_disconnected`` removes them."""
 
-INCIDENTS_LOSS_THRESHOLD = 100  # chaos wins once incidents reach this
-
-MEETING_DURATION_SECONDS = 60.0
-
-TAKEDOWN_RADIUS = 40.0  # px
-TAKEDOWN_COOLDOWN = 25.0  # seconds
-REPORT_RADIUS = 40.0  # px
-
-_MEETING_TITLES = [
-    "Wer hat auf main gepusht?",
-    "Warum sind die Tests rot?",
-    "Wieso ist der Kunde im Sprint?",
-    "Wer hat den KI-Agenten unbeaufsichtigt gelassen?",
-    "Wer hat den Coffee Token verbraucht?",
-]
+INCIDENTS_LOSS_THRESHOLD = 100
+"""Chaos win threshold: once room.incidents reaches this, the round ends."""
 
 # Feste 12er-Palette: paarweise distinkt, sechs „klassische" Hues (Doc 07 Farbsystem)
 # plus sechs zusaetzliche, gut unterscheidbare Toene fuer 7..12 Spieler.
@@ -100,7 +98,11 @@ class GameRoom:
         self.players: dict[str, Player] = {}
         self.remaining_seconds: float = ROUND_SECONDS
 
-        # Global gameplay stats (0 in LOBBY, reset on start()).
+        # Global gameplay stats (0 in LOBBY, reset on start()). NOTE:
+        # ``coffee_level`` is the TEAM-LEVEL int 0..100 — UI pill, gates
+        # the coffee_outage sabotage trigger, and feeds movement_speed
+        # floor when at 0. Per-player coffee state lives on Player as
+        # ``coffee_energy: float`` (Tier 3.5) and is independent.
         self.release_progress: int = 0
         self.pipeline_stability: int = 100
         self.coffee_level: int = 100
@@ -731,19 +733,18 @@ class GameRoom:
 
         elif ability == "standup":
             # Like emergency meeting but waives the war-room location rule and
-            # doesn't consume the player's normal meeting allowance.
-            self.meeting_caller_id = player_id
-            self.meeting_remaining_seconds = MEETING_DURATION_SECONDS
-            self.votes = {}
-            self.meeting_title = "STANDUP — Scrum Master called it"
-            self.phase = Phase.MEETING
-            for task in self.tasks.values():
-                task.per_player_progress = {}
-                if task.status == "in_progress":
-                    task.status = "available"
-            self._cancel_all_mini_games("meeting_started")
+            # doesn't consume the player's normal meeting allowance. Goes
+            # through the meeting controller so the PLAYING->MEETING
+            # transition is centralised (task holds cleared, mini-games
+            # cancelled, context snapshotted) — no copy/paste of the eight
+            # mutations that step entails.
             self._emit_event("warn", f"{player.name} ruft ein Standup ein. Alle in den Slack-Call.")
-            self._snapshot_meeting_context(reporter_id=player_id, body=None)
+            self._meeting_ctl.begin_meeting(
+                caller_id=player_id,
+                title="STANDUP — Scrum Master called it",
+                body=None,
+                consume_quota=False,
+            )
 
         elif ability == "reproduce_bug":
             # Flavor / placeholder hook for now — emits an event and consumes
