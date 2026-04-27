@@ -187,6 +187,92 @@ function screenToMap(sx, sy) {
 
 window.addEventListener("resize", fitCanvas);
 
+// --- Pan / Zoom on the 2D canvas ------------------------------------------
+//
+// The shared layout (220px / 1fr / 480px) makes the 2D pane narrower than
+// before, so a fit-to-view defaults to a tiny map. Wheel-zoom around the
+// cursor + middle-mouse-drag pan + a "fit" hotkey give designers room to
+// breathe without resizing the panes.
+
+const VIEW_MIN_SCALE = 0.05;
+const VIEW_MAX_SCALE = 5;
+
+dom.canvas.addEventListener(
+  "wheel",
+  (e) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    const rect = dom.canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    const mapPt = screenToMap(cx, cy);
+    const next = Math.max(VIEW_MIN_SCALE, Math.min(VIEW_MAX_SCALE, state.view.scale * factor));
+    state.view.scale = next;
+    // Re-anchor: the same map point should stay under the cursor.
+    state.view.offsetX = cx - mapPt.x * next;
+    state.view.offsetY = cy - mapPt.y * next;
+    requestRender();
+  },
+  { passive: false }
+);
+
+let panState = null;
+
+dom.canvas.addEventListener(
+  "mousedown",
+  (e) => {
+    // Middle-mouse-button OR Space+left starts panning. Capture-phase so we
+    // can stopPropagation before per-tool handlers see the event.
+    const isPan = e.button === 1 || (e.button === 0 && e.shiftKey === false && state._spaceHeld);
+    if (!isPan) return;
+    e.preventDefault();
+    e.stopPropagation();
+    panState = {
+      startX: e.clientX,
+      startY: e.clientY,
+      baseOffsetX: state.view.offsetX,
+      baseOffsetY: state.view.offsetY,
+    };
+    dom.canvas.style.cursor = "grabbing";
+  },
+  true
+);
+
+window.addEventListener("mousemove", (e) => {
+  if (!panState) return;
+  state.view.offsetX = panState.baseOffsetX + (e.clientX - panState.startX);
+  state.view.offsetY = panState.baseOffsetY + (e.clientY - panState.startY);
+  requestRender();
+});
+
+window.addEventListener("mouseup", () => {
+  if (!panState) return;
+  panState = null;
+  updateCanvasCursor();
+});
+
+// Space-bar acts as a temporary pan modifier. Track in state so the
+// middle-button check above can use it without re-reading the keyboard.
+window.addEventListener("keydown", (e) => {
+  if (e.code === "Space" && !state._spaceHeld) {
+    state._spaceHeld = true;
+    if (!panState) dom.canvas.style.cursor = "grab";
+  }
+  // Strg+0 / Cmd+0 = fit-to-view reset.
+  if ((e.ctrlKey || e.metaKey) && e.code === "Digit0") {
+    e.preventDefault();
+    computeFitView();
+    requestRender();
+  }
+});
+
+window.addEventListener("keyup", (e) => {
+  if (e.code === "Space") {
+    state._spaceHeld = false;
+    if (!panState) updateCanvasCursor();
+  }
+});
+
 // --- Rendering -------------------------------------------------------------
 
 let renderQueued = false;

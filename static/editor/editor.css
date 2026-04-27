@@ -83,7 +83,11 @@ body {
 
 #editor-main {
   display: grid;
-  grid-template-columns: 220px 1fr 1fr;
+  /* 2D-Editor bekommt den Großteil der Breite; das 3D-Preview-Pane sitzt
+     als rechtes Sidebar mit fester Mindestbreite (480px) und darf bis zu
+     30% der Gesamtbreite einnehmen. So bleibt Platz zum präzisen Editieren
+     im 2D-Canvas, ohne dass die 3D-Vorschau auf "Vignettengröße" schrumpft. */
+  grid-template-columns: 220px minmax(0, 1fr) clamp(360px, 30vw, 560px);
   grid-template-rows: 1fr 1fr;
   gap: 0;
   height: calc(100vh - 56px);
@@ -91,7 +95,7 @@ body {
 
 /* When the 3D-Preview toggle is off, collapse the preview column. */
 #editor-main.preview-off {
-  grid-template-columns: 220px 1fr 0;
+  grid-template-columns: 220px minmax(0, 1fr) 0;
 }
 
 #editor-main.preview-off #preview-area {
