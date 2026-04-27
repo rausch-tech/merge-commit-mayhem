@@ -19,6 +19,9 @@ const TYPE_JOIN_ROOM: String = "join_room"
 const TYPE_REJOIN: String = "rejoin"
 const TYPE_START_GAME: String = "start_game"
 const TYPE_PLAYER_INPUT: String = "player_input"
+const TYPE_TASK_HOLD_START: String = "task_hold_start"
+const TYPE_TASK_HOLD_STOP: String = "task_hold_stop"
+const TYPE_MINI_GAME_INPUT: String = "mini_game_input"
 const TYPE_RETURN_TO_LOBBY: String = "return_to_lobby"
 
 # Incoming message types
@@ -29,6 +32,9 @@ const TYPE_PRIVATE_ROLE: String = "private_role"
 const TYPE_PRIVATE_STATE: String = "private_state"
 const TYPE_VOTING_RESULT: String = "voting_result"
 const TYPE_GAME_ENDED: String = "game_ended"
+const TYPE_MINI_GAME_STARTED: String = "mini_game_started"
+const TYPE_MINI_GAME_STATE: String = "mini_game_state"
+const TYPE_MINI_GAME_COMPLETED: String = "mini_game_completed"
 const TYPE_ERROR: String = "error"
 
 # Phases (mirror server's Phase enum)

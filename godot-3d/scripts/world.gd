@@ -43,6 +43,13 @@ var initial_state: Dictionary = {}
 # zwischen den Updates.
 var private_state: Dictionary = {}
 
+# Task interaction state (Tier 4.6).
+var _tasks_by_id: Dictionary = {}              # taskId → task dict from game_state
+var _hold_task_id: String = ""                  # "" = nicht gehalten; sonst der Task auf dem E gehalten wird
+var _nearest_task_id: String = ""               # cached fuer HUD-Prompt
+var _mini_game_modal: CanvasLayer = null        # aktive Modal-Instance (nur 1 zur Zeit)
+const _MINI_GAME_MODAL_SCRIPT: Script = preload("res://scripts/mini_game_modal.gd")
+
 # Runtime
 var _world_root: Node3D
 var _input_sender: InputSender
@@ -120,6 +127,11 @@ func _ready() -> void:
 			print("[world]   player ", pid, " at ", ch.global_position)
 
 func _process(delta: float) -> void:
+	# Task-Proximity-Check fuer den HUD-Prompt — laeuft auch im Aerial-Mode,
+	# aber wenn aerial-demo wir den lokalen Player gar nicht haben, gibt's
+	# nichts zu zeigen.
+	_update_nearest_task()
+
 	# In aerial demo-camera mode the rig stays parked at map center.
 	if aerial_demo_camera:
 		return
@@ -138,10 +150,24 @@ func _process(delta: float) -> void:
 	_camera_rig.position = current.lerp(anchor, t)
 
 func _input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo:
-		var key_event := event as InputEventKey
-		if key_event.keycode == KEY_ESCAPE:
-			_toggle_pause_menu()
+	if not (event is InputEventKey):
+		return
+	var key_event := event as InputEventKey
+	if key_event.echo:
+		return
+	# E down: task_hold_start auf den naechstgelegenen Task. E up: stop.
+	# Server validiert Proximity nochmal; wir tippen nur den Task an dem wir
+	# vermutlich stehen.
+	if key_event.keycode == KEY_E:
+		if key_event.pressed:
+			_on_e_pressed()
+		else:
+			_on_e_released()
+		return
+	if key_event.pressed and key_event.keycode == KEY_ESCAPE:
+		# Wenn Mini-Game offen ist, hat dessen _input ESC schon geschluckt —
+		# hier landet ESC nur wenn kein Modal offen ist.
+		_toggle_pause_menu()
 
 func _on_message(type_: String, payload: Dictionary) -> void:
 	match type_:
@@ -171,11 +197,147 @@ func _on_message(type_: String, payload: Dictionary) -> void:
 			private_state = payload.duplicate()
 			if _hud and _hud.has_method("apply_private_state"):
 				_hud.call("apply_private_state", private_state)
+		Protocol.TYPE_MINI_GAME_STARTED:
+			_open_mini_game_modal(payload)
+		Protocol.TYPE_MINI_GAME_STATE:
+			if _mini_game_modal != null and _mini_game_modal.has_method("apply_view"):
+				_mini_game_modal.call("apply_view", payload.get("view", {}))
+		Protocol.TYPE_MINI_GAME_COMPLETED:
+			if _mini_game_modal != null and _mini_game_modal.has_method("on_complete"):
+				_mini_game_modal.call(
+					"on_complete",
+					bool(payload.get("success", false)),
+					str(payload.get("reason", "")),
+				)
+			# Sting + close — Server-event ist authoritative.
+			if bool(payload.get("success", false)):
+				_play_sting(STING_TASK_COMPLETE)
+			_close_mini_game_modal()
+			_hold_task_id = ""
 		_:
-			# Voting/meeting/mini-game etc. — Tier 4.6+ rendert sie, vorher
-			# fallen sie hier durch. Logs auf Debugging-Bedarf nicht hier
-			# anwerfen, sonst flutet das die Konsole bei 20 Hz.
+			# Voting/meeting etc. — Tier 4.7+ rendert sie, vorher fallen sie
+			# hier durch. Logs auf Debugging-Bedarf nicht hier anwerfen,
+			# sonst flutet das die Konsole bei 20 Hz.
 			pass
+
+# -- Task-Interaction (Tier 4.6) --------------------------------------------
+
+func _update_nearest_task() -> void:
+	# Findet den naechsten Task-Anchor zum lokalen Spieler und schiebt einen
+	# Prompt ins HUD. Default-Reichweite TASK_INTERACTION_RADIUS (40 server-px,
+	# = 0.4 world-units bei WORLD_SCALE 0.01).
+	if _hud == null:
+		return
+	# Modal offen → Prompt verstecken (Spieler ist gerade im Mini-Game).
+	if _mini_game_modal != null:
+		_set_nearest("", 0.0, false)
+		return
+	if not _players_by_id.has(player_id):
+		_set_nearest("", 0.0, false)
+		return
+	var local: Node3D = _players_by_id[player_id]
+	var local_pos: Vector3 = local.global_position
+	var radius_world: float = Protocol.TASK_INTERACTION_RADIUS * Protocol.WORLD_SCALE
+	var radius_world_sq: float = radius_world * radius_world
+
+	var best_id: String = ""
+	var best_task: Dictionary = {}
+	var best_dist_sq: float = INF
+	for tid in _tasks_by_id.keys():
+		var t: Dictionary = _tasks_by_id[tid]
+		var tx: float = float(t.get("x", 0))
+		var ty: float = float(t.get("y", 0))
+		var tpos: Vector3 = Protocol.server_to_world(tx, ty)
+		var d_sq: float = (tpos - local_pos).length_squared()
+		if d_sq < radius_world_sq and d_sq < best_dist_sq:
+			best_dist_sq = d_sq
+			best_id = str(tid)
+			best_task = t
+
+	_nearest_task_id = best_id
+	if best_id == "":
+		_set_nearest("", 0.0, false)
+		return
+	# Server liefert progress als 0..1 Float in game_state.tasks[].progress.
+	var progress: float = float(best_task.get("progress", 0.0))
+	var holding: bool = (_hold_task_id == best_id)
+	_set_nearest(best_id, progress, holding)
+
+func _set_nearest(task_id: String, progress: float, holding: bool) -> void:
+	if _hud == null or not _hud.has_method("set_task_prompt"):
+		return
+	if task_id == "":
+		_hud.call("set_task_prompt", "", 0.0, false)
+	else:
+		_hud.call("set_task_prompt", task_id, clampf(progress, 0.0, 1.0), holding)
+
+func _on_e_pressed() -> void:
+	# Wenn ein Mini-Game-Modal offen ist, fuettern wir E nicht — Modal frisst
+	# Inputs selbst.
+	if _mini_game_modal != null:
+		return
+	if _nearest_task_id == "":
+		return
+	if _hold_task_id != "":
+		return
+	if ws_client == null:
+		return
+	_hold_task_id = _nearest_task_id
+	ws_client.send(Protocol.TYPE_TASK_HOLD_START, {"taskId": _hold_task_id})
+
+func _on_e_released() -> void:
+	if _hold_task_id == "":
+		return
+	if ws_client != null:
+		ws_client.send(Protocol.TYPE_TASK_HOLD_STOP, {"taskId": _hold_task_id})
+	_hold_task_id = ""
+
+# -- Mini-Game-Modal --------------------------------------------------------
+
+func _open_mini_game_modal(payload: Dictionary) -> void:
+	# Wenn schon eines offen ist (sollte nicht passieren — Server enforced
+	# einzelne Session), schliessen wir das alte hart.
+	if _mini_game_modal != null:
+		_close_mini_game_modal()
+
+	var modal := CanvasLayer.new()
+	modal.set_script(_MINI_GAME_MODAL_SCRIPT)
+	add_child(modal)
+	_mini_game_modal = modal
+
+	if modal.has_method("setup"):
+		modal.call(
+			"setup",
+			str(payload.get("taskId", "")),
+			str(payload.get("miniGameId", "")),
+			str(payload.get("title", "")),
+			payload.get("view", {}),
+		)
+	if modal.has_signal("input_sent"):
+		modal.connect("input_sent", _on_mini_game_input)
+	if modal.has_signal("aborted"):
+		modal.connect("aborted", _on_mini_game_aborted)
+
+func _close_mini_game_modal() -> void:
+	if _mini_game_modal == null:
+		return
+	_mini_game_modal.queue_free()
+	_mini_game_modal = null
+
+func _on_mini_game_input(action: String, params: Dictionary) -> void:
+	if ws_client == null:
+		return
+	ws_client.send(Protocol.TYPE_MINI_GAME_INPUT, {"action": action, "params": params})
+
+func _on_mini_game_aborted() -> void:
+	# Modal-Abort = Server bekommt task_hold_stop. Server quittiert mit
+	# mini_game_completed{success=false} und unser Handler raeumt das Modal weg.
+	if ws_client != null and _hold_task_id != "":
+		ws_client.send(Protocol.TYPE_TASK_HOLD_STOP, {"taskId": _hold_task_id})
+	# Falls der Server nicht antwortet (z.B. Demo-Mode), schliessen wir auch
+	# direkt — sonst klemmt das Modal.
+	_close_mini_game_modal()
+	_hold_task_id = ""
 
 func _on_disconnected() -> void:
 	push_warning("world: disconnected — returning to main")
@@ -235,6 +397,13 @@ func _apply_state(state: Dictionary) -> void:
 
 	if any_kill:
 		_play_sting(STING_KILL)
+
+	# Tasks-By-Id refresh (fuer Proximity-Check + Hold-Progress).
+	_tasks_by_id.clear()
+	for t in state.get("tasks", []):
+		var tid := str(t.get("taskId", t.get("id", "")))
+		if tid != "":
+			_tasks_by_id[tid] = t
 
 	# HUD update
 	if _hud and _hud.has_method("apply_game_state"):

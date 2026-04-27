@@ -43,12 +43,17 @@ var _map_label: Label
 var _roster: VBoxContainer
 var _personal_coffee_fill: ColorRect
 var _personal_coffee_max_width: float = 180.0
+var _task_prompt_panel: PanelContainer
+var _task_prompt_label: Label
+var _task_prompt_fill: ColorRect
+var _task_prompt_fill_max_width: float = 220.0
 
 func _ready() -> void:
 	_build_top_bar()
 	_build_role_chip()
 	_build_roster_panel()
 	_build_map_label()
+	_build_task_prompt()
 	apply_game_state({})
 
 # Public API ----------------------------------------------------------------
@@ -77,6 +82,25 @@ func set_role_info(role_info: Dictionary) -> void:
 	else:
 		_team_chip.text = "—"
 		_team_chip.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+
+func set_task_prompt(task_id: String, progress: float, holding: bool) -> void:
+	# task_id == "" = nichts in Reichweite, Prompt verstecken.
+	# holding == true = Spieler haelt gerade E auf diesem Task; zeig den
+	# Progress-Balken statt nur "[E] HALTEN".
+	if _task_prompt_panel == null:
+		return
+	if task_id == "":
+		_task_prompt_panel.visible = false
+		return
+	_task_prompt_panel.visible = true
+	if holding:
+		_task_prompt_label.text = "%s · halten ..." % task_id
+		_task_prompt_label.add_theme_color_override("font_color", COLOR_ACCENT)
+	else:
+		_task_prompt_label.text = "[E] halten — %s" % task_id
+		_task_prompt_label.add_theme_color_override("font_color", COLOR_TEXT)
+	if _task_prompt_fill != null:
+		_task_prompt_fill.size = Vector2(_task_prompt_fill_max_width * clampf(progress, 0.0, 1.0), 6)
 
 func apply_private_state(state: Dictionary) -> void:
 	var energy: float = float(state.get("coffeeEnergy", 100.0))
@@ -393,3 +417,60 @@ func _format_timer(seconds: int) -> String:
 	var m: int = s / 60
 	var sec: int = s % 60
 	return "%02d:%02d" % [m, sec]
+
+func _build_task_prompt() -> void:
+	# Bottom-center Prompt fuer Task-Interaction. Sichtbar wenn Spieler in
+	# Reichweite eines Tasks ist; zeigt entweder "[E] halten — TASK_ID" oder
+	# (waehrend Hold) den Task-Progress.
+	_task_prompt_panel = PanelContainer.new()
+	_task_prompt_panel.anchor_left = 0.5
+	_task_prompt_panel.anchor_right = 0.5
+	_task_prompt_panel.anchor_bottom = 1.0
+	_task_prompt_panel.anchor_top = 1.0
+	_task_prompt_panel.offset_left = -160
+	_task_prompt_panel.offset_right = 160
+	_task_prompt_panel.offset_top = -100
+	_task_prompt_panel.offset_bottom = -50
+	_task_prompt_panel.visible = false
+	add_child(_task_prompt_panel)
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = COLOR_PANEL_BG
+	style.set_corner_radius_all(8)
+	style.set_border_width_all(1)
+	style.border_color = Color(1, 1, 1, 0.10)
+	style.set_content_margin_all(10)
+	_task_prompt_panel.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	_task_prompt_panel.add_child(vbox)
+
+	_task_prompt_label = Label.new()
+	_task_prompt_label.text = ""
+	_task_prompt_label.add_theme_color_override("font_color", COLOR_TEXT)
+	_task_prompt_label.add_theme_font_size_override("font_size", 13)
+	_task_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(_task_prompt_label)
+
+	# Progress-Bar — Server-driven (game_state.tasks[].progress).
+	var bar_container := PanelContainer.new()
+	bar_container.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var bar_bg := StyleBoxFlat.new()
+	bar_bg.bg_color = Color(0.08, 0.10, 0.14, 0.8)
+	bar_bg.set_corner_radius_all(2)
+	bar_bg.set_content_margin_all(1)
+	bar_container.add_theme_stylebox_override("panel", bar_bg)
+	vbox.add_child(bar_container)
+
+	var bar_inner := Control.new()
+	bar_inner.custom_minimum_size = Vector2(_task_prompt_fill_max_width, 6)
+	bar_container.add_child(bar_inner)
+
+	_task_prompt_fill = ColorRect.new()
+	_task_prompt_fill.color = COLOR_ACCENT
+	_task_prompt_fill.anchor_top = 0.0
+	_task_prompt_fill.anchor_bottom = 1.0
+	_task_prompt_fill.anchor_left = 0.0
+	_task_prompt_fill.size = Vector2(0, 6)
+	bar_inner.add_child(_task_prompt_fill)

@@ -33,7 +33,9 @@ fi
 failed=0
 checked=0
 
-for script in "$PROJECT"/scripts/*.gd; do
+# Recurse into subdirs (z.B. scripts/minigames/) — sonst werden Mini-Game-
+# Plugins still uebersprungen.
+while IFS= read -r script; do
     rel="${script#$REPO_ROOT/}"
     out=$(godot --headless --path "$PROJECT" --check-only --script "$script" 2>&1) || true
     rc=$?
@@ -48,7 +50,7 @@ for script in "$PROJECT"/scripts/*.gd; do
             echo "$out" | head -1 | sed 's/^/      /'
         fi
     fi
-done
+done < <(find "$PROJECT/scripts" -type f -name '*.gd' | sort)
 
 echo ""
 if [[ $failed -gt 0 ]]; then
