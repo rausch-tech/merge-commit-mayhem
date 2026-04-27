@@ -78,7 +78,7 @@
       "width": 1400,
       "height": 1200,
       "color": "#2a4a70",
-      "floorMaterial": "office",
+      "floorMaterial": "server",
       "wallHeightM": 2.6,
       "lightingProfile": "neutral",
       "ambientSound": null
@@ -104,7 +104,7 @@
       "width": 1400,
       "height": 1200,
       "color": "#7a5030",
-      "floorMaterial": "office",
+      "floorMaterial": "kitchen",
       "wallHeightM": 2.6,
       "lightingProfile": "neutral",
       "ambientSound": null
@@ -117,7 +117,7 @@
       "width": 1400,
       "height": 1200,
       "color": "#3a6a3a",
-      "floorMaterial": "office",
+      "floorMaterial": "legacy",
       "wallHeightM": 2.6,
       "lightingProfile": "neutral",
       "ambientSound": null
