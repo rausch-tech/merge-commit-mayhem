@@ -48,6 +48,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         room="open_space",
         required_seconds=5.0,
         release_progress_reward=8,
+        mini_game="diff_review",
         category="code",
     ),
     TaskDefinition(

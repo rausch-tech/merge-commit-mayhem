@@ -19,11 +19,14 @@ from app.game.sabotages import COFFEE_SLOW_SPEED, NORMAL_SPEED
 
 def _started_room(player_count: int = 4, seed: int = 0) -> tuple[GameRoom, list[str]]:
     """Spawn a started GameRoom with at least 4 players (1 chaos + 3 release)."""
+    from tests.conftest import make_task_hold_e
+
     if player_count < 4:
         player_count = 4
     room = GameRoom(code="GHST")
     ids = [room.add_player(f"p{i}").id for i in range(player_count)]
     room.start(requesting_player_id=ids[0], rng=random.Random(seed))
+    make_task_hold_e(room, "review_pr")
     return room, ids
 
 
