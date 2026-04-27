@@ -26,6 +26,62 @@ import { snap, TOOLS } from "/static/editor/editor-tools.js";
 // a working 2D editor. Errors are shown in the preview status bar.
 let MapPreview3D = null;
 
+// --- Auto-save (localStorage) ----------------------------------------------
+//
+// Designers lose work when they close the tab without explicit save. We
+// debounce-save a serialized snapshot to localStorage on every markDirty,
+// then offer to restore on the next boot if the backup is recent. Cleared
+// after explicit save (download / "In Spiel speichern").
+
+const AUTOSAVE_KEY = "mcm.editor.autosave.v1";
+const AUTOSAVE_DEBOUNCE_MS = 500;
+const AUTOSAVE_MAX_AGE_MS = 24 * 3600 * 1000;
+
+let _autosaveTimer = null;
+
+function scheduleAutosave() {
+  if (_autosaveTimer) clearTimeout(_autosaveTimer);
+  _autosaveTimer = window.setTimeout(() => {
+    _autosaveTimer = null;
+    try {
+      const payload = {
+        map: serializeMap(state.map),
+        savedAt: new Date().toISOString(),
+      };
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(payload));
+    } catch {
+      // localStorage might be full or unavailable (private browsing) —
+      // soft-fail; designer still has Strg+S as the real save path.
+    }
+  }, AUTOSAVE_DEBOUNCE_MS);
+}
+
+function clearAutosave() {
+  try {
+    localStorage.removeItem(AUTOSAVE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function readRecentAutosave() {
+  let payload;
+  try {
+    const raw = localStorage.getItem(AUTOSAVE_KEY);
+    if (!raw) return null;
+    payload = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!payload?.map || !payload?.savedAt) return null;
+  const ageMs = Date.now() - new Date(payload.savedAt).getTime();
+  if (!Number.isFinite(ageMs) || ageMs < 0 || ageMs > AUTOSAVE_MAX_AGE_MS) {
+    clearAutosave();
+    return null;
+  }
+  return payload;
+}
+
 // Layers the user can hide. Each key matches a draw-call below; toggling
 // hides the layer in the canvas without removing the data from the model.
 const DEFAULT_LAYERS = {
@@ -120,6 +176,7 @@ const toolContext = {
     dom.dirtyFlag.classList.remove("hidden");
     refreshValidationStrip();
     requestRender();
+    scheduleAutosave();
   },
   pushUndo() {
     history.push(state.map);
@@ -787,6 +844,17 @@ dom.canvas.addEventListener("mouseup", (e) => {
   requestRender();
 });
 
+// Single-letter hotkeys that pick a tool. Skip when typing in a field
+// or when any modifier is held (so they don't fight Strg+S etc.).
+const TOOL_HOTKEYS = {
+  a: "select",
+  r: "room",
+  s: "spawn",
+  t: "task",
+  o: "object",
+  d: "door",
+};
+
 window.addEventListener("keydown", (e) => {
   if (e.key === "Shift") state.shiftHeld = true;
   // Most shortcuts must NOT fire while a form field is focused — typing
@@ -822,10 +890,108 @@ window.addEventListener("keydown", (e) => {
     triggerDownload();
     return;
   }
+  if ((e.ctrlKey || e.metaKey) && (e.key === "d" || e.key === "D")) {
+    if (inField) return;
+    e.preventDefault();
+    duplicateSelection();
+    return;
+  }
+  // Tool hotkeys — bare letter, no modifier.
+  if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+    if (inField) return;
+    const tool = TOOL_HOTKEYS[e.key.toLowerCase()];
+    if (tool) {
+      e.preventDefault();
+      setTool(tool);
+      // Sync the radio so the topbar reflects the new tool.
+      const radio = document.querySelector(`input[name="tool"][value="${tool}"]`);
+      if (radio) radio.checked = true;
+      return;
+    }
+  }
 });
 window.addEventListener("keyup", (e) => {
   if (e.key === "Shift") state.shiftHeld = false;
 });
+
+// Generate a unique id by appending `_copy` (or `_copy_N`) to ``baseId``,
+// avoiding collisions with the supplied set of existing ids. Strips
+// existing ``_copy`` / ``_copy_N`` suffixes so chain-duplicates stay
+// readable (foo → foo_copy → foo_copy_2 instead of foo_copy_copy).
+function makeUniqueId(baseId, existingIds) {
+  const stripped = String(baseId || "item").replace(/_copy(_\d+)?$/, "");
+  const used = new Set(existingIds);
+  let candidate = `${stripped}_copy`;
+  let n = 1;
+  while (used.has(candidate)) {
+    n += 1;
+    candidate = `${stripped}_copy_${n}`;
+  }
+  return candidate;
+}
+
+// Strg+D: deep-clone the current selection at +24/+24 offset, select the
+// clone. Rooms / mapObjects / spawns are duplicable; taskAnchors are
+// keyed by task_id (server expects each at most once) and doors are
+// edge-bound (a duplicate would overlap), so those skip with a status.
+function duplicateSelection() {
+  const sel = state.selection;
+  if (!sel) {
+    flashStatus("Nichts ausgewählt zum Duplizieren.", true);
+    return;
+  }
+  const offset = 24;
+  if (sel.kind === "room") {
+    const r = state.map.rooms[sel.index];
+    if (!r) return;
+    toolContext.pushUndo();
+    const newId = makeUniqueId(
+      r.id,
+      state.map.rooms.map((x) => x.id)
+    );
+    state.map.rooms.push({ ...r, id: newId, x: r.x + offset, y: r.y + offset });
+    state.selection = { kind: "room", index: state.map.rooms.length - 1 };
+    flashStatus(`Raum "${newId}" dupliziert.`);
+  } else if (sel.kind === "object") {
+    const o = (state.map.mapObjects || [])[sel.index];
+    if (!o) return;
+    toolContext.pushUndo();
+    const newId = makeUniqueId(
+      o.id,
+      (state.map.mapObjects || []).map((x) => x.id)
+    );
+    // Drop task / sabotage bindings on the clone — those are 1-per-map
+    // and would silently break the server-side task assignment if
+    // duplicated. Designers can re-bind via the props sidebar.
+    const clone = {
+      ...o,
+      id: newId,
+      x: o.x + offset,
+      y: o.y + offset,
+    };
+    delete clone.taskId;
+    delete clone.sabotageRepairId;
+    state.map.mapObjects.push(clone);
+    state.selection = { kind: "object", index: state.map.mapObjects.length - 1 };
+    flashStatus(`Objekt "${newId}" dupliziert.`);
+  } else if (sel.kind === "spawn") {
+    const s = state.map.spawnPoints[sel.index];
+    if (!s) return;
+    toolContext.pushUndo();
+    state.map.spawnPoints.push({ x: s.x + offset, y: s.y + offset });
+    state.selection = { kind: "spawn", index: state.map.spawnPoints.length - 1 };
+    flashStatus("Spawn dupliziert.");
+  } else if (sel.kind === "task") {
+    flashStatus("TaskAnchors sind 1-pro-Map (Server-Constraint). Nicht duplizierbar.", true);
+    return;
+  } else if (sel.kind === "door") {
+    flashStatus("Türen sind kantenge­bunden. Lege eine neue Tür mit dem Tür-Tool an.", true);
+    return;
+  }
+  toolContext.markDirty();
+  refreshWarRoomChoices();
+  renderPropsSidebar();
+}
 
 function deleteSelection() {
   const sel = state.selection;
@@ -1352,6 +1518,9 @@ function triggerDownload() {
   setTimeout(() => URL.revokeObjectURL(url), 0);
   state.dirty = false;
   dom.dirtyFlag.classList.add("hidden");
+  // After explicit save the autosave is the same data — drop it so the
+  // next boot doesn't ask "restore?" with redundant content.
+  clearAutosave();
 }
 
 window.addEventListener("beforeunload", (e) => {
@@ -1607,6 +1776,7 @@ async function onSaveToServer() {
     const result = await putServerMap(mapId, payload);
     state.dirty = false;
     dom.dirtyFlag.classList.add("hidden");
+    clearAutosave();
     flashStatus(`In Spiel gespeichert: ${result.id} (${result.name})`);
     fetchServerMaps().catch(() => {});
   } catch (err) {
@@ -1735,6 +1905,33 @@ window.addEventListener("keydown", (e) => {
     await initKindsCatalogue();
   } catch (err) {
     flashStatus(`Kind-Catalogue nicht geladen: ${err.message}`, true);
+  }
+  // Auto-save restore prompt — only when there's a recent backup AND the
+  // editor is starting on the blank default. If we get here mid-edit
+  // (shouldn't happen — boot runs once), the user is in the editor and
+  // the prompt would be jarring.
+  const backup = readRecentAutosave();
+  if (backup) {
+    const ageMin = Math.max(
+      1,
+      Math.round((Date.now() - new Date(backup.savedAt).getTime()) / 60000)
+    );
+    const ok = window.confirm(
+      `Lokales Auto-Save gefunden (vor ${ageMin} Min).\n\nWiederherstellen?`
+    );
+    if (ok) {
+      try {
+        state.map = deserializeMap(backup.map);
+        state.dirty = true;
+        dom.dirtyFlag.classList.remove("hidden");
+        flashStatus("Auto-Save wiederhergestellt.");
+      } catch (err) {
+        flashStatus(`Auto-Save konnte nicht geladen werden: ${err.message}`, true);
+        clearAutosave();
+      }
+    } else {
+      clearAutosave();
+    }
   }
   renderKindLibrary();
   renderLayerToggles();
