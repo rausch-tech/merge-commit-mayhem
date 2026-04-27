@@ -1,0 +1,69 @@
+{
+  "name": "office-complex",
+  "size": { "width": 5600, "height": 3200 },
+  "rooms": [
+    { "id": "reception",      "title": "Reception",       "x": 0,    "y": 0,    "width": 800,  "height": 1200, "color": "#3a4a5a" },
+    { "id": "open_space",     "title": "Open Space West", "x": 800,  "y": 0,    "width": 1600, "height": 1200, "color": "#3a4560" },
+    { "id": "open_space_east","title": "Open Space East", "x": 2400, "y": 0,    "width": 1600, "height": 1200, "color": "#3a4560" },
+    { "id": "meeting_room",   "title": "Meeting Room",    "x": 4000, "y": 0,    "width": 1600, "height": 1200, "color": "#5a3a70" },
+    { "id": "corridor",       "title": "Corridor",        "x": 0,    "y": 1200, "width": 5600, "height": 800,  "color": "#26303c" },
+    { "id": "server_room",    "title": "Server Room",     "x": 0,    "y": 2000, "width": 1400, "height": 1200, "color": "#2a4a70" },
+    { "id": "war_room",       "title": "War Room",        "x": 1400, "y": 2000, "width": 1400, "height": 1200, "color": "#2a607a" },
+    { "id": "kitchen",        "title": "Kitchen",         "x": 2800, "y": 2000, "width": 1400, "height": 1200, "color": "#7a5030" },
+    { "id": "legacy_basement","title": "Legacy Basement", "x": 4200, "y": 2000, "width": 1400, "height": 1200, "color": "#3a6a3a" }
+  ],
+  "wallLines": [
+    { "axis": "y", "position": 1200, "doors": [
+      { "center": 400,  "width": 240 },
+      { "center": 1600, "width": 240 },
+      { "center": 3200, "width": 240 },
+      { "center": 4800, "width": 240 }
+    ]},
+    { "axis": "y", "position": 2000, "doors": [
+      { "center": 700,  "width": 240 },
+      { "center": 2100, "width": 240 },
+      { "center": 3500, "width": 240 },
+      { "center": 4900, "width": 240 }
+    ]},
+    { "axis": "x", "position": 800,  "doors": [{ "center": 600, "width": 240 }] },
+    { "axis": "x", "position": 2400, "doors": [{ "center": 600, "width": 240 }] },
+    { "axis": "x", "position": 4000, "doors": [{ "center": 600, "width": 240 }] },
+    { "axis": "x", "position": 1400, "doors": [{ "center": 2600, "width": 240 }] },
+    { "axis": "x", "position": 2800, "doors": [{ "center": 2600, "width": 240 }] },
+    { "axis": "x", "position": 4200, "doors": [{ "center": 2600, "width": 240 }] }
+  ],
+  "spawnPoints": [
+    { "x": 1200, "y": 600 },
+    { "x": 1600, "y": 600 },
+    { "x": 2000, "y": 600 },
+    { "x": 2800, "y": 600 },
+    { "x": 3200, "y": 600 },
+    { "x": 3600, "y": 600 },
+    { "x": 400,  "y": 600 },
+    { "x": 4400, "y": 600 },
+    { "x": 1200, "y": 900 },
+    { "x": 2800, "y": 900 },
+    { "x": 4400, "y": 900 },
+    { "x": 700,  "y": 1600 }
+  ],
+  "taskAnchors": [
+    { "taskId": "fix_unit_tests",      "x": 1200, "y": 400 },
+    { "taskId": "review_pr",           "x": 3200, "y": 400 },
+    { "taskId": "repair_deployment",   "x": 700,  "y": 2700 },
+    { "taskId": "refill_coffee",       "x": 3500, "y": 2700 },
+    { "taskId": "analyze_logs",        "x": 700,  "y": 2400 },
+    { "taskId": "calm_legacy_service", "x": 4900, "y": 2700 },
+    { "taskId": "reduce_scope",        "x": 4800, "y": 600 },
+    { "taskId": "write_release_notes", "x": 2100, "y": 2400 }
+  ],
+  "sabotagePanels": [
+    { "sabotageId": "lights_out",   "x": 700,  "y": 2400 },
+    { "sabotageId": "comms_outage", "x": 2100, "y": 2400 }
+  ],
+  "vents": [
+    { "id": "v_open",    "x": 1600, "y": 600,  "connectedTo": ["v_server", "v_legacy"] },
+    { "id": "v_server",  "x": 700,  "y": 2400, "connectedTo": ["v_open", "v_legacy"] },
+    { "id": "v_legacy",  "x": 4900, "y": 2700, "connectedTo": ["v_open", "v_server"] }
+  ],
+  "warRoomId": "war_room"
+}

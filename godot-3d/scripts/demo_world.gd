@@ -47,7 +47,9 @@ func _ready() -> void:
 	get_tree().root.add_child.call_deferred(world)
 
 func _load_map() -> Dictionary:
-	var path := "res://maps/default.json"
+	# Hardcoded to office_complex for the bigger 9-room map with central corridor.
+	# Switch back to "default" via the path constant if the small map is needed.
+	var path := "res://maps/office_complex.json"
 	print("[demo] map exists: ", FileAccess.file_exists(path))
 	if not FileAccess.file_exists(path):
 		print("[demo] map fallback: minimal map")
