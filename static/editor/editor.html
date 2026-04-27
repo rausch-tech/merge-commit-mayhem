@@ -26,7 +26,13 @@
       </div>
       <div class="topbar-group">
         <button id="btn-new" type="button">Neu</button>
-        <button id="btn-load" type="button">JSON laden</button>
+        <button id="btn-load-server" type="button" title="Karte vom Server laden">
+          Vom Server laden
+        </button>
+        <button id="btn-save-server" type="button" title="Karte auf dem Server speichern">
+          In Spiel speichern
+        </button>
+        <button id="btn-load" type="button" title="JSON-Datei lokal laden">JSON laden</button>
         <input id="file-input" type="file" accept=".json,application/json" hidden />
         <button id="btn-download" type="button" title="Strg+S">JSON herunterladen</button>
         <button id="btn-undo" type="button" title="Strg+Z" disabled>Undo</button>
@@ -57,6 +63,7 @@
         </label>
       </div>
       <div class="topbar-group" id="dirty-indicator">
+        <span id="status-flash" class="hidden"></span>
         <span id="dirty-flag" class="hidden">unsaved</span>
       </div>
     </header>
@@ -139,6 +146,17 @@
         </div>
       </section>
     </main>
+    <div id="server-load-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <header>
+          <h3>Karte vom Server laden</h3>
+          <button id="server-load-close" type="button" aria-label="Schließen">×</button>
+        </header>
+        <div id="server-load-list" class="server-load-list">
+          <p class="server-load-empty">Lade…</p>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/static/editor/editor.js"></script>
   </body>
 </html>

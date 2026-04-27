@@ -3,12 +3,17 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
-from app.game.game_map import GameMap, get_map_registry
+from app.game.game_map import (
+    GameMap,
+    get_map_registry,
+    is_valid_map_id,
+    save_map,
+)
 from app.game.game_room import GameRoom, GameRoomError
 from app.game.models import InputState, Phase
 from app.game.sabotages import SABOTAGE_DEFINITIONS
@@ -768,3 +773,57 @@ async def spielprinzip_page() -> FileResponse:
     """Serve the long-form game-overview subpage with screenshots, role
     matrix, sabotage-object map and design philosophy."""
     return FileResponse(_static_dir / "spielprinzip.html")
+
+
+# --- Map storage HTTP API --------------------------------------------------
+#
+# The /editor needs a way to save designed maps directly into the live
+# registry so a host can pick a freshly-edited map in the lobby without a
+# git push + redeploy cycle. The save is **ephemeral** — the maps/
+# directory belongs to the deployed snapshot and gets overwritten on the
+# next deploy. Designers still download JSON + commit for permanence.
+#
+# Intentionally no auth: this is an internal tool on a non-public URL, and
+# all writes go through Pydantic validation + filename sanitisation.
+
+
+@app.get("/api/maps")
+async def api_list_maps() -> dict[str, list[dict[str, str]]]:
+    """List all available maps as ``{id, name}`` records, sorted by id."""
+    return {"maps": _available_maps_payload()}
+
+
+@app.get("/api/maps/{map_id}")
+async def api_get_map(map_id: str) -> dict[str, object]:
+    """Return the full JSON content of one map for the editor to load."""
+    if not is_valid_map_id(map_id):
+        raise HTTPException(status_code=400, detail="invalid map id")
+    reg = get_map_registry()
+    if map_id not in reg:
+        raise HTTPException(status_code=404, detail="map not found")
+    return reg[map_id].model_dump(by_alias=True)
+
+
+@app.put("/api/maps/{map_id}")
+async def api_save_map(map_id: str, payload: dict[str, object]) -> dict[str, object]:
+    """Validate and persist a map JSON. Reloads the registry so the next
+    room creation can select it. Returns the parsed map for confirmation.
+    """
+    if not is_valid_map_id(map_id):
+        raise HTTPException(
+            status_code=400,
+            detail="invalid map id (must match [a-z0-9][a-z0-9_-]{0,39})",
+        )
+    try:
+        parsed = save_map(map_id, payload)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "id": map_id,
+        "name": parsed.name,
+        "rooms": len(parsed.rooms),
+        "doors": len(parsed.doors),
+        "mapObjects": len(parsed.map_objects),
+    }

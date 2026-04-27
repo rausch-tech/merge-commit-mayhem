@@ -19,8 +19,9 @@ Map-Map. Der Editor erzeugt das gleiche Format.
 
 import json
 import logging
+import re
 from pathlib import Path
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -386,13 +387,18 @@ _log = logging.getLogger("mcm.maps")
 _MAP_REGISTRY_CACHE: dict[str, GameMap] | None = None
 
 
-def discover_maps(maps_dir: Path = _MAPS_DIR) -> dict[str, GameMap]:
+def discover_maps(maps_dir: Path | None = None) -> dict[str, GameMap]:
     """Scan ``maps_dir`` for *.json maps and return ``{stem: GameMap}``.
+
+    ``maps_dir`` defaults to the module-level ``_MAPS_DIR`` looked up at
+    call time so tests can monkey-patch it without rebinding default args.
 
     Files that fail to load are logged and skipped — one bad map should not
     poison the whole registry. Result keys are sorted alphabetically for
     deterministic ordering on the wire.
     """
+    if maps_dir is None:
+        maps_dir = _MAPS_DIR
     out: dict[str, GameMap] = {}
     if not maps_dir.exists():
         return out
@@ -417,6 +423,41 @@ def get_map_registry() -> dict[str, GameMap]:
     if _MAP_REGISTRY_CACHE is None:
         _MAP_REGISTRY_CACHE = discover_maps()
     return _MAP_REGISTRY_CACHE
+
+
+# Map-id sanitisation. Editor-facing API accepts a slugified form so
+# filenames stay shell-safe and free from path-traversal vectors.
+_MAP_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")
+
+
+def is_valid_map_id(map_id: str) -> bool:
+    """True if ``map_id`` is a safe slug we'd accept as a filename stem."""
+    return bool(_MAP_ID_PATTERN.fullmatch(map_id))
+
+
+def save_map(map_id: str, raw: dict[str, Any], maps_dir: Path | None = None) -> GameMap:
+    """Validate ``raw`` against the schema and write to ``maps_dir/{id}.json``.
+
+    ``maps_dir`` defaults to the module-level ``_MAPS_DIR`` resolved at call
+    time so tests can monkey-patch it. Raises ``ValueError`` for invalid
+    ids and ``pydantic.ValidationError`` for invalid map content. Atomic
+    write via tmp-file + rename so a crash half-way never leaves a corrupt
+    JSON behind. Reloads the registry so the next room creation sees the
+    new map.
+    """
+    if not is_valid_map_id(map_id):
+        raise ValueError(f"Invalid map id {map_id!r}: must match [a-z0-9][a-z0-9_-]{{0,39}}")
+    if maps_dir is None:
+        maps_dir = _MAPS_DIR
+    parsed = GameMap.model_validate(raw)
+    maps_dir.mkdir(parents=True, exist_ok=True)
+    target = maps_dir / f"{map_id}.json"
+    tmp = target.with_suffix(".json.tmp")
+    payload = json.dumps(parsed.model_dump(by_alias=True), indent=2, ensure_ascii=False)
+    tmp.write_text(payload + "\n", encoding="utf-8")
+    tmp.replace(target)
+    reload_map_registry()
+    return parsed
 
 
 def resolve_default_map_id(registry: dict[str, GameMap] | None = None) -> str:
