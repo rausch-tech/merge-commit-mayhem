@@ -24,9 +24,7 @@ describe("EventFeed", () => {
       { seq: 2, severity: "warn", message: "Pipeline instabil." },
       { seq: 3, severity: "danger", message: "PagerDuty-Storm!" },
     ]);
-    const rows = [...root.querySelectorAll("li")].filter((li) =>
-      /event-row/.test(li.className)
-    );
+    const rows = [...root.querySelectorAll("li")].filter((li) => /event-row/.test(li.className));
     expect(rows.length).toBe(3);
   });
 

@@ -417,25 +417,36 @@ export class Renderer {
     this.localPlayerNearPanel = nearPanel;
 
     // Vents (Tier 2.3). Drawn for everyone — they are part of the world's
-    // architecture. Only chaos can interact with them.
+    // architecture. Only chaos can interact with them. Visibility was a
+    // playtest pain point: dark-on-dark backgrounds made them invisible.
+    // Editor-slice-1: lighter steel finish + outer halo so they pop
+    // against any room tint, and slightly bigger footprint.
     const VENT_INTERACT_RADIUS = 50;
+    const VENT_HALF_W = 16;
+    const VENT_HALF_H = 14;
     let nearVent = null;
     for (const vent of this.vents) {
       ctx.save();
-      // Dark steel grille icon — small rectangle with parallel lines.
-      ctx.fillStyle = "#1f2937";
-      ctx.fillRect(vent.x - 14, vent.y - 12, 28, 24);
-      ctx.strokeStyle = "#475569";
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(vent.x - 14, vent.y - 12, 28, 24);
+      // Outer halo so the vent is findable on a dark room background.
+      ctx.fillStyle = "rgba(148, 163, 184, 0.22)";
+      ctx.beginPath();
+      ctx.arc(vent.x, vent.y, VENT_HALF_W + 8, 0, Math.PI * 2);
+      ctx.fill();
+      // Steel grille body — lighter slate so it contrasts the dark floor.
+      ctx.fillStyle = "#64748b";
+      ctx.fillRect(vent.x - VENT_HALF_W, vent.y - VENT_HALF_H, VENT_HALF_W * 2, VENT_HALF_H * 2);
+      ctx.strokeStyle = "#0b0f1f";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(vent.x - VENT_HALF_W, vent.y - VENT_HALF_H, VENT_HALF_W * 2, VENT_HALF_H * 2);
+      // Grates: brighter horizontal slats for legibility.
       ctx.beginPath();
       for (let i = 0; i < 4; i++) {
-        const yy = vent.y - 9 + i * 6;
-        ctx.moveTo(vent.x - 11, yy);
-        ctx.lineTo(vent.x + 11, yy);
+        const yy = vent.y - VENT_HALF_H + 4 + i * ((VENT_HALF_H * 2 - 8) / 3);
+        ctx.moveTo(vent.x - VENT_HALF_W + 3, yy);
+        ctx.lineTo(vent.x + VENT_HALF_W - 3, yy);
       }
-      ctx.strokeStyle = "#94a3b8";
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.restore();
 
