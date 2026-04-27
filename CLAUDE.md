@@ -1,5 +1,10 @@
 # Merge Conflict Mayhem — Projekt-Leitfaden für Claude
 
+> **Erste Anlaufstelle für jeden Agent:** [`AGENTS.md`](AGENTS.md) — die
+> umfassende Onboarding-Doku (Stack, Commands, CI-Gates, Conventions,
+> Gotchas, Doc-Index). Diese Datei hier ist der Claude-Code-spezifische
+> Quick-Guide; bei Konflikten gewinnt `AGENTS.md`.
+
 ## Was das ist
 
 Internes Multiplayer-Spiel für Tech-Teams: Release-Team vs. geheime Chaos-Agenten
