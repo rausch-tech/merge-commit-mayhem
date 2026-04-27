@@ -1,0 +1,497 @@
+extends Control
+
+# Lobby + entry point. Builds the UI programmatically so the .tscn stays
+# small and the entire connect flow lives in one readable script.
+#
+# Flow:
+#   1. _ready() builds connect-form + lobby-card (lobby-card hidden initially).
+#   2. on_connect_pressed → ws.connect_to_server → join_room.
+#   3. room_joined  → cache map + player-id, swap UI to lobby-card.
+#   4. lobby_state  → populate player list, expose Demo-Mode + Start-Button to host.
+#   5. game_state phase=playing → load world.tscn, hand off ws + state.
+
+const WORLD_SCENE: String = "res://scenes/world.tscn"
+
+# UI colors (cyber/dev-themed, dark + green-cyan accent)
+const COLOR_BG_TOP: Color = Color(0.05, 0.07, 0.12)
+const COLOR_BG_BOTTOM: Color = Color(0.02, 0.03, 0.06)
+const COLOR_PANEL_BG: Color = Color(0.10, 0.13, 0.18, 0.95)
+const COLOR_ACCENT: Color = Color(0.27, 0.95, 0.55)            # bright green
+const COLOR_ACCENT_DIM: Color = Color(0.27, 0.95, 0.55, 0.5)
+const COLOR_TEXT: Color = Color(0.92, 0.96, 0.98)
+const COLOR_TEXT_DIM: Color = Color(0.62, 0.70, 0.78)
+const COLOR_DANGER: Color = Color(0.95, 0.35, 0.35)
+const COLOR_INPUT_BG: Color = Color(0.06, 0.08, 0.12)
+const COLOR_INPUT_BORDER: Color = Color(0.20, 0.30, 0.40)
+
+var _ws: WSClient
+var _player_id: String = ""
+var _is_host: bool = false
+var _map: Dictionary = {}
+var _role_info: Dictionary = {}
+
+# UI Nodes (built in _ready)
+var _connect_card: PanelContainer
+var _url_field: LineEdit
+var _room_field: LineEdit
+var _name_field: LineEdit
+var _connect_btn: Button
+var _connect_status: Label
+
+var _lobby_card: PanelContainer
+var _lobby_room_label: Label
+var _player_list: VBoxContainer
+var _demo_check: CheckBox
+var _start_btn: Button
+var _leave_btn: Button
+var _lobby_status: Label
+
+var _log_area: TextEdit
+
+func _ready() -> void:
+	_ws = WSClient.new()
+	add_child(_ws)
+	_ws.connected.connect(_on_connected)
+	_ws.disconnected.connect(_on_disconnected)
+	_ws.connection_error.connect(_on_error)
+	_ws.message_received.connect(_on_message)
+
+	_build_ui()
+	_show_connect_card()
+	_append_log("[main] ready — connect to start")
+
+# -- UI construction ---------------------------------------------------------
+
+func _build_ui() -> void:
+	# Background gradient
+	var bg := ColorRect.new()
+	bg.color = COLOR_BG_BOTTOM
+	bg.anchor_right = 1.0
+	bg.anchor_bottom = 1.0
+	add_child(bg)
+
+	var bg_overlay := _make_gradient_panel()
+	bg_overlay.anchor_right = 1.0
+	bg_overlay.anchor_bottom = 1.0
+	add_child(bg_overlay)
+
+	# Title block (top-center)
+	var title_container := VBoxContainer.new()
+	title_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	title_container.anchor_left = 0.5
+	title_container.anchor_right = 0.5
+	title_container.anchor_top = 0.0
+	title_container.offset_left = -300
+	title_container.offset_right = 300
+	title_container.offset_top = 60
+	title_container.offset_bottom = 200
+	add_child(title_container)
+
+	var title := Label.new()
+	title.text = "MERGE CONFLICT MAYHEM"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", COLOR_ACCENT)
+	title.add_theme_font_size_override("font_size", 56)
+	title.add_theme_constant_override("outline_size", 4)
+	title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	title_container.add_child(title)
+
+	var subtitle := Label.new()
+	subtitle.text = "Release-Team vs. Chaos-Agenten · Tier 4 · 3D Demo"
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+	subtitle.add_theme_font_size_override("font_size", 18)
+	title_container.add_child(subtitle)
+
+	# Connect card (centered)
+	_connect_card = _make_card()
+	_connect_card.anchor_left = 0.5
+	_connect_card.anchor_top = 0.5
+	_connect_card.anchor_right = 0.5
+	_connect_card.anchor_bottom = 0.5
+	_connect_card.offset_left = -240
+	_connect_card.offset_top = -180
+	_connect_card.offset_right = 240
+	_connect_card.offset_bottom = 220
+	add_child(_connect_card)
+
+	var connect_vbox := VBoxContainer.new()
+	connect_vbox.add_theme_constant_override("separation", 14)
+	_connect_card.add_child(connect_vbox)
+	_pad_container(connect_vbox, 32)
+
+	connect_vbox.add_child(_make_section_label("CONNECT"))
+
+	_url_field = _make_line_edit("ws://127.0.0.1:8000/ws")
+	connect_vbox.add_child(_make_field_row("Server", _url_field))
+
+	_room_field = _make_line_edit("DEMO")
+	_room_field.max_length = 8
+	connect_vbox.add_child(_make_field_row("Raumcode", _room_field))
+
+	_name_field = _make_line_edit("Player")
+	_name_field.max_length = 16
+	connect_vbox.add_child(_make_field_row("Spielername", _name_field))
+
+	_connect_btn = _make_primary_button("VERBINDEN")
+	_connect_btn.pressed.connect(_on_connect_pressed)
+	connect_vbox.add_child(_connect_btn)
+
+	_connect_status = _make_status_label("")
+	connect_vbox.add_child(_connect_status)
+
+	# Lobby card (centered, bigger; hidden initially)
+	_lobby_card = _make_card()
+	_lobby_card.anchor_left = 0.5
+	_lobby_card.anchor_top = 0.5
+	_lobby_card.anchor_right = 0.5
+	_lobby_card.anchor_bottom = 0.5
+	_lobby_card.offset_left = -300
+	_lobby_card.offset_top = -240
+	_lobby_card.offset_right = 300
+	_lobby_card.offset_bottom = 260
+	_lobby_card.visible = false
+	add_child(_lobby_card)
+
+	var lobby_vbox := VBoxContainer.new()
+	lobby_vbox.add_theme_constant_override("separation", 14)
+	_lobby_card.add_child(lobby_vbox)
+	_pad_container(lobby_vbox, 28)
+
+	lobby_vbox.add_child(_make_section_label("LOBBY"))
+
+	_lobby_room_label = Label.new()
+	_lobby_room_label.text = "Raum: ?"
+	_lobby_room_label.add_theme_color_override("font_color", COLOR_TEXT)
+	_lobby_room_label.add_theme_font_size_override("font_size", 22)
+	lobby_vbox.add_child(_lobby_room_label)
+
+	var players_label := Label.new()
+	players_label.text = "Spieler"
+	players_label.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+	players_label.add_theme_font_size_override("font_size", 14)
+	lobby_vbox.add_child(players_label)
+
+	var player_scroll := ScrollContainer.new()
+	player_scroll.custom_minimum_size = Vector2(0, 180)
+	player_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	lobby_vbox.add_child(player_scroll)
+
+	_player_list = VBoxContainer.new()
+	_player_list.add_theme_constant_override("separation", 6)
+	_player_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	player_scroll.add_child(_player_list)
+
+	_demo_check = CheckBox.new()
+	_demo_check.text = "Demo-Mode (1 Spieler erlaubt, du bist Chaos)"
+	_demo_check.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+	_demo_check.button_pressed = true
+	_demo_check.visible = false
+	lobby_vbox.add_child(_demo_check)
+
+	var btn_row := HBoxContainer.new()
+	btn_row.add_theme_constant_override("separation", 10)
+	lobby_vbox.add_child(btn_row)
+
+	_leave_btn = _make_secondary_button("VERLASSEN")
+	_leave_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_leave_btn.pressed.connect(_on_leave_pressed)
+	btn_row.add_child(_leave_btn)
+
+	_start_btn = _make_primary_button("SPIEL STARTEN")
+	_start_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_start_btn.pressed.connect(_on_start_pressed)
+	_start_btn.visible = false
+	btn_row.add_child(_start_btn)
+
+	_lobby_status = _make_status_label("")
+	lobby_vbox.add_child(_lobby_status)
+
+	# Log area (bottom)
+	var log_panel := PanelContainer.new()
+	log_panel.anchor_left = 0.0
+	log_panel.anchor_right = 1.0
+	log_panel.anchor_bottom = 1.0
+	log_panel.offset_left = 16
+	log_panel.offset_right = -16
+	log_panel.offset_top = -120
+	log_panel.offset_bottom = -16
+	var log_style := StyleBoxFlat.new()
+	log_style.bg_color = Color(0.04, 0.05, 0.08, 0.85)
+	log_style.set_corner_radius_all(8)
+	log_style.set_border_width_all(1)
+	log_style.border_color = COLOR_INPUT_BORDER
+	log_style.set_content_margin_all(8)
+	log_panel.add_theme_stylebox_override("panel", log_style)
+	add_child(log_panel)
+
+	_log_area = TextEdit.new()
+	_log_area.editable = false
+	_log_area.scroll_smooth = true
+	_log_area.add_theme_color_override("font_color", COLOR_ACCENT)
+	_log_area.add_theme_color_override("background_color", Color(0, 0, 0, 0))
+	_log_area.add_theme_font_size_override("font_size", 12)
+	log_panel.add_child(_log_area)
+
+func _make_card() -> PanelContainer:
+	var card := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = COLOR_PANEL_BG
+	style.set_corner_radius_all(12)
+	style.set_border_width_all(2)
+	style.border_color = COLOR_ACCENT_DIM
+	style.shadow_size = 24
+	style.shadow_color = Color(0, 0, 0, 0.5)
+	card.add_theme_stylebox_override("panel", style)
+	return card
+
+func _make_gradient_panel() -> Control:
+	var rect := ColorRect.new()
+	rect.color = COLOR_BG_TOP
+	rect.modulate.a = 0.6
+	return rect
+
+func _pad_container(node: Container, padding: int) -> void:
+	node.add_theme_constant_override("margin_left", padding)
+	node.add_theme_constant_override("margin_right", padding)
+	node.add_theme_constant_override("margin_top", padding)
+	node.add_theme_constant_override("margin_bottom", padding)
+
+func _make_section_label(text: String) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_color_override("font_color", COLOR_ACCENT)
+	label.add_theme_font_size_override("font_size", 18)
+	return label
+
+func _make_field_row(label_text: String, edit: LineEdit) -> VBoxContainer:
+	var row := VBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	var lbl := Label.new()
+	lbl.text = label_text
+	lbl.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+	lbl.add_theme_font_size_override("font_size", 12)
+	row.add_child(lbl)
+	row.add_child(edit)
+	return row
+
+func _make_line_edit(default_text: String) -> LineEdit:
+	var edit := LineEdit.new()
+	edit.text = default_text
+	edit.placeholder_text = default_text
+	edit.add_theme_color_override("font_color", COLOR_TEXT)
+	edit.add_theme_font_size_override("font_size", 16)
+	var style := StyleBoxFlat.new()
+	style.bg_color = COLOR_INPUT_BG
+	style.set_corner_radius_all(6)
+	style.set_border_width_all(1)
+	style.border_color = COLOR_INPUT_BORDER
+	style.set_content_margin_all(8)
+	edit.add_theme_stylebox_override("normal", style)
+	var focus_style := style.duplicate() as StyleBoxFlat
+	focus_style.border_color = COLOR_ACCENT
+	edit.add_theme_stylebox_override("focus", focus_style)
+	return edit
+
+func _make_primary_button(text: String) -> Button:
+	var btn := Button.new()
+	btn.text = text
+	btn.add_theme_color_override("font_color", Color(0.04, 0.06, 0.10))
+	btn.add_theme_color_override("font_hover_color", Color(0.04, 0.06, 0.10))
+	btn.add_theme_font_size_override("font_size", 18)
+	btn.custom_minimum_size = Vector2(0, 44)
+	for state in ["normal", "hover", "pressed"]:
+		var style := StyleBoxFlat.new()
+		style.bg_color = COLOR_ACCENT if state == "normal" else COLOR_ACCENT.lightened(0.1)
+		if state == "pressed":
+			style.bg_color = COLOR_ACCENT.darkened(0.15)
+		style.set_corner_radius_all(8)
+		style.set_content_margin_all(10)
+		btn.add_theme_stylebox_override(state, style)
+	return btn
+
+func _make_secondary_button(text: String) -> Button:
+	var btn := Button.new()
+	btn.text = text
+	btn.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+	btn.add_theme_font_size_override("font_size", 14)
+	btn.custom_minimum_size = Vector2(0, 44)
+	for state in ["normal", "hover", "pressed"]:
+		var style := StyleBoxFlat.new()
+		style.bg_color = COLOR_INPUT_BG if state == "normal" else COLOR_INPUT_BG.lightened(0.05)
+		style.set_corner_radius_all(8)
+		style.set_border_width_all(1)
+		style.border_color = COLOR_INPUT_BORDER
+		style.set_content_margin_all(10)
+		btn.add_theme_stylebox_override(state, style)
+	return btn
+
+func _make_status_label(text: String) -> Label:
+	var lbl := Label.new()
+	lbl.text = text
+	lbl.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+	lbl.add_theme_font_size_override("font_size", 13)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	return lbl
+
+func _show_connect_card() -> void:
+	_connect_card.visible = true
+	_lobby_card.visible = false
+
+func _show_lobby_card() -> void:
+	_connect_card.visible = false
+	_lobby_card.visible = true
+
+# -- Connect flow ------------------------------------------------------------
+
+func _on_connect_pressed() -> void:
+	var url := _url_field.text.strip_edges()
+	var room := _room_field.text.strip_edges().to_upper()
+	var name_ := _name_field.text.strip_edges()
+	if url == "" or room == "" or name_ == "":
+		_set_connect_status("Bitte alle Felder ausfüllen.", true)
+		return
+	_set_connect_status("Verbinde mit %s …" % url, false)
+	_append_log("[ws] connecting to %s" % url)
+	set_meta("pending_room", room)
+	set_meta("pending_name", name_)
+	_connect_btn.disabled = true
+	_ws.connect_to_server(url)
+
+func _on_connected() -> void:
+	_append_log("[ws] connected")
+	_set_connect_status("Verbunden — sende join_room …", false)
+	var room := str(get_meta("pending_room"))
+	var name_ := str(get_meta("pending_name"))
+	_ws.send(Protocol.TYPE_JOIN_ROOM, {"roomCode": room, "playerName": name_})
+	_append_log("[ws] sent join_room room=%s name=%s" % [room, name_])
+
+func _on_disconnected() -> void:
+	_append_log("[ws] disconnected")
+	_connect_btn.disabled = false
+	_set_connect_status("Verbindung verloren.", true)
+	_show_connect_card()
+
+func _on_error(reason: String) -> void:
+	_append_log("[ws] error: %s" % reason)
+	_connect_btn.disabled = false
+	_set_connect_status("Fehler: %s" % reason, true)
+
+func _on_message(type_: String, payload: Dictionary) -> void:
+	match type_:
+		Protocol.TYPE_ROOM_JOINED:
+			_player_id = str(payload.get("playerId", ""))
+			_is_host = bool(payload.get("isHost", false))
+			_map = payload.get("map", {})
+			_append_log("[room_joined] playerId=%s isHost=%s mapName=%s" % [
+				_player_id, _is_host, _map.get("name", "?")
+			])
+			_lobby_room_label.text = "Raum: %s" % str(payload.get("roomCode", "?"))
+			_set_lobby_status("In der Lobby — warte auf Spielstart.", false)
+			_demo_check.visible = _is_host
+			_start_btn.visible = _is_host
+			_show_lobby_card()
+		Protocol.TYPE_LOBBY_STATE:
+			_update_player_list(payload.get("players", []))
+		Protocol.TYPE_PRIVATE_ROLE:
+			_role_info = payload.duplicate()
+			_append_log("[private_role] role=%s team=%s" % [
+				payload.get("role", "?"), payload.get("team", "?")
+			])
+		Protocol.TYPE_GAME_STATE:
+			var phase := str(payload.get("phase", ""))
+			if phase == Protocol.PHASE_PLAYING or phase == Protocol.PHASE_MEETING:
+				_transition_to_world(payload)
+		Protocol.TYPE_ERROR:
+			var code := str(payload.get("code", "?"))
+			var message := str(payload.get("message", ""))
+			_append_log("[server_error] %s: %s" % [code, message])
+			_set_lobby_status("%s: %s" % [code, message], true)
+		_:
+			# Ignore other messages in lobby (they belong to the world scene).
+			pass
+
+func _update_player_list(players: Array) -> void:
+	for child in _player_list.get_children():
+		child.queue_free()
+	for p in players:
+		var entry := _make_player_row(p)
+		_player_list.add_child(entry)
+
+func _make_player_row(player: Dictionary) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var dot := ColorRect.new()
+	var color_hex := str(player.get("color", "#888888"))
+	dot.color = Color(color_hex) if color_hex.begins_with("#") else Color(0.5, 0.5, 0.5)
+	dot.custom_minimum_size = Vector2(16, 16)
+	row.add_child(dot)
+	var name_label := Label.new()
+	name_label.text = str(player.get("name", "?"))
+	name_label.add_theme_color_override("font_color", COLOR_TEXT)
+	name_label.add_theme_font_size_override("font_size", 16)
+	row.add_child(name_label)
+	if bool(player.get("isHost", false)):
+		var host_tag := Label.new()
+		host_tag.text = "HOST"
+		host_tag.add_theme_color_override("font_color", COLOR_ACCENT)
+		host_tag.add_theme_font_size_override("font_size", 11)
+		row.add_child(host_tag)
+	return row
+
+func _on_start_pressed() -> void:
+	if not _is_host:
+		return
+	var demo := _demo_check.button_pressed
+	_ws.send(Protocol.TYPE_START_GAME, {"demo": demo})
+	_set_lobby_status("Spielstart angefragt …", false)
+	_append_log("[ws] sent start_game demo=%s" % demo)
+
+func _on_leave_pressed() -> void:
+	_ws.close()
+	_show_connect_card()
+	_connect_btn.disabled = false
+	_set_connect_status("Verbindung getrennt.", false)
+
+func _set_connect_status(text: String, is_error: bool) -> void:
+	_connect_status.text = text
+	_connect_status.add_theme_color_override(
+		"font_color", COLOR_DANGER if is_error else COLOR_TEXT_DIM
+	)
+
+func _set_lobby_status(text: String, is_error: bool) -> void:
+	_lobby_status.text = text
+	_lobby_status.add_theme_color_override(
+		"font_color", COLOR_DANGER if is_error else COLOR_TEXT_DIM
+	)
+
+func _transition_to_world(initial_state: Dictionary) -> void:
+	_append_log("[main] phase=playing — switching to 3D world")
+	var world_packed := load(WORLD_SCENE) as PackedScene
+	if world_packed == null:
+		_set_lobby_status("world.tscn nicht gefunden", true)
+		return
+	var world := world_packed.instantiate()
+	world.set("ws_client", _ws)
+	world.set("player_id", _player_id)
+	world.set("is_host", _is_host)
+	world.set("map_data", _map)
+	world.set("role_info", _role_info)
+	world.set("initial_state", initial_state)
+	get_tree().root.add_child.call_deferred(world)
+	# Hand over WSClient ownership: detach from Main, reparent to world.
+	# Reparent on next frame so Main still receives any in-flight signals safely.
+	await get_tree().process_frame
+	if _ws.get_parent() == self:
+		remove_child(_ws)
+		world.add_child(_ws)
+	# Hide ourselves but keep in tree so signals still flow if anything dangling.
+	visible = false
+	queue_free()
+
+func _append_log(line: String) -> void:
+	print(line)
+	if _log_area == null:
+		return
+	_log_area.text += line + "\n"
+	_log_area.scroll_vertical = _log_area.get_line_count()

@@ -10,9 +10,9 @@ config_version=5
 
 [application]
 
-config/name="MCM Godot 3D Spike (Spike-2)"
-config/version="0.0.1-spike-3d"
-run/main_scene="res://scenes/test_world.tscn"
+config/name="Merge Conflict Mayhem (Tier 4 Demo)"
+config/version="0.4.0-demo"
+run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.6", "Mobile")
 
 [display]
