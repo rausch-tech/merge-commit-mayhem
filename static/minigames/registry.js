@@ -6,6 +6,7 @@
 
 import { CablePairingRenderer } from "./cable_pairing.js";
 import { CoffeePourRenderer } from "./coffee_pour.js";
+import { DiffReviewRenderer } from "./diff_review.js";
 import { LogFilterRenderer } from "./log_filter.js";
 import { SprintTrimRenderer } from "./sprint_trim.js";
 import { TestSuiteRepairRenderer } from "./test_suite_repair.js";
@@ -16,4 +17,5 @@ export const MINI_GAME_RENDERERS = {
   coffee_pour: CoffeePourRenderer,
   log_filter: LogFilterRenderer,
   sprint_trim: SprintTrimRenderer,
+  diff_review: DiffReviewRenderer,
 };

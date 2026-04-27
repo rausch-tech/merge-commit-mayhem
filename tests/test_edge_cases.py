@@ -27,7 +27,13 @@ def _make_started_room(player_count: int = 4, seed: int = 0) -> GameRoom:
     below 4 silently. Tier 2.1 chaos-parity (chaos_alive >= release_alive) still
     needs >=3 release; with 4 players (1 chaos + 3 release) parity does not fire
     on the first tick.
+
+    Forces ``review_pr`` into hold-E mode so legacy hold-E mechanics tests
+    keep working after Tier 3.7 wired ``review_pr`` to the diff_review
+    mini-game. Other tasks keep their mini-game bindings intact.
     """
+    from tests.conftest import make_task_hold_e
+
     if player_count < 4:
         player_count = 4
     room = GameRoom(code="TEST")
@@ -35,6 +41,7 @@ def _make_started_room(player_count: int = 4, seed: int = 0) -> GameRoom:
         room.add_player(f"p{i}")
     host_id = next(iter(room.players))
     room.start(requesting_player_id=host_id, rng=random.Random(seed))
+    make_task_hold_e(room, "review_pr")
     return room
 
 

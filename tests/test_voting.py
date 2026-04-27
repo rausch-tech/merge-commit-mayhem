@@ -66,6 +66,8 @@ def test_all_chaos_eliminated_some_alive():
 
 def _started_room(player_count: int = 4) -> tuple[GameRoom, list[str]]:
     """Tier 1.5 raised MIN_PLAYERS_TO_START to 4 — bump any caller below 4."""
+    from tests.conftest import make_task_hold_e
+
     if player_count < 4:
         player_count = 4
     room = GameRoom(code="VOTE")
@@ -73,6 +75,7 @@ def _started_room(player_count: int = 4) -> tuple[GameRoom, list[str]]:
     for i in range(player_count):
         ids.append(room.add_player(f"p{i}").id)
     room.start(requesting_player_id=ids[0], rng=random.Random(0))
+    make_task_hold_e(room, "review_pr")
     return room, ids
 
 

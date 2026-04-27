@@ -16,6 +16,8 @@ from app.game.tasks import TASK_RESPAWN_COOLDOWN, task_by_id
 def _started_room(player_count: int = 4, seed: int = 0) -> tuple[GameRoom, list[str]]:
     # Tier 1.5 raised MIN_PLAYERS_TO_START to 4. With 4 players (1 chaos +
     # 3 release) Tier 2.1's chaos-parity rule still does not fire on tick.
+    from tests.conftest import make_task_hold_e
+
     if player_count < 4:
         player_count = 4
     room = GameRoom(code="EVNT")
@@ -23,6 +25,7 @@ def _started_room(player_count: int = 4, seed: int = 0) -> tuple[GameRoom, list[
     for i in range(player_count):
         ids.append(room.add_player(f"p{i}").id)
     room.start(requesting_player_id=ids[0], rng=random.Random(seed))
+    make_task_hold_e(room, "review_pr")
     return room, ids
 
 

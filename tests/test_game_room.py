@@ -94,6 +94,8 @@ def _make_started_room(player_count: int = 4) -> GameRoom:
     two ids stay in deterministic join order so callers indexing into them
     still get the expected pair.
     """
+    from tests.conftest import make_task_hold_e
+
     if player_count < 4:
         player_count = 4
     room = GameRoom(code="ABCD")
@@ -101,6 +103,7 @@ def _make_started_room(player_count: int = 4) -> GameRoom:
     for i in range(player_count - 1):
         room.add_player(f"p{i}")
     room.start(requesting_player_id=host.id, rng=random.Random(0))
+    make_task_hold_e(room, "review_pr")
     return room
 
 

@@ -1250,6 +1250,46 @@ button:hover {
   word-break: break-word;
 }
 
+/* --- Tier 3.7 diff_review ---------------------------------------------- */
+
+.mini-game-diff-list {
+  list-style: decimal inside;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+  counter-reset: diffline;
+}
+
+.mini-game-diff-line {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #10152a;
+  border-left: 4px solid #475569;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.mini-game-diff-line .mini-game-diff-code {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+.mini-game-diff-line.marked {
+  background: #163d2c;
+  border-left-color: #34d399;
+  cursor: default;
+  opacity: 0.9;
+}
+
+.mini-game-diff-line.marked .mini-game-diff-code {
+  color: #bbf7d0;
+}
+
 /* --- Tier 3.6 sprint_trim ----------------------------------------------- */
 
 .mini-game-sprint-list {
