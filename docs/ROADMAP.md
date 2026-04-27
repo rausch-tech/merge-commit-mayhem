@@ -8,32 +8,29 @@ Dieses Dokument ist der **eine** Plan. Es ist die Wahrheit über den Stand und d
 
 ## Stand (2026-04-27)
 
-|                                  |                                                                                                                                                                                                                                                                                                |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Repo**                         | https://github.com/rausch-tech/merge-commit-mayhem                                                                                                                                                                                                                                             |
-| **Live (Test-Server)**           | https://prod-is-lava.dev                                                                                                                                                                                                                                                                       |
-| **Backend-Tests**                | 471 grün (`uv run pytest`)                                                                                                                                                                                                                                                                     |
-| **Frontend-Tests**               | 37 grün (`npx vitest run`)                                                                                                                                                                                                                                                                     |
-| **Stack**                        | Python 3.12 + FastAPI + Pydantic v2 + WebSockets, Vanilla JS + Canvas, Map als JSON-Daten, Vitest + happy-dom für Frontend-Smoke                                                                                                                                                               |
-| **Geshippte Tier 0–3.5/3.6/3.7** | Foundation cleanup, Mechanik-Komplettierung, Among-Us-Features, Mini-Game-Framework, Persona-Layer (Rollen + persönliche Tasks + Coffee-Energy), Object-Bound-Sabotage, Endscreen-Story — auf Live deployt                                                                                     |
-| **Geshippte Slice-IDs**          | … → mobile-drawers-minimap → cable-pairing → coffee-pour → log-filter → sprint-trim → protocol-audit → sabotage-console (verworfen) → sabotage-object-binding → roles-and-personal-tasks → coffee-energy-and-abilities → meeting-context → endscreen-story → ai-flavor → lobby-role-preference |
+|                        |                                                                                                                                                                                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Repo**               | https://github.com/rausch-tech/merge-commit-mayhem                                                                                                                                                                                               |
+| **Live (Test-Server)** | https://prod-is-lava.dev (Apex-Domain seit 2026-04-27; alte `game.*` Subdomain leitet 301 weiter)                                                                                                                                                |
+| **Backend-Tests**      | 602 grün (`uv run pytest`), Coverage-Floor 88 % auf `app/game/`                                                                                                                                                                                  |
+| **Frontend-Tests**     | 109 grün (`npx vitest run`)                                                                                                                                                                                                                      |
+| **Stack**              | Python 3.12 + FastAPI + Pydantic v2 + WebSockets, Vanilla JS + Canvas, Three.js für Editor-3D-Vorschau, Godot 4.6 für den 3D-Demo-Client, Vitest + happy-dom                                                                                     |
+| **CI-Gates**           | pytest (+ coverage 88 %), ruff (lint + format), mypy, prettier 3.3.3, vitest, godot-check (auto-deploy auf jedem main-Push)                                                                                                                      |
+| **Geshippte Tier**     | 0 (Foundation), 1 (Core-Mechaniken), 2 (Among-Us-Features), 3 (Mini-Games), 3.5 (Persona-Layer), 3.6 (Meeting-Kontext + AI-Flavor), 3.7 (Endscreen + Closing-Mini-Games + Metrik-Export), 3.8 (Map-Authoring-Toolchain — Editor + 3D-Vorschau)   |
+| **Tier 4 Stand**       | 3D-Demo (`godot-3d/`) als Architektur-Referenz auf main: Lobby + World + Character + HUD + Pause + 2 Demo-Modi. Map-Loader liest seit 2026-04-27 das aktuelle Schema (compute_walls portiert nach GDScript). Productionization 4.6+ steht offen. |
 
-**Was funktioniert (Live, Stand 2026-04-26):**
+**Was funktioniert (Live, Stand 2026-04-27):**
 
-- 4–12 Spieler joinen einen Raum (Multi-Map-Auswahl in Lobby, Map-Editor unter `/editor`).
-- 4800×3200-Map mit Räumen, Wänden, Türen, Vents, Sabotage-Panels. Camera scrollt am Spieler.
-- Rollen werden privat verteilt (vibe_coder/developer, mehrere Chaos ab 7 Spielern).
-- Hold-E auf 7 von 8 Tasks; `fix_unit_tests` startet das Mini-Game „Test-Suite reparieren" (klick 5 Tests in numerischer Reihenfolge).
-- 7 Sabotagen: ci_cd_red, coffee_outage, mandatory_meeting, merge_conflict_storm, fake_customer_request, flaky_tests, lights_out (Vignette + Repair am Panel im Server-Room), comms_outage (Slack-Down: Tasks + andere Sabotagen blockiert, Repair am Panel im War-Room).
-- Take-Down + Body-Discovery + Report-Trigger; Spectator-Mode für Geister (können noch Tasks erledigen).
-- Vents: Chaos-only Teleport-Netzwerk, V-Taste cycelt durch Verbindungen.
-- Voting + Endscreen mit Rollen-Reveal; In-Game-Menü via ESC mit Lobby verlassen / Runde beenden / Audio.
-- Eventfeed rechts neben Canvas; konsistente HUD-Stats (Release, Pipeline, Coffee, Incidents, Timer, Rolle).
-- Auto-Deploy auf jedem main-Push via GitHub Actions; CI gates pytest + vitest + ruff (lint+format) + prettier.
-
-**Offen vor dem Godot-Sprint:**
-
-- Asset-Pipeline-Entscheidung (Tier 4.0.x) bevor Tier 4 startet.
+- 4–12 Spieler joinen einen Raum, drei Maps wählbar in der Lobby (`default`, `office_complex` mit 140 thematischen MapObjects, `small`).
+- Map-Editor unter `/editor` mit 2D-Canvas + Three.js-3D-Vorschau Side-by-Side, Pan/Zoom, Save-/Load-direkt-zum-Server (`/api/maps`), Undo/Redo, Validation-Strip, Layer-Toggles, Drag-to-Move, Door-Tool.
+- 5+3 Rollen mit persönlichen Tasks, Stärken/Schwächen, Coffee-Profil, aktiven Fähigkeiten.
+- Alle 8 Tasks haben Mini-Games (sequencing / pairing / timing / filter-by-criterion / subset-by-constraint, plus Spot-the-Bug / Stability-Balance / Click-to-Cycle-Sort).
+- 8 Sabotagen mit Object-Binding (Tier 2.7): chaos triggert nur in Reichweite eines Task-Anchors mit passendem `objectType`.
+- Among-Us-Features: Take-Down + Body-Discovery + Report, Vents (Chaos-Teleport), Lights/Comms-Sabotage mit Repair-Panels, Spectator-Mode für Geister.
+- Coffee-Energy mit Decay/Speed-Penalty/Task-Bonus, Aktive Abilities 1×/Runde.
+- Meeting-Kontext + AI-Flavor in Eventfeed + Postmortem; Endscreen mit Awards + Per-Player-Stats + AI-Postmortem.
+- Metrik-Export (JSONL pro Tag) für Balancing.
+- Brand: Subtitle „PROD IS LAVA" (vorher „Lunch Break Edition"), transparenter Logo-PNG.
 
 ---
 
@@ -97,7 +94,7 @@ Sechs Tier, in der Reihenfolge wie sie gebaut werden sollten. Jedes Tier hat ein
 | 1.6 | **Mute-Toggle / Volume-Slider** — Audio-Hygiene                                                                                                          | ✅ done |
 | 1.7 | **Map-Editor (Phase 1)** — Browser-Editor unter `/editor`: Räume rechtecken, Wand-Linien + Türen, Spawns, Task-Anker. JSON-Export.                       | ✅ done |
 | 1.8 | **Multi-Map-Support** — Lobby-Dropdown, mehrere `maps/*.json`, Host wählt                                                                                | ✅ done |
-| 1.9 | **In-Game-Menü** — ESC-Overlay mit Lobby verlassen (alle), Runde beenden (host-only), Audio-Controls reingezogen, Rolle/Aufgaben-Recap                   | ~1 Tag  |
+| 1.9 | **In-Game-Menü** — ESC-Overlay mit Lobby verlassen (alle), Runde beenden (host-only), Audio-Controls reingezogen, Rolle/Aufgaben-Recap                   | ✅ done |
 
 **Done-Kriterium:** Browser-Client deckt das gesamte Master-Doc-MVP ab plus Eventfeed plus Map-Editor plus In-Game-Menü. Mit 8 Leuten testbar. Multi-Map-Auswahl in der Lobby. Spieler können die Runde jederzeit verlassen, Host kann sie beenden.
 
@@ -195,46 +192,60 @@ Naming-Prinzip: nerdig, dev-thematisch, „kill" wird vermieden zugunsten von ha
 
 **Done-Kriterium:** Endscreen erzählt die Runde, alle 8 Tasks haben Mini-Games, Server logged Balance-Metriken.
 
+### Tier 3.8 — Map-Authoring-Toolchain
+
+**Ziel:** Designer können Maps schnell iterieren, ohne git-Push-Zyklus pro Test, und sehen sofort wie die Karte später in 3D aussieht. Vorbereitung für reichhaltige Maps in Tier 4 + ongoing.
+
+**Aufwand:** ~1 Woche, in Slices von 0.5–2 Tagen.
+
+| #     | Was                                                                                                                                                                                                                                     | Status  |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 3.8.1 | **Editor-Slices 1–5** — vents/panels/objectType beim Save erhalten, Kind-Library + Drag-to-Move, Wand-Modell C (Doors top-level + `compute_walls`), Door-Tool + draggable doors, Undo/Redo + Validation-Strip + Layer-Toggles + Strg+S. | ✅ done |
+| 3.8.2 | **MapObjects-Schema** — 25 Kinds (Workstation, Server, Meeting, Kitchen, Decor, Legacy), Server validiert + rendert als Bounding-Boxes im Browser, Editor-Palette + Default-Sizes pro Kind, MapObject-Placement-Tool mit Drag.          | ✅ done |
+| 3.8.3 | **3D-Preview-Pane (Three.js)** — Read-only WYSIWYG neben dem 2D-Canvas, lädt dieselben `.glb`-Files wie der Godot-Client (KayKit Furniture, Kenney Mini Characters), Live-Sync, OrbitControls, prozedurale Wand-Textur.                 | ✅ done |
+| 3.8.4 | **Server-Save-API** — `GET /api/maps`, `GET /api/maps/{id}`, `PUT /api/maps/{id}` mit Pydantic-Validate + atomic write + Registry-Reload. Editor-UI: „In Spiel speichern" + „Vom Server laden"-Modal. Ephemer (überlebt Deploy nicht).  | ✅ done |
+| 3.8.5 | **office_complex-Befüllung** — 140 thematische MapObjects per Generator-Skript (`scripts/populate_office_complex.py`) über alle 9 Räume, 8 Task-Anchors mit `objectType`-Bindings, Sabotage-Repairs platziert.                          | ✅ done |
+| 3.8.6 | **Floor-Texturen + Door-Frames** — pro `floorMaterial` eine prozedurale Tile-Texture (Parquet/Fliesen/Beton/Carpet), Türen als sichtbare Geometrie statt Wand-Lücken.                                                                   | ⏳ open |
+
+**Done-Kriterium:** Designer kann ohne git-Touch eine Karte komponieren, sofort live testen, und im 3D-Preview sehen was Spieler später sehen werden. Bei Tier 3.8.6 ist das Floor + Door visuell unterscheidbar.
+
 ### Tier 4 — Godot-Migration
 
-**Ziel:** Browser-Client bleibt als Web-Fallback und Reference-Implementation. Godot wird der polished primary client mit echten Charakter-Animationen, Tilemaps, Sound-Mixing und Particle-Effects.
+**Ziel:** Browser-Client bleibt als Web-Fallback und Reference-Implementation. Godot wird der polished primary client mit echten Charakter-Animationen, 3D-Tilemaps, Sound-Mixing und Particle-Effects.
 
-**Aufwand:** ~5–7 Wochen.
+**Aufwand:** ~5–7 Wochen ab Production-Sprint, plus 0.5 Wochen 3D-Demo-Spike (geshippt).
 
-Der Godot-Sprint kommt **nach** Tier 0–3, weil:
-
-- Mit unfinishedem Browser doppelte Feature-Arbeit
-- Ohne Foundation-Cleanup (Tier 0) keine Test-Sicherheit beim Porten
-- Ohne Among-Us-Features im Browser (Tier 2) keine klare Spec für Godot
-- Ohne Mini-Game-API im Browser (Tier 3) doppelte Mini-Game-Arbeit in Godot
+**Stand 2026-04-27:** Eine 3D-Demo (`godot-3d/`) liegt direkt in main als Architektur-Referenz für den externen Godot-Entwickler — Lobby, World, Character (6 Kenney-Mini-Meshes), HUD, Pause-Menü, plus zwei Headless-Demo-Modi für Screenshots. Production-Sprint ab Tier 4.6 startet darauf aufbauend. Vollständige Onboarding-Doku unter [`docs/GODOT_HANDOFF.md`](GODOT_HANDOFF.md).
 
 #### Vor-Godot-Block (Decisions, ~1 Woche)
 
-| #     | Was                                                                                                                    | Status           |
-| ----- | ---------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| 4.0.1 | Asset-Pipeline-Entscheidung — Pixel-Art-Pack einkaufen + AI-generierte DevOps-Sprites (Coffee-Maschinen, Server-Racks) | Sven entscheidet |
-| 4.0.2 | Asset-Pack-Beschaffung — itch.io / Humble / Synty research + Lizenz-Doku                                               | 1 Tag            |
-| 4.0.3 | DevOps-Theme-Sprites generieren oder commission'en (Coffee, Server, Bug, etc.)                                         | 1–3 Tage         |
+| #     | Was                                                                                                                  | Status           |
+| ----- | -------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| 4.0.1 | Asset-Pipeline-Entscheidung — Pixel-Art-Pack einkaufen vs. AI-generierte DevOps-Sprites vs. KayKit-Bits weiterführen | Sven entscheidet |
+| 4.0.2 | Asset-Pack-Beschaffung + Lizenz-Doku                                                                                 | 1 Tag            |
+| 4.0.3 | DevOps-Theme-Sprites/Meshes (Coffee, Server, Bug, etc.) — Eigenproduktion oder Commission                            | 1–3 Tage         |
 
-#### Godot-Sprint (~4–6 Wochen)
+Übergangs-Stand: 3D-Demo nutzt KayKit Furniture (CC0) + Kenney Mini Characters (CC0) + Kenney UI/Footsteps/Stings (CC0). 3 von 25 Kinds sind als 3D-Mesh gestaged; der Rest sind farbige Box-Fallbacks im Demo + Editor-Preview.
 
-| #    | Paket                                                                                                                        | Aufwand  |
-| ---- | ---------------------------------------------------------------------------------------------------------------------------- | -------- |
-| 4.1  | Godot 4 Projekt-Setup, Web-Export-Config, WebSocketPeer-Anbindung                                                            | 1 Tag    |
-| 4.2  | Lobby-Scene (UI, Raumcode-Input, Spielerliste, Map-Auswahl, Start)                                                           | 1–2 Tage |
-| 4.3  | Map-Loader: Map-JSON → Tilemap-Layer dynamisch                                                                               | 2 Tage   |
-| 4.4  | Charakter-Scene: Sprites + 4-Richtungs-Idle/Walk-Animation + Movement-Interpolation                                          | 2–3 Tage |
-| 4.5  | HUD + Stat-Pills + Rolle + Timer mit Tween-Animationen                                                                       | 1 Tag    |
-| 4.6  | Task-Interaktion (Mini-Game-Modals via Tier-3-API + Progress-Ring + Completion-VFX)                                          | 2 Tage   |
-| 4.7  | Sabotage-Buttons mit Cooldown-Anzeige                                                                                        | 1 Tag    |
-| 4.8  | Voting-Overlay + Result-Toast mit Slide-Animationen                                                                          | 1 Tag    |
-| 4.9  | Endscreen mit Rollen-Reveal + Stats + Confetti-Particles                                                                     | 1 Tag    |
-| 4.10 | Among-Us-Features: Vents (Animation + Sound), Body-Discovery + Report, Take-Down-Animation, Lights/Comms-VFX, Spectator-Mode | 5–8 Tage |
-| 4.11 | Sound-Integration (Footsteps, UI-SFX, BGM)                                                                                   | 1 Tag    |
-| 4.12 | Polish + Bug-Fixes                                                                                                           | 3–5 Tage |
-| 4.13 | Web-Export-Deploy auf gleiche EC2                                                                                            | 0.5 Tag  |
+#### Godot-Sprint
 
-**Done-Kriterium:** Godot-Web-Build läuft auf gleichem Server, fühlt sich „wie Among Us, dev-themed" an, hat mindestens dieselbe Featuredecke wie Browser-Client, plus Tier-2-Animationen + Sound + Particles.
+| #    | Paket                                                                                                                        | Aufwand  | Status                                                                                        |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------- |
+| 4.1  | Godot 4.6 Projekt-Setup, WebSocketPeer-Anbindung                                                                             | 1 Tag    | ✅ via 3D-Demo (`project.godot`, `ws_client.gd`, `protocol.gd`)                               |
+| 4.2  | Lobby-Scene (UI, Raumcode, Spielerliste, Map-Auswahl, Start)                                                                 | 1–2 Tage | ✅ via 3D-Demo (`main.gd`); offen: Map-Auswahl an `lobby_state.availableMaps` koppeln         |
+| 4.3  | Map-Loader: JSON → 3D-Geometrie (Floors, Walls, Doors, Spawns, TaskAnchors, MapObjects)                                      | 2 Tage   | 🟡 Walls + Floors via 3D-Demo + `compute_walls`-Port (2026-04-27); MapObjects-Rendering offen |
+| 4.4  | Charakter-Scene: Mesh + Idle/Walk-Animation + Movement-Interpolation                                                         | 2–3 Tage | ✅ via 3D-Demo (`character.gd`, 6 Kenney-Mini-Meshes pro Color); offen: Spectator-Variant     |
+| 4.5  | HUD + Stat-Pills + Rolle + Timer + Tween-Animationen                                                                         | 1 Tag    | ✅ via 3D-Demo (`hud.gd`); offen: Tween-Polish + Coffee-Bar aus `private_state`               |
+| 4.6  | Task-Interaktion (Mini-Game-Modals via Tier-3-API + Progress-Ring + Completion-VFX)                                          | 2 Tage   | ⛔ TODO                                                                                       |
+| 4.7  | Sabotage-Buttons mit Cooldown-Anzeige                                                                                        | 1 Tag    | ⛔ TODO                                                                                       |
+| 4.8  | Voting-Overlay + Result-Toast mit Slide-Animationen                                                                          | 1 Tag    | ⛔ TODO                                                                                       |
+| 4.9  | Endscreen mit Rollen-Reveal + Stats + Confetti-Particles                                                                     | 1 Tag    | ⛔ TODO                                                                                       |
+| 4.10 | Among-Us-Features: Vents (Animation + Sound), Body-Discovery + Report, Take-Down-Animation, Lights/Comms-VFX, Spectator-Mode | 5–8 Tage | ⛔ TODO (Ghost-Alpha vorhanden)                                                               |
+| 4.11 | Sound-Integration (Footsteps, UI-SFX, BGM)                                                                                   | 1 Tag    | 🟡 Footsteps + 4 Stings + 2 UI-Klicks vorhanden (Carpet-only); BGM bewusst ausgelassen        |
+| 4.12 | Polish + Bug-Fixes + Auto-Reconnect                                                                                          | 3–5 Tage | ⛔ TODO                                                                                       |
+| 4.13 | Web-Export-Deploy auf gleiche EC2                                                                                            | 0.5 Tag  | ⛔ TODO                                                                                       |
+
+**Done-Kriterium:** Godot-Web-Build läuft auf prod-is-lava.dev, fühlt sich „wie Among Us, dev-themed" an, hat mindestens dieselbe Featuredecke wie Browser-Client, plus Animationen + Sound + Particles. Live-Test mit echten Spielern bestätigt das Tier-Übergang.
 
 ### Tier 5 — Polish + Distribution
 
@@ -264,8 +275,8 @@ Der Godot-Sprint kommt **nach** Tier 0–3, weil:
 | 6.2 | **Sabotagen aus JSON** (`sabotages.json`)                                                                                                                                                                                                       | 1 Tag    |
 | 6.3 | **Rollen aus JSON** (`roles.json`) — Team, Description, available Sabotagen, Spezial-Fähigkeiten                                                                                                                                                | 1.5 Tage |
 | 6.4 | **Eventtexte aus JSON** (`event_texts.json`) — Pool pro Event-Typ, zufällig                                                                                                                                                                     | 0.5 Tag  |
-| 6.5 | **Map-Editor Phase 2** — Live-Preview (Map sofort spielen), Validierung visualisieren, mehrere Maps gleichzeitig                                                                                                                                | 2–3 Tage |
-| 6.6 | **Map-Browser** — Liste aller `maps/*.json` mit Vorschau, Hot-Reload                                                                                                                                                                            | 1 Tag    |
+| 6.5 | **Map-Editor Phase 2** — durch Tier 3.8 vorgezogen: Live-Preview (Server-Save → sofort spielbar), Validation-Strip, 3D-Vorschau                                                                                                                 | ✅ done  |
+| 6.6 | **Map-Browser** — `GET /api/maps` + Editor-Modal listet alle Karten + lädt direkt; Hot-Reload via Registry-Reload nach Save                                                                                                                     | ✅ done  |
 | 6.7 | **Erweiterte Rollen** — Data Wizard, Consultant, Shadow Admin, Incident Commander, Caffeine Collector, Bug Squasher, Legacy Oracle, Scrum Master mit Spezial-Fähigkeiten (Auto-Fix Bot, Distract, Speed Boost, Coffee Run, Scan Logs, Rollback) | 2 Wochen |
 | 6.8 | **Insider-Gags + Memes** — kuratiert von Sven + Team, im Pool                                                                                                                                                                                   | ongoing  |
 
@@ -289,17 +300,21 @@ Diese Tier ist absichtlich vage — was hier passiert hängt davon ab wie das Ga
 
 ## Was als nächstes konkret zu tun ist
 
-**Aktueller Stand (2026-04-26):** Tier 0–3 sind durch. Browser-Client deckt das gesamte Among-Us-Feature-Set ab; drei Mini-Games (Sequencing/Pairing/Timing) decken bereits drei der acht Tasks ab.
+**Aktueller Stand (2026-04-27):** Tier 0–3.8 sind durch. Browser-Client deckt das gesamte Feature-Set inkl. aller 8 Mini-Games ab. Editor mit 2D + 3D-Live-Vorschau und Server-Save ist live. Drei Maps spielbar (`default`, `office_complex` mit 140 MapObjects, `small`). 3D-Demo-Spike als Architektur-Referenz für den externen Godot-Entwickler liegt in `godot-3d/`.
 
-**Als nächstes:** Asset-Pipeline-Entscheidung (Tier 4.0.x) anstossen — Pixel-Art-Pack einkaufen vs. AI-generierte DevOps-Sprites. Parallel weitere Mini-Games (Tier 3) fuer die restlichen 5 Tasks, wann immer eine als zu „flach" auf Live auffaellt.
+**Direkt als nächstes (kleine Slices):**
 
-**Vor Godot:** Asset-Pipeline-Entscheidung (Tier 4.0.x) — Pixel-Art-Pack einkaufen vs. AI-generierte DevOps-Sprites. Sven entscheidet.
+- **Tier 3.8.6** — Floor-Texturen + Door-Frames im 3D-Editor-Preview, damit die Vorschau dem Godot-Client visuell näher kommt. Halbe bis ein Tag.
+- **Live-Test mit Team** auf `office_complex` — Bug-Surface, Map-Layout-Feedback, ggf. Iteration via "In Spiel speichern".
+- **Tier 3.6.4 + 3.6.5** — Voting-Polish (Accusation-Tags, Voting-Result-Story); bringt mit Voice-Chat den meisten Wert, daher kein Top-Prio.
 
-**Wochen 1–7 ab Godot-Start:** Tier 4 (Godot-Migration mit Polish).
+**Vor dem Godot-Production-Sprint:**
+
+- **Tier 4.0.x — Asset-Pipeline-Entscheidung** (KayKit weiter verwenden, Pixel-Art-Pack einkaufen oder AI-generieren). Sven entscheidet. Bestimmt, ob die 3 staged Kinds in `godot-3d/assets/` ausgebaut oder ersetzt werden.
+
+**Godot-Production-Sprint (Tier 4.6+):** Externer Entwickler übernimmt mit `godot-3d/`-Demo als Startpunkt + `docs/GODOT_HANDOFF.md` als Onboarding. Reihenfolge: Task-Interaktion → Sabotage-Buttons → Voting → Endscreen → Among-Us-Features → Sound → Polish → Web-Export-Deploy. Geschätzt 4–6 Wochen ab Sprint-Start.
 
 **Anschließend:** Tier 5–7 als ongoing Slices.
-
-Mit Asset-Pack-Hilfe und ohne Mobile/Account: ~2 Monate ab Tier 4 bis „polished public-fähig".
 
 ---
 
@@ -313,10 +328,13 @@ Mit Asset-Pack-Hilfe und ohne Mobile/Account: ~2 Monate ab Tier 4 bis „polishe
 
 ## Verwandte Docs
 
-- `docs/maps.md` — Map-JSON-Schema (Referenz für Map-Bauer)
-- `docs/CONTRIBUTING.md` — wie Mitarbeitende beitragen können (kommt mit Tier 6.0)
-- `docs/PROTOCOL.md` — vollständiger WS-Vertrag (kommt mit Tier 0.4)
-- `docs/ARCHITECTURE.md` — High-Level-Overview (kommt mit Tier 0.5)
-- `docs/DEPLOY.md` — Deploy-Workflow (kommt mit Tier 0.6)
-- `docs/DEV.md` — lokale Entwicklung (kommt mit Tier 0.7)
+- [`docs/maps.md`](maps.md) — Map-JSON-Schema (Referenz für Map-Bauer)
+- [`docs/PROTOCOL.md`](PROTOCOL.md) — vollständiger WS-Vertrag
+- [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) — High-Level-Overview
+- [`docs/DEPLOY.md`](DEPLOY.md) — Deploy-Workflow + AWS/EC2/Caddy-Setup
+- [`docs/DEV.md`](DEV.md) — lokale Entwicklung
+- [`docs/GAME_OVERVIEW.md`](GAME_OVERVIEW.md) — Spielmechanik, Rollen, Win-Conditions
+- [`docs/GODOT_HANDOFF.md`](GODOT_HANDOFF.md) — Tier-4-Onboarding für den externen Godot-Entwickler
+- [`docs/HOWTO-SABOTAGE.md`](HOWTO-SABOTAGE.md), [`HOWTO-MINIGAME.md`](HOWTO-MINIGAME.md), [`HOWTO-ROLE.md`](HOWTO-ROLE.md) — Contributing-Guides für neue Inhalte
+- [`AGENTS.md`](../AGENTS.md) — Repo-weiter Onboarding-Guide für AI-Agents (Stack, Commands, Conventions)
 - `merge_conflict_mayhem_project/` — ursprüngliches Design-Paket von Sven, behalten als historische Inspirations-Quelle (Roadmap ersetzt es)

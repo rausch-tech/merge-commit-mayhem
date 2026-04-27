@@ -929,6 +929,19 @@ code {
   flex-wrap: wrap;
 }
 
+.footer-rausch-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.footer-rausch-prefix {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
 .footer-rausch {
   display: inline-flex;
   align-items: center;
