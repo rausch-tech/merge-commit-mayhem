@@ -28,9 +28,12 @@ Vier Packs als Quelle, alle **CC0 / Public Domain Dedication**:
 - **Ultimate Modular Sci-Fi Pack (Feb 2021)** — Quaternius, [quaternius.com](https://www.quaternius.com).
   CC0 1.0. Server-Room-Equipment.
 - **Ultimate House Interior Pack (June 2020)** — Quaternius. CC0 1.0. Wohn-/Office-Möbel.
+- **Kenney UI Audio** — [kenney.nl](https://kenney.nl/assets/ui-audio). CC0 1.0. UI-Klicks/Switches.
+- **Kenney Impact Sounds** — [kenney.nl](https://kenney.nl/assets/impact-sounds). CC0 1.0. Footsteps (carpet).
+- **Kenney Sci-Fi Sounds** — [kenney.nl](https://kenney.nl/assets/sci-fi-sounds). CC0 1.0. Event-Stings (role-reveal, meeting, kill, task-complete).
 
 Attribution ist bei CC0 nicht erforderlich, aber wir tun's freiwillig — Kay
-Lousberg und Quaternius haben hochwertige Pakete bereitgestellt.
+Lousberg, Quaternius und Kenney Vleugels haben hochwertige Pakete bereitgestellt.
 
 The source code of this project is licensed separately under the MIT License;
 see `LICENSE`.

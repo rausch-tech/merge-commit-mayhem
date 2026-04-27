@@ -21,9 +21,25 @@ const NAMEPLATE_HEIGHT: float = 3.4
 
 const COLOR_SELF_RING: Color = Color(0.30, 0.95, 0.50)
 
+# Footstep sounds — 5 carpet variants, randomized per step. Step rhythm is
+# decoupled from the walk anim so all chars sound natural even across slight
+# cycle desyncs.
+const FOOTSTEP_SOUNDS: Array[AudioStream] = [
+	preload("res://assets/audio/footsteps/footstep_carpet_000.ogg"),
+	preload("res://assets/audio/footsteps/footstep_carpet_001.ogg"),
+	preload("res://assets/audio/footsteps/footstep_carpet_002.ogg"),
+	preload("res://assets/audio/footsteps/footstep_carpet_003.ogg"),
+	preload("res://assets/audio/footsteps/footstep_carpet_004.ogg"),
+]
+const FOOTSTEP_INTERVAL: float = 0.38  # seconds between steps while walking
+const FOOTSTEP_VOLUME_DB: float = -14.0
+const FOOTSTEP_MAX_DISTANCE: float = 12.0  # falls off past this many world units
+
 # Animation names tried in order; first match wins.
 const ANIM_WALK_PRIORITY: Array = ["Walking_A", "Walking_B", "Walking_C", "Running_A", "Running_B"]
-const ANIM_IDLE_PRIORITY: Array = ["T-Pose"]
+# KayKit Rig_Medium_MovementBasic has no real idle. Falling back to T-Pose looks
+# rigid — instead we just stop the animation when idle so the character keeps
+# the last frame of its previous walk/idle blend.
 
 @export var is_self: bool = false
 
@@ -37,11 +53,13 @@ var _last_pos: Vector3 = Vector3.ZERO
 var _dummy: Node3D
 var _anim_player: AnimationPlayer
 var _walk_anim: String = ""
-var _idle_anim: String = ""
 var _current_anim: String = ""
 var _facing: float = 0.0
 var _nameplate: Label3D
 var _self_ring: MeshInstance3D
+var _footstep_player: AudioStreamPlayer3D
+var _footstep_timer: float = 0.0
+var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 func setup(player_id: String, player_name: String, color_hex: String, is_alive: bool, is_self_: bool) -> void:
 	_player_id = player_id
@@ -56,19 +74,24 @@ func _ready() -> void:
 	# KayKit Dummy is ~1.7 units tall raw; scale up so we read clearly when the
 	# camera is parked aerial. WORLD_SCALE=0.01 means 1 server-pixel = 1cm in
 	# our world, and a 0.6m-tall character would barely be a pixel from above.
-	_dummy.scale = Vector3(1.4, 1.4, 1.4)
+	_dummy.scale = Vector3(0.7, 0.7, 0.7)
 
+	# Dummy.glb ships without an AnimationPlayer — create one and feed it the
+	# library from Rig_Medium_MovementBasic.glb. Both share the same Rig_Medium
+	# skeleton so the bone-targeted tracks resolve cleanly.
 	_anim_player = _dummy.find_child("AnimationPlayer", true, false) as AnimationPlayer
-	if _anim_player != null:
-		_setup_animations(_anim_player)
-		_idle_anim = _pick_animation(ANIM_IDLE_PRIORITY)
-		_walk_anim = _pick_animation(ANIM_WALK_PRIORITY)
-		if _idle_anim != "":
-			_play_anim(_idle_anim)
+	if _anim_player == null:
+		_anim_player = AnimationPlayer.new()
+		_anim_player.name = "AnimationPlayer"
+		_dummy.add_child(_anim_player)
+	_setup_animations(_anim_player)
+	_walk_anim = _pick_animation(ANIM_WALK_PRIORITY)
 
 	_apply_color_tint()
 	_build_nameplate()
 	_build_self_ring()
+	_build_footstep_player()
+	_rng.randomize()
 	# Start at target so we don't slide in from origin
 	_dummy.position = Vector3.ZERO
 	_last_pos = global_position
@@ -107,9 +130,16 @@ func _process(delta: float) -> void:
 		_dummy.rotation.y = lerp_angle(_dummy.rotation.y, _facing, ROTATION_LERP_SPEED * delta)
 		if _walk_anim != "" and _current_anim != _walk_anim:
 			_play_anim(_walk_anim)
+		_footstep_timer -= delta
+		if _footstep_timer <= 0.0 and _is_alive:
+			_play_footstep()
+			_footstep_timer = FOOTSTEP_INTERVAL
 	else:
-		if _idle_anim != "" and _current_anim != _idle_anim:
-			_play_anim(_idle_anim)
+		# Pause on idle — keeps the last walk-frame instead of snapping to T-Pose.
+		if _current_anim != "" and _anim_player != null and _anim_player.is_playing():
+			_anim_player.pause()
+			_current_anim = ""
+		_footstep_timer = 0.0  # next move triggers a step immediately
 
 	if _self_ring != null:
 		# Floating ring pulse
@@ -245,3 +275,20 @@ func _parse_color(hex: String) -> Color:
 	if hex.begins_with("#") and hex.length() == 7:
 		return Color(hex)
 	return Color(0.5, 0.5, 0.5)
+
+func _build_footstep_player() -> void:
+	_footstep_player = AudioStreamPlayer3D.new()
+	_footstep_player.name = "FootstepPlayer"
+	_footstep_player.volume_db = FOOTSTEP_VOLUME_DB
+	_footstep_player.max_distance = FOOTSTEP_MAX_DISTANCE
+	# Slight pitch jitter per character so it doesn't sound like a metronome.
+	_footstep_player.pitch_scale = 0.95 + 0.10 * _rng.randf()
+	add_child(_footstep_player)
+
+func _play_footstep() -> void:
+	if _footstep_player == null or FOOTSTEP_SOUNDS.is_empty():
+		return
+	var idx: int = _rng.randi_range(0, FOOTSTEP_SOUNDS.size() - 1)
+	_footstep_player.stream = FOOTSTEP_SOUNDS[idx]
+	_footstep_player.pitch_scale = 0.92 + 0.12 * _rng.randf()
+	_footstep_player.play()

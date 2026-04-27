@@ -14,7 +14,7 @@ extends RefCounted
 #   Furniture            — placed Office decor (KayKit Bits)
 
 const WALL_HEIGHT: float = 2.6
-const WALL_THICKNESS: float = 0.18
+const WALL_THICKNESS: float = 0.12
 const FLOOR_THICKNESS: float = 0.05
 const WORLD_SCALE: float = Protocol.WORLD_SCALE
 

@@ -19,11 +19,24 @@ const COLOR_TEXT: Color = Color(0.95, 0.97, 0.99)
 const COLOR_TEXT_DIM: Color = Color(0.62, 0.70, 0.78)
 const COLOR_DANGER: Color = Color(0.95, 0.35, 0.35)
 
+# Open/close uses the heavier "switch" sound; menu buttons reuse the "click".
+const OPEN_STREAM: AudioStream = preload("res://assets/audio/ui/switch.ogg")
+const CLICK_STREAM: AudioStream = preload("res://assets/audio/ui/click.ogg")
+
 @export var is_host: bool = false
+
+var _click_player: AudioStreamPlayer
 
 func _ready() -> void:
 	layer = 50
 	_build_ui()
+	_click_player = AudioStreamPlayer.new()
+	_click_player.name = "ClickPlayer"
+	_click_player.volume_db = -16.0
+	add_child(_click_player)
+	# Sting on open
+	_click_player.stream = OPEN_STREAM
+	_click_player.play()
 	# Allow ESC to close
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
@@ -82,15 +95,18 @@ func _build_ui() -> void:
 	vbox.add_child(_make_separator())
 
 	var continue_btn := _make_button("WEITER", COLOR_ACCENT, false)
+	continue_btn.pressed.connect(_play_click)
 	continue_btn.pressed.connect(func(): close_requested.emit())
 	vbox.add_child(continue_btn)
 
 	if is_host:
 		var end_btn := _make_button("RUNDE BEENDEN (Host)", COLOR_TEXT, false)
+		end_btn.pressed.connect(_play_click)
 		end_btn.pressed.connect(func(): end_round_requested.emit())
 		vbox.add_child(end_btn)
 
 	var leave_btn := _make_button("RAUM VERLASSEN", COLOR_DANGER, true)
+	leave_btn.pressed.connect(_play_click)
 	leave_btn.pressed.connect(func(): leave_requested.emit())
 	vbox.add_child(leave_btn)
 
@@ -122,3 +138,9 @@ func _make_separator() -> HSeparator:
 	var sep := HSeparator.new()
 	sep.add_theme_constant_override("separation", 8)
 	return sep
+
+func _play_click() -> void:
+	if _click_player == null:
+		return
+	_click_player.stream = CLICK_STREAM
+	_click_player.play()

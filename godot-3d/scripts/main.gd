@@ -12,6 +12,10 @@ extends Control
 
 const WORLD_SCENE: String = "res://scenes/world.tscn"
 
+# UI click feedback — tiny, satisfying tap on each button press.
+const UI_CLICK_STREAM: AudioStream = preload("res://assets/audio/ui/click.ogg")
+const UI_CLICK_VOLUME_DB: float = -16.0
+
 # UI colors (cyber/dev-themed, dark + green-cyan accent)
 const COLOR_BG_TOP: Color = Color(0.05, 0.07, 0.12)
 const COLOR_BG_BOTTOM: Color = Color(0.02, 0.03, 0.06)
@@ -50,6 +54,7 @@ var _leave_btn: Button
 var _lobby_status: Label
 
 var _log_area: TextEdit
+var _click_player: AudioStreamPlayer
 
 func _ready() -> void:
 	_ws = WSClient.new()
@@ -60,6 +65,11 @@ func _ready() -> void:
 	_ws.message_received.connect(_on_message)
 
 	_build_ui()
+	_click_player = AudioStreamPlayer.new()
+	_click_player.name = "ClickPlayer"
+	_click_player.stream = UI_CLICK_STREAM
+	_click_player.volume_db = UI_CLICK_VOLUME_DB
+	add_child(_click_player)
 	_show_connect_card()
 	_append_log("[main] ready — connect to start")
 
@@ -145,6 +155,7 @@ func _build_ui() -> void:
 
 	_connect_btn = _make_primary_button("VERBINDEN")
 	_connect_btn.pressed.connect(_on_connect_pressed)
+	_connect_btn.pressed.connect(_play_click)
 	connect_vbox.add_child(_connect_btn)
 
 	_connect_status = _make_status_label("")
@@ -206,11 +217,13 @@ func _build_ui() -> void:
 	_leave_btn = _make_secondary_button("VERLASSEN")
 	_leave_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_leave_btn.pressed.connect(_on_leave_pressed)
+	_leave_btn.pressed.connect(_play_click)
 	btn_row.add_child(_leave_btn)
 
 	_start_btn = _make_primary_button("SPIEL STARTEN")
 	_start_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_start_btn.pressed.connect(_on_start_pressed)
+	_start_btn.pressed.connect(_play_click)
 	_start_btn.visible = false
 	btn_row.add_child(_start_btn)
 
@@ -516,3 +529,7 @@ func _append_log(line: String) -> void:
 		return
 	_log_area.text += line + "\n"
 	_log_area.scroll_vertical = _log_area.get_line_count()
+
+func _play_click() -> void:
+	if _click_player != null:
+		_click_player.play()

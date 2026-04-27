@@ -9,11 +9,22 @@ const HUD_SCENE: PackedScene = preload("res://scenes/hud.tscn")
 const PAUSE_SCENE: PackedScene = preload("res://scenes/pause_menu.tscn")
 const MAIN_SCENE: String = "res://scenes/main.tscn"
 
-# Camera placement (Godot units, relative to player).
-const CAMERA_OFFSET: Vector3 = Vector3(0, 28, 22)
+# Audio — stings are one-shot 2D players for game-wide events. Footsteps
+# live on each Character (3D positional). No ambient loop — Kenney's
+# computer-noise loop was too "dülülüut" to keep running during play.
+const STING_ROLE_REVEAL: AudioStream = preload("res://assets/audio/sting/role_reveal.ogg")
+const STING_MEETING: AudioStream = preload("res://assets/audio/sting/meeting.ogg")
+const STING_KILL: AudioStream = preload("res://assets/audio/sting/kill.ogg")
+const STING_TASK_COMPLETE: AudioStream = preload("res://assets/audio/sting/task_complete.ogg")
+const STING_VOLUME_DB: float = -10.0
+
+# Camera placement (Godot units, relative to player). Tuned so the player
+# fills a noticeable chunk of the screen and only ~one room is visible at a
+# time — matches the close-up feel of the 2D online client.
+const CAMERA_OFFSET: Vector3 = Vector3(0, 10, 8)
 const CAMERA_LERP_SPEED: float = 6.0
-# Pitch from horizontal: atan2(offset.y, offset.z) = atan2(28, 22) ≈ 51.84°.
-const CAMERA_PITCH_RAD: float = -0.9046  # = -deg_to_rad(51.84)
+# Pitch from horizontal: atan2(offset.y, offset.z) = atan2(10, 8) ≈ 51.34°.
+const CAMERA_PITCH_RAD: float = -0.8961  # = -deg_to_rad(51.34)
 
 # Demo mode: when true, camera is parked above the map center, orthographic,
 # showing all rooms at once (screenshots / team presentations). When false,
@@ -38,6 +49,10 @@ var _pause_menu: CanvasLayer
 var _players_by_id: Dictionary = {}
 var _world_initialized: bool = false
 var _last_state: Dictionary = {}
+var _sting_player: AudioStreamPlayer
+var _last_phase: String = ""
+var _alive_state: Dictionary = {}  # pid → bool, tracks transitions for kill sting
+var _role_sting_played: bool = false
 
 func _ready() -> void:
 	if ws_client == null:
@@ -76,6 +91,11 @@ func _ready() -> void:
 
 	_hud = HUD_SCENE.instantiate() as CanvasLayer
 	add_child(_hud)
+
+	_sting_player = AudioStreamPlayer.new()
+	_sting_player.name = "StingPlayer"
+	_sting_player.volume_db = STING_VOLUME_DB
+	add_child(_sting_player)
 	if _hud.has_method("set_player_id"):
 		_hud.call("set_player_id", player_id)
 	if _hud.has_method("set_role_info"):
@@ -133,6 +153,10 @@ func _on_message(type_: String, payload: Dictionary) -> void:
 			role_info = payload.duplicate()
 			if _hud and _hud.has_method("set_role_info"):
 				_hud.call("set_role_info", role_info)
+			# Server may resend role on reconnect — only sting once.
+			if not _role_sting_played:
+				_play_sting(STING_ROLE_REVEAL)
+				_role_sting_played = true
 		_:
 			# Many other message types (private_state, voting_result, etc.) —
 			# the demo doesn't render them but logs help debugging.
@@ -145,6 +169,12 @@ func _on_disconnected() -> void:
 func _apply_state(state: Dictionary) -> void:
 	_last_state = state
 	var phase := str(state.get("phase", ""))
+	# Phase-transition stings — meeting and kill detection happen here so
+	# we react in lockstep with the authoritative server state.
+	if phase != _last_phase:
+		if phase == Protocol.PHASE_MEETING and _last_phase != "":
+			_play_sting(STING_MEETING)
+		_last_phase = phase
 	if phase == Protocol.PHASE_ENDED:
 		_return_to_main()
 		return
@@ -152,6 +182,7 @@ func _apply_state(state: Dictionary) -> void:
 	# Players
 	var seen_ids: Dictionary = {}
 	var players_array: Array = state.get("players", [])
+	var any_kill: bool = false
 	for p in players_array:
 		var pid := str(p.get("id", ""))
 		if pid == "":
@@ -162,6 +193,10 @@ func _apply_state(state: Dictionary) -> void:
 		var name_str: String = str(p.get("name", "?"))
 		var color_hex: String = str(p.get("color", "#888888"))
 		var is_alive: bool = bool(p.get("isAlive", true))
+		# Death transition — sting once (collected, plays after the loop).
+		if _alive_state.has(pid) and _alive_state[pid] and not is_alive:
+			any_kill = true
+		_alive_state[pid] = is_alive
 		if _players_by_id.has(pid):
 			var existing: Node3D = _players_by_id[pid]
 			existing.call("set_player_data", name_str, color_hex, is_alive)
@@ -182,6 +217,9 @@ func _apply_state(state: Dictionary) -> void:
 			var ch: Node3D = _players_by_id[old_id]
 			ch.queue_free()
 			_players_by_id.erase(old_id)
+
+	if any_kill:
+		_play_sting(STING_KILL)
 
 	# HUD update
 	if _hud and _hud.has_method("apply_game_state"):
@@ -225,7 +263,7 @@ func _setup_camera() -> void:
 		_camera.far = 200.0
 	else:
 		_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-		_camera.fov = 42
+		_camera.fov = 55
 		_camera.position = CAMERA_OFFSET
 		_camera.rotation = Vector3(CAMERA_PITCH_RAD, 0.0, 0.0)
 	_camera.current = true
@@ -267,3 +305,9 @@ func _on_end_round_requested() -> void:
 func _return_to_main() -> void:
 	# Tear down the world cleanly and load main.tscn fresh.
 	get_tree().change_scene_to_file(MAIN_SCENE)
+
+func _play_sting(stream: AudioStream) -> void:
+	if _sting_player == null or stream == null:
+		return
+	_sting_player.stream = stream
+	_sting_player.play()

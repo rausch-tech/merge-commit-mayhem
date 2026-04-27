@@ -250,6 +250,11 @@ func _build_role_chip() -> void:
 
 func _build_roster_panel() -> void:
 	var panel := PanelContainer.new()
+	# Anchor right edge: both left and right anchors must be 1.0 so the panel
+	# stays a fixed 244px wide on the right (offset_left = -260, offset_right = -16).
+	# Without anchor_left = 1.0 the panel stretches from x=-260 to x=screen_width-16
+	# and looks like a giant semi-transparent overlay covering the playfield.
+	panel.anchor_left = 1.0
 	panel.anchor_right = 1.0
 	panel.anchor_top = 0.0
 	panel.anchor_bottom = 1.0
@@ -283,8 +288,12 @@ func _build_roster_panel() -> void:
 
 func _build_map_label() -> void:
 	_map_label = Label.new()
+	# Anchor bottom-center: both top and bottom anchors at 1.0 so the label
+	# stays a thin strip just above the bottom edge instead of stretching
+	# from y=-28 to y=712 (which it does without anchor_top set).
 	_map_label.anchor_left = 0.5
 	_map_label.anchor_right = 0.5
+	_map_label.anchor_top = 1.0
 	_map_label.anchor_bottom = 1.0
 	_map_label.offset_left = -150
 	_map_label.offset_right = 150
