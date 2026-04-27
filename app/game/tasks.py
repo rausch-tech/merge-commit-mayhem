@@ -84,6 +84,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         room="legacy_basement",
         required_seconds=8.0,
         incidents_change=-20,
+        mini_game="stability_balance",
         category="legacy",
     ),
     TaskDefinition(
