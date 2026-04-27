@@ -8,21 +8,22 @@ Dieses Dokument ist der **eine** Plan. Es ist die Wahrheit über den Stand und d
 
 ## Stand (2026-04-27)
 
-|                        |                                                                                                                                                                                                                                                  |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Repo**               | https://github.com/rausch-tech/merge-commit-mayhem                                                                                                                                                                                               |
-| **Live (Test-Server)** | https://prod-is-lava.dev (Apex-Domain seit 2026-04-27; alte `game.*` Subdomain leitet 301 weiter)                                                                                                                                                |
-| **Backend-Tests**      | 602 grün (`uv run pytest`), Coverage-Floor 88 % auf `app/game/`                                                                                                                                                                                  |
-| **Frontend-Tests**     | 109 grün (`npx vitest run`)                                                                                                                                                                                                                      |
-| **Stack**              | Python 3.12 + FastAPI + Pydantic v2 + WebSockets, Vanilla JS + Canvas, Three.js für Editor-3D-Vorschau, Godot 4.6 für den 3D-Demo-Client, Vitest + happy-dom                                                                                     |
-| **CI-Gates**           | pytest (+ coverage 88 %), ruff (lint + format), mypy, prettier 3.3.3, vitest, godot-check (auto-deploy auf jedem main-Push)                                                                                                                      |
-| **Geshippte Tier**     | 0 (Foundation), 1 (Core-Mechaniken), 2 (Among-Us-Features), 3 (Mini-Games), 3.5 (Persona-Layer), 3.6 (Meeting-Kontext + AI-Flavor), 3.7 (Endscreen + Closing-Mini-Games + Metrik-Export), 3.8 (Map-Authoring-Toolchain — Editor + 3D-Vorschau)   |
-| **Tier 4 Stand**       | 3D-Demo (`godot-3d/`) als Architektur-Referenz auf main: Lobby + World + Character + HUD + Pause + 2 Demo-Modi. Map-Loader liest seit 2026-04-27 das aktuelle Schema (compute_walls portiert nach GDScript). Productionization 4.6+ steht offen. |
+|                        |                                                                                                                                                                                                                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Repo**               | https://github.com/rausch-tech/merge-commit-mayhem                                                                                                                                                                                                                                                            |
+| **Live (Test-Server)** | https://prod-is-lava.dev (Apex-Domain seit 2026-04-27)                                                                                                                                                                                                                                                        |
+| **Backend-Tests**      | 613 grün (`uv run pytest`), Coverage-Floor 88 % auf `app/game/`                                                                                                                                                                                                                                               |
+| **Frontend-Tests**     | 109 grün (`npx vitest run`)                                                                                                                                                                                                                                                                                   |
+| **Stack**              | Python 3.12 + FastAPI + Pydantic v2 + WebSockets, Vanilla JS + Canvas, Three.js für Editor-3D-Vorschau, Godot 4.6 für den 3D-Demo-Client, Vitest + happy-dom                                                                                                                                                  |
+| **CI-Gates**           | pytest (+ coverage 88 %), ruff (lint + format), mypy, prettier 3.3.3, vitest, godot-check (auto-deploy auf jedem main-Push)                                                                                                                                                                                   |
+| **Geshippte Tier**     | 0 (Foundation), 1 (Core-Mechaniken), 2 (Among-Us-Features), 3 (Mini-Games), 3.5 (Persona-Layer), 3.6 (Meeting-Kontext + AI-Flavor), 3.7 (Endscreen + Closing-Mini-Games + Metrik-Export), 3.8 (Map-Authoring-Toolchain — Editor + 3D-Vorschau + Floor-Textures + Door-Frames + Kinds-Registry)                |
+| **Tier 4 Stand**       | 3D-Demo (`godot-3d/`) als Architektur-Referenz auf main: Lobby + World + Character + HUD + Pause + 2 Demo-Modi. Map-Loader liest aktuelles Schema (compute_walls portiert nach GDScript). Tier 4.0.x Asset-Pipeline **wird gerade vom Godot-Team gebaut**. Productionization 4.6+ wartet auf das Asset-Paket. |
 
 **Was funktioniert (Live, Stand 2026-04-27):**
 
-- 4–12 Spieler joinen einen Raum, drei Maps wählbar in der Lobby (`default`, `office_complex` mit 140 thematischen MapObjects, `small`).
-- Map-Editor unter `/editor` mit 2D-Canvas + Three.js-3D-Vorschau Side-by-Side, Pan/Zoom, Save-/Load-direkt-zum-Server (`/api/maps`), Undo/Redo, Validation-Strip, Layer-Toggles, Drag-to-Move, Door-Tool.
+- 4–12 Spieler joinen einen Raum, vier Maps wählbar in der Lobby (`default` mit 44 MapObjects, `office_complex` mit 140 MapObjects, `datacenter` strukturell + leer, `small`).
+- Map-Editor unter `/editor` mit 2D-Canvas + Three.js-3D-Vorschau Side-by-Side: Pan/Zoom, Save-/Load-direkt-zum-Server (`/api/maps`), Undo/Redo, Validation-Strip, Layer-Toggles, Drag-to-Move, Door-Tool, prozedurale Floor-Texturen pro `floorMaterial` (Carpet/Tiles/Concrete/Legacy), Door-Frames als sichtbare Geometrie.
+- **Single Source of Truth für MapObject-Kinds** in `maps/kinds.json` (25 Kinds + `_meta`-Block mit Schema-Doku). Pydantic-Validator auf `MapObject.kind` rejected unbekannte Kinds. Editor + Browser-Renderer + 3D-Preview + Godot-Client lesen alle dynamisch via `GET /api/kinds`.
 - 5+3 Rollen mit persönlichen Tasks, Stärken/Schwächen, Coffee-Profil, aktiven Fähigkeiten.
 - Alle 8 Tasks haben Mini-Games (sequencing / pairing / timing / filter-by-criterion / subset-by-constraint, plus Spot-the-Bug / Stability-Balance / Click-to-Cycle-Sort).
 - 8 Sabotagen mit Object-Binding (Tier 2.7): chaos triggert nur in Reichweite eines Task-Anchors mit passendem `objectType`.
@@ -30,7 +31,7 @@ Dieses Dokument ist der **eine** Plan. Es ist die Wahrheit über den Stand und d
 - Coffee-Energy mit Decay/Speed-Penalty/Task-Bonus, Aktive Abilities 1×/Runde.
 - Meeting-Kontext + AI-Flavor in Eventfeed + Postmortem; Endscreen mit Awards + Per-Player-Stats + AI-Postmortem.
 - Metrik-Export (JSONL pro Tag) für Balancing.
-- Brand: Subtitle „PROD IS LAVA" (vorher „Lunch Break Edition"), transparenter Logo-PNG.
+- Brand: Subtitle „PROD IS LAVA", transparenter Logo-PNG, Apex-Domain.
 
 ---
 
@@ -198,16 +199,19 @@ Naming-Prinzip: nerdig, dev-thematisch, „kill" wird vermieden zugunsten von ha
 
 **Aufwand:** ~1 Woche, in Slices von 0.5–2 Tagen.
 
-| #     | Was                                                                                                                                                                                                                                     | Status  |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| 3.8.1 | **Editor-Slices 1–5** — vents/panels/objectType beim Save erhalten, Kind-Library + Drag-to-Move, Wand-Modell C (Doors top-level + `compute_walls`), Door-Tool + draggable doors, Undo/Redo + Validation-Strip + Layer-Toggles + Strg+S. | ✅ done |
-| 3.8.2 | **MapObjects-Schema** — 25 Kinds (Workstation, Server, Meeting, Kitchen, Decor, Legacy), Server validiert + rendert als Bounding-Boxes im Browser, Editor-Palette + Default-Sizes pro Kind, MapObject-Placement-Tool mit Drag.          | ✅ done |
-| 3.8.3 | **3D-Preview-Pane (Three.js)** — Read-only WYSIWYG neben dem 2D-Canvas, lädt dieselben `.glb`-Files wie der Godot-Client (KayKit Furniture, Kenney Mini Characters), Live-Sync, OrbitControls, prozedurale Wand-Textur.                 | ✅ done |
-| 3.8.4 | **Server-Save-API** — `GET /api/maps`, `GET /api/maps/{id}`, `PUT /api/maps/{id}` mit Pydantic-Validate + atomic write + Registry-Reload. Editor-UI: „In Spiel speichern" + „Vom Server laden"-Modal. Ephemer (überlebt Deploy nicht).  | ✅ done |
-| 3.8.5 | **office_complex-Befüllung** — 140 thematische MapObjects per Generator-Skript (`scripts/populate_office_complex.py`) über alle 9 Räume, 8 Task-Anchors mit `objectType`-Bindings, Sabotage-Repairs platziert.                          | ✅ done |
-| 3.8.6 | **Floor-Texturen + Door-Frames** — pro `floorMaterial` eine prozedurale Tile-Texture (Parquet/Fliesen/Beton/Carpet), Türen als sichtbare Geometrie statt Wand-Lücken.                                                                   | ⏳ open |
+| #     | Was                                                                                                                                                                                                                                                                                                                                          | Status  |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| 3.8.1 | **Editor-Slices 1–5** — vents/panels/objectType beim Save erhalten, Kind-Library + Drag-to-Move, Wand-Modell C (Doors top-level + `compute_walls`), Door-Tool + draggable doors, Undo/Redo + Validation-Strip + Layer-Toggles + Strg+S.                                                                                                      | ✅ done |
+| 3.8.2 | **MapObjects-Schema** — 25 Kinds (Workstation, Server, Meeting, Kitchen, Decor, Legacy), Server validiert + rendert als Bounding-Boxes im Browser, Editor-Palette + Default-Sizes pro Kind, MapObject-Placement-Tool mit Drag.                                                                                                               | ✅ done |
+| 3.8.3 | **3D-Preview-Pane (Three.js)** — Read-only WYSIWYG neben dem 2D-Canvas, lädt dieselben `.glb`-Files wie der Godot-Client (KayKit Furniture, Kenney Mini Characters), Live-Sync, OrbitControls, prozedurale Wand-Textur.                                                                                                                      | ✅ done |
+| 3.8.4 | **Server-Save-API** — `GET /api/maps`, `GET /api/maps/{id}`, `PUT /api/maps/{id}` mit Pydantic-Validate + atomic write + Registry-Reload. Editor-UI: „In Spiel speichern" + „Vom Server laden"-Modal. Ephemer (überlebt Deploy nicht).                                                                                                       | ✅ done |
+| 3.8.5 | **office_complex-Befüllung** — 140 thematische MapObjects per Generator-Skript (`scripts/populate_office_complex.py`) über alle 9 Räume, 8 Task-Anchors mit `objectType`-Bindings, Sabotage-Repairs platziert.                                                                                                                               | ✅ done |
+| 3.8.6 | **Floor-Texturen + Door-Frames** — pro `floorMaterial` eine prozedurale Tile-Texture (Parquet/Fliesen/Beton/Carpet), Türen als sichtbare Lintel-Geometrie pro `doorKind`.                                                                                                                                                                    | ✅ done |
+| 3.8.7 | **`maps/kinds.json` als Single Source of Truth** — neue Backend-Validation (`MapObject.kind` field_validator gegen Registry), `GET /api/kinds` endpoint, Frontend-Migration (editor-kinds.js + render.js + editor-preview-3d.js) lesen dynamisch, Godot-Client (godot-3d/scripts/map_builder.gd) konsumiert dieselbe Datei. Drift-resistant. | ✅ done |
+| 3.8.8 | **`docs/ASSET_SPEC.md`** — Naming-Convention, Pivot/Polycount-Budget, kinds.json-Erweiterungs-Workflow für die Godot-Devs, damit Tier 4.0.x in einem definierten Format landet (Schema bereit, aktuelle Pipeline wird gerade gebaut).                                                                                                        | ⏳ open |
+| 3.8.9 | **datacenter-Befüllung** — Generator-Skript für die strukturell gelandete Datacenter-Map mit ~100 MapObjects (Server-Racks dominate). Optional bis das Tier 4.0.x-Asset-Paket landet, dann nochmal über die finalen Kinds.                                                                                                                   | ⏳ open |
 
-**Done-Kriterium:** Designer kann ohne git-Touch eine Karte komponieren, sofort live testen, und im 3D-Preview sehen was Spieler später sehen werden. Bei Tier 3.8.6 ist das Floor + Door visuell unterscheidbar.
+**Done-Kriterium:** Designer kann ohne git-Touch eine Karte komponieren, sofort live testen, im 3D-Preview sehen was Spieler später sehen werden, und neue Kinds ohne Drift-Risiko hinzufügen. Floor + Door visuell unterscheidbar pro Material.
 
 ### Tier 4 — Godot-Migration
 
@@ -215,17 +219,17 @@ Naming-Prinzip: nerdig, dev-thematisch, „kill" wird vermieden zugunsten von ha
 
 **Aufwand:** ~5–7 Wochen ab Production-Sprint, plus 0.5 Wochen 3D-Demo-Spike (geshippt).
 
-**Stand 2026-04-27:** Eine 3D-Demo (`godot-3d/`) liegt direkt in main als Architektur-Referenz für den externen Godot-Entwickler — Lobby, World, Character (6 Kenney-Mini-Meshes), HUD, Pause-Menü, plus zwei Headless-Demo-Modi für Screenshots. Production-Sprint ab Tier 4.6 startet darauf aufbauend. Vollständige Onboarding-Doku unter [`docs/GODOT_HANDOFF.md`](GODOT_HANDOFF.md).
+**Stand 2026-04-27:** Eine 3D-Demo (`godot-3d/`) liegt direkt in main als Architektur-Referenz für den externen Godot-Entwickler — Lobby, World, Character (6 Kenney-Mini-Meshes), HUD, Pause-Menü, plus zwei Headless-Demo-Modi für Screenshots. Production-Sprint ab Tier 4.6 startet darauf aufbauend. Vollständige Onboarding-Doku unter [`docs/GODOT_HANDOFF.md`](GODOT_HANDOFF.md). Schema-Konsolidierung via `maps/kinds.json` ist durch (siehe Tier 3.8.7).
 
-#### Vor-Godot-Block (Decisions, ~1 Woche)
+#### Vor-Godot-Block (Decisions + Asset-Pipeline)
 
-| #     | Was                                                                                                                  | Status           |
-| ----- | -------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| 4.0.1 | Asset-Pipeline-Entscheidung — Pixel-Art-Pack einkaufen vs. AI-generierte DevOps-Sprites vs. KayKit-Bits weiterführen | Sven entscheidet |
-| 4.0.2 | Asset-Pack-Beschaffung + Lizenz-Doku                                                                                 | 1 Tag            |
-| 4.0.3 | DevOps-Theme-Sprites/Meshes (Coffee, Server, Bug, etc.) — Eigenproduktion oder Commission                            | 1–3 Tage         |
+| #     | Was                                                                                                                                                                                                            | Status                       |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| 4.0.1 | **Asset-Pipeline-Entscheidung** — Sven hat KayKit-Bits + Eigenproduktion bestätigt; Godot-Devs bauen die Pipeline.                                                                                             | ✅ entschieden               |
+| 4.0.2 | **Asset-Pipeline aufbauen** — Naming-Convention, Pivot, Polycount, kinds.json-Workflow, dann sukzessive Meshes pro Kind liefern. Godot-Team lead, Backend liefert `docs/ASSET_SPEC.md` (Tier 3.8.8) als Anker. | 🟡 in progress (Godot-Team)  |
+| 4.0.3 | **DevOps-Theme-Spezial-Meshes** (Coffee-Maschine, Server-Rack, Bug-Trophy, etc.) — über kinds.json registriert, GLTF-Asset im Repo unter `godot-3d/assets/`.                                                   | ⛔ wartet auf 4.0.2-Pipeline |
 
-Übergangs-Stand: 3D-Demo nutzt KayKit Furniture (CC0) + Kenney Mini Characters (CC0) + Kenney UI/Footsteps/Stings (CC0). 3 von 25 Kinds sind als 3D-Mesh gestaged; der Rest sind farbige Box-Fallbacks im Demo + Editor-Preview.
+Übergangs-Stand: 3D-Demo nutzt KayKit Furniture (CC0) + Kenney Mini Characters (CC0) + Kenney UI/Footsteps/Stings (CC0). 3 von 25 Kinds sind als 3D-Mesh gestaged; der Rest sind farbige Box-Fallbacks im Demo + Editor-Preview. Sobald 4.0.2 weitere Meshes liefert, ergänzt die Godot-Slice das `godot_asset`-Feld in `maps/kinds.json`, und Editor-3D-Preview + Godot-Client picken sie automatisch auf.
 
 #### Godot-Sprint
 
@@ -269,11 +273,13 @@ Naming-Prinzip: nerdig, dev-thematisch, „kill" wird vermieden zugunsten von ha
 
 **Ziel:** Anderer Devs in deinem Team können Inhalte beitragen ohne Code-Touch.
 
+**Pattern (geblueprintet durch Tier 3.8.7):** JSON unter `maps/<thing>.json` als single source of truth → Pydantic-Registry-Modul (`app/game/<thing>_registry.py`) mit fail-loud loader → `GET /api/<thing>` Endpoint → Pydantic-field_validator gegen Registry + Frontend liest dynamisch. Tests lesen die produktive JSON von disk + seed via `_seedFromRegistryForTests`. Drift-resistant per Konstruktion.
+
 | #   | Was                                                                                                                                                                                                                                             | Aufwand  |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| 6.1 | **Tasks aus JSON** (`tasks.json`) — Reward-Werte, Räume, Dauern. Code lädt validiert.                                                                                                                                                           | 1 Tag    |
-| 6.2 | **Sabotagen aus JSON** (`sabotages.json`)                                                                                                                                                                                                       | 1 Tag    |
-| 6.3 | **Rollen aus JSON** (`roles.json`) — Team, Description, available Sabotagen, Spezial-Fähigkeiten                                                                                                                                                | 1.5 Tage |
+| 6.1 | **Tasks aus JSON** (`maps/tasks.json` o.ä.) — Reward-Werte, Räume, Dauern, Mini-Game-Bindung. Folgt dem 3.8.7-Pattern.                                                                                                                          | 1 Tag    |
+| 6.2 | **Sabotagen aus JSON** (`maps/sabotages.json`) — Cooldown, Effekte, allowed_trigger_object_types. Folgt dem 3.8.7-Pattern.                                                                                                                      | 1 Tag    |
+| 6.3 | **Rollen aus JSON** (`maps/roles.json`) — Team, Description, available_sabotages, Spezial-Fähigkeiten, Stärken/Schwächen-Kategorien. Folgt dem 3.8.7-Pattern.                                                                                   | 1.5 Tage |
 | 6.4 | **Eventtexte aus JSON** (`event_texts.json`) — Pool pro Event-Typ, zufällig                                                                                                                                                                     | 0.5 Tag  |
 | 6.5 | **Map-Editor Phase 2** — durch Tier 3.8 vorgezogen: Live-Preview (Server-Save → sofort spielbar), Validation-Strip, 3D-Vorschau                                                                                                                 | ✅ done  |
 | 6.6 | **Map-Browser** — `GET /api/maps` + Editor-Modal listet alle Karten + lädt direkt; Hot-Reload via Registry-Reload nach Save                                                                                                                     | ✅ done  |
@@ -300,19 +306,25 @@ Diese Tier ist absichtlich vage — was hier passiert hängt davon ab wie das Ga
 
 ## Was als nächstes konkret zu tun ist
 
-**Aktueller Stand (2026-04-27):** Tier 0–3.8 sind durch. Browser-Client deckt das gesamte Feature-Set inkl. aller 8 Mini-Games ab. Editor mit 2D + 3D-Live-Vorschau und Server-Save ist live. Drei Maps spielbar (`default`, `office_complex` mit 140 MapObjects, `small`). 3D-Demo-Spike als Architektur-Referenz für den externen Godot-Entwickler liegt in `godot-3d/`.
+**Aktueller Stand (2026-04-27):** Tier 0–3.8.7 durch. Browser-Client komplett. Editor mit 2D + 3D-Vorschau, Server-Save, Floor-Texturen, Door-Frames. **Kinds-Registry konsolidiert** (3.8.7) — alle 4 Konsumenten (Backend, Editor, Browser, Godot) lesen `maps/kinds.json`. Vier Maps in der Lobby (drei populiert, `datacenter` strukturell). Godot-Devs bauen gerade Tier 4.0.2 Asset-Pipeline.
 
-**Direkt als nächstes (kleine Slices):**
+**Direkt als nächstes (während Godot 4.0.2 läuft):**
 
-- **Tier 3.8.6** — Floor-Texturen + Door-Frames im 3D-Editor-Preview, damit die Vorschau dem Godot-Client visuell näher kommt. Halbe bis ein Tag.
-- **Live-Test mit Team** auf `office_complex` — Bug-Surface, Map-Layout-Feedback, ggf. Iteration via "In Spiel speichern".
-- **Tier 3.6.4 + 3.6.5** — Voting-Polish (Accusation-Tags, Voting-Result-Story). Kein Top-Prio; Voice-Chat passiert outside-of-game (Teams nutzen TeamSpeak/Slack/Meet).
+- **Tier 3.8.8 — `docs/ASSET_SPEC.md`** schreiben. Naming-Convention, Pivot/Polycount, kinds.json-Erweiterungs-Workflow. ~30 min, koordiniert die Godot-Pipeline.
+- **Tier 3.8.9 — `datacenter`-Map befüllen** mit ~100 MapObjects via Generator-Skript (analog `populate_office_complex.py`). Vor allem server_racks und monitoring_panels. ~1 h. Nach Tier 4.0.2-Asset-Lieferung ggf. Re-Run mit finalen Kinds.
+- **Live-Test mit Team** auf `office_complex` (oder `datacenter` nach 3.8.9) — Bug-Surface, Map-Layout-Feedback, Iteration via "In Spiel speichern".
 
-**Vor dem Godot-Production-Sprint:**
+**Lower priority (anytime):**
 
-- **Tier 4.0.x — Asset-Pipeline-Entscheidung** (KayKit weiter verwenden, Pixel-Art-Pack einkaufen oder AI-generieren). Sven entscheidet. Bestimmt, ob die 3 staged Kinds in `godot-3d/assets/` ausgebaut oder ersetzt werden.
+- **Tier 3.6.4 + 3.6.5** — Voting-Polish (Accusation-Tags, Voting-Result-Story). Voice-Chat passiert outside-of-game.
+- **Editor-QoL** — Keyboard-Shortcuts, Multi-Select, Duplicate. ~1–2 h.
+- **`/api/metrics`** — Aggregations-Endpoint für die JSONL-Files aus Tier 3.7.6. Hilft beim Balancing nach Live-Tests. ~45 min.
 
-**Godot-Production-Sprint (Tier 4.6+):** Externer Entwickler übernimmt mit `godot-3d/`-Demo als Startpunkt + `docs/GODOT_HANDOFF.md` als Onboarding. Reihenfolge: Task-Interaktion → Sabotage-Buttons → Voting → Endscreen → Among-Us-Features → Sound → Polish → Web-Export-Deploy. Geschätzt 4–6 Wochen ab Sprint-Start.
+**Wartet auf externen Input:**
+
+- **Tier 4.0.2 Asset-Pipeline** — Godot-Team baut. Bei Lieferung: `kinds.json` updaten + `godot-3d/assets/` befüllen. Editor-3D + Godot-Client picken automatisch auf.
+- **Tier 4.0.3 DevOps-Theme-Meshes** (Coffee-Maschine, Server-Rack, Bug-Trophy) — folgt nach 4.0.2.
+- **Tier 4.6+ Godot-Production-Sprint** — externer Entwickler übernimmt mit `godot-3d/`-Demo + `docs/GODOT_HANDOFF.md` als Onboarding. Reihenfolge: Task-Interaktion → Sabotage-Buttons → Voting → Endscreen → Among-Us-Features → Sound → Polish → Web-Export-Deploy. ~4–6 Wochen.
 
 **Anschließend:** Tier 5–7 als ongoing Slices.
 
