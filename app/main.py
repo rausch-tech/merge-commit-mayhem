@@ -511,14 +511,11 @@ async def _drain_mini_game_events(room: GameRoom) -> None:
         if ws is None:
             continue
         if kind == "started":
-            msg = MiniGameStartedMsg(**payload)
-            await ws.send_json(envelope("mini_game_started", msg))
+            await ws.send_json(envelope("mini_game_started", MiniGameStartedMsg(**payload)))
         elif kind == "state":
-            msg = MiniGameStateMsg(**payload)
-            await ws.send_json(envelope("mini_game_state", msg))
+            await ws.send_json(envelope("mini_game_state", MiniGameStateMsg(**payload)))
         elif kind == "completed":
-            msg = MiniGameCompletedMsg(**payload)
-            await ws.send_json(envelope("mini_game_completed", msg))
+            await ws.send_json(envelope("mini_game_completed", MiniGameCompletedMsg(**payload)))
 
 
 async def _handle_call_emergency_meeting(ws: WebSocket) -> None:
