@@ -27,3 +27,4 @@ package-lock.json
 
 # Playwright MCP scratch dir (per-session screenshots/snapshots)
 .playwright-mcp/
+.coverage
