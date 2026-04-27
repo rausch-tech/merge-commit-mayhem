@@ -71,8 +71,16 @@
 │   ├── PROTOCOL.md          #   vollstaendiger WS-Vertrag
 │   ├── ARCHITECTURE.md      #   Backend high-level
 │   ├── GAME_OVERVIEW.md     #   shareable Markdown-Tour
+│   ├── GODOT_HANDOFF.md     #   Onboarding für externe Godot-Devs (Tier-4-Client)
+│   ├── GODOT-DEV-WITH-CLAUDE.md  # Workflow-Quick-Ref für KI-Agenten am Godot-Client
 │   ├── DEPLOY.md · DEV.md · maps.md · README.md
-├── scripts/                 # deploy.sh + perf_baseline.py
+├── godot-3d/                # Godot 4.6 Client (Tier-4)
+│   ├── project.godot        #   Mobile-Renderer + canvas_items stretch + MSAA 4x
+│   ├── scripts/             #   GDScripts (character, world, hud, …)
+│   ├── scenes/              #   .tscn-Files (mostly Root-Node + Script-Anhang)
+│   ├── assets/              #   KayKit + Kenney CC0 (siehe ASSET_LICENSE.md)
+│   └── maps/                #   Lokal-Kopien für Demo-Szenen ohne Backend
+├── scripts/                 # deploy.sh + perf_baseline.py + godot-check.sh
 ├── .worktrees/              # Git-Worktrees (in .gitignore)
 └── merge_conflict_mayhem_project/  # historisches Design-Paket + externes Feedback
 ```
@@ -111,6 +119,19 @@ PYTHONPATH=. uv run python scripts/perf_baseline.py
 
 # Deploy lokal triggern (CI macht das automatisch auf main-Push)
 bash scripts/deploy.sh
+
+# Godot-Client (Tier 4)
+scripts/godot-check.sh                    # GDScript-Parse-Check (auch in CI)
+godot --headless --path godot-3d --import # Asset-Import nach Pull
+
+# Headless-Render einer Demo-Szene (für Visual-Tests)
+xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+  godot --path godot-3d --rendering-driver opengl3 \
+  --scene res://scenes/demo_world_followcam.tscn \
+  --write-movie /tmp/godot-shots/frame.png \
+  --quit-after 60 --fixed-fps 20
+# Frame ansehen: Read /tmp/godot-shots/frame00000050.png
+# Vollständiger Workflow-Guide: docs/GODOT-DEV-WITH-CLAUDE.md
 ```
 
 **Stand der Tests** (2026-04-27): **471 Backend** + **37 Frontend** grün.
