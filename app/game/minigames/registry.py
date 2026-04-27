@@ -7,8 +7,11 @@ match ``MiniGamePlugin.id`` and the value used in TaskDefinition.mini_game.
 from app.game.minigames.base import MiniGamePlugin
 from app.game.minigames.cable_pairing import CablePairing
 from app.game.minigames.coffee_pour import CoffeePour
+from app.game.minigames.diff_review import DiffReview
 from app.game.minigames.log_filter import LogFilter
+from app.game.minigames.release_notes import ReleaseNotes
 from app.game.minigames.sprint_trim import SprintTrim
+from app.game.minigames.stability_balance import StabilityBalance
 from app.game.minigames.test_suite_repair import TestSuiteRepair
 
 MINI_GAME_PLUGINS: dict[str, MiniGamePlugin] = {
@@ -17,6 +20,9 @@ MINI_GAME_PLUGINS: dict[str, MiniGamePlugin] = {
     "coffee_pour": CoffeePour(),
     "log_filter": LogFilter(),
     "sprint_trim": SprintTrim(),
+    "diff_review": DiffReview(),
+    "stability_balance": StabilityBalance(),
+    "release_notes": ReleaseNotes(),
 }
 
 

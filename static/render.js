@@ -71,6 +71,89 @@ function clamp(v, lo, hi) {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
+// --- MapObject rendering (Tier 4) ------------------------------------------
+//
+// The server sends ``map.mapObjects`` as an array of axis-aligned props with
+// a logical ``kind`` string. The browser draws each as a coloured rectangle
+// with a short label — this is intentionally placeholder-grade. Godot's
+// 3D client (separate branch) maps the same ``kind`` to a real .gltf scene.
+
+// kind → {fill, label}. New kinds added to the server should also land here
+// so the placeholder stays meaningful. Unknown kinds fall back to a neutral
+// grey + the kind string itself as label.
+const MAP_OBJECT_STYLE = {
+  // Workstation cluster
+  desk: { fill: "#7c5a3a", label: "DESK" },
+  desk_large: { fill: "#7c5a3a", label: "DESK" },
+  desk_decorated: { fill: "#7c5a3a", label: "DESK" },
+  chair_desk: { fill: "#3f3128", label: "" },
+  monitor: { fill: "#1f2937", label: "MON" },
+  keyboard: { fill: "#1f2937", label: "" },
+  mouse_pad: { fill: "#1f2937", label: "" },
+  mug: { fill: "#a16207", label: "" },
+  lamp_desk: { fill: "#fbbf24", label: "" },
+
+  // Server room
+  server_rack: { fill: "#1e293b", label: "RACK" },
+  monitoring_panel: { fill: "#0ea5e9", label: "PANEL" },
+  cabinet: { fill: "#3f3f46", label: "" },
+
+  // Meeting / War Room
+  meeting_table: { fill: "#52525b", label: "TABLE" },
+  presentation_screen: { fill: "#1e1b4b", label: "SCRN" },
+  chair_meeting: { fill: "#3f3128", label: "" },
+
+  // Kitchen
+  kitchen_counter: { fill: "#9ca3af", label: "CNTR" },
+  kitchen_corner: { fill: "#9ca3af", label: "CNTR" },
+  kitchen_sink: { fill: "#94a3b8", label: "SINK" },
+  coffee_machine: { fill: "#854d0e", label: "COFFEE" },
+  fridge: { fill: "#cbd5e1", label: "FRIDGE" },
+  chair_stool: { fill: "#3f3128", label: "" },
+
+  // Decor (blocks_movement usually false)
+  plant_cactus: { fill: "#15803d", label: "" },
+  picture_frame: { fill: "#a78bfa", label: "" },
+  rug: { fill: "#7e22ce", label: "" },
+  cup_pencils: { fill: "#a16207", label: "" },
+
+  // Legacy basement
+  crate: { fill: "#78350f", label: "CRATE" },
+  old_workstation: { fill: "#44403c", label: "OLD" },
+};
+
+function drawMapObjects(ctx, mapObjects) {
+  if (!Array.isArray(mapObjects)) return;
+  for (const obj of mapObjects) {
+    const x = obj.x ?? 0;
+    const y = obj.y ?? 0;
+    const w = obj.width ?? 0;
+    const h = obj.height ?? 0;
+    const rotation = obj.rotation ?? 0;
+    // 90 / 270 swap dimensions visually too — the client mirrors the server's
+    // map_object_aabb() so collision and render line up exactly.
+    const dw = rotation === 90 || rotation === 270 ? h : w;
+    const dh = rotation === 90 || rotation === 270 ? w : h;
+    const style = MAP_OBJECT_STYLE[obj.kind] || { fill: "#475569", label: obj.kind || "?" };
+
+    ctx.fillStyle = style.fill;
+    ctx.globalAlpha = obj.blocksMovement === false ? 0.5 : 1;
+    ctx.fillRect(x - dw / 2, y - dh / 2, dw, dh);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = "#0b0f1f";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x - dw / 2, y - dh / 2, dw, dh);
+
+    if (style.label && Math.min(dw, dh) >= 30) {
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.font = "bold 10px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(style.label, x, y);
+    }
+  }
+}
+
 export class Renderer {
   constructor(canvas) {
     this.ctx = canvas.getContext("2d");
@@ -198,6 +281,13 @@ export class Renderer {
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       ctx.fillText(room.title.toUpperCase(), room.x + 12, room.y + 12);
+    }
+
+    // Map objects (Tier 4 props — desks, server racks, plants).
+    // Drawn between rooms and walls so a wall sitting on top of an object
+    // (e.g. a desk against a room edge) wins visually.
+    if (Array.isArray(this.map.mapObjects)) {
+      drawMapObjects(ctx, this.map.mapObjects);
     }
 
     // Walls.

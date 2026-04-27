@@ -1,7 +1,6 @@
 import collections
 import random
 import uuid
-from dataclasses import dataclass, field
 
 from app.game.ai_flavor import generate_postmortem
 from app.game.game_map import (
@@ -12,61 +11,56 @@ from app.game.game_map import (
     task_position_map,
     war_room_bounds_for,
 )
-from app.game.minigames.base import MiniGamePluginError
-from app.game.minigames.registry import get_plugin as get_mini_game_plugin
-from app.game.minigames.registry import is_known as mini_game_is_known
 from app.game.models import InputState, Phase, Player
 from app.game.roles import (
     RoleInfo,
-    movement_speed_multiplier,
     role_by_id,
-    task_speed_multiplier,
 )
 from app.game.roles import assign as assign_roles
 from app.game.roles import (
     info_for as role_info_for,
 )
+from app.game.runtime import (
+    VALID_EVENT_SEVERITIES as _VALID_EVENT_SEVERITIES,
+)
+from app.game.runtime import (
+    Body,
+    EventEntry,
+    GameRoomError,
+    MiniGameSession,
+    SabotageRuntime,
+    TaskRuntime,
+)
 from app.game.sabotages import (
-    COFFEE_SLOW_SPEED,
-    MEETING_DURATION,
-    NORMAL_SPEED,
     SABOTAGE_DEFINITIONS,
     SabotageDefinition,
 )
 from app.game.tasks import (
-    SABOTAGE_OBJECT_INTERACTION_RADIUS,
-    SABOTAGE_PANEL_INTERACTION_RADIUS,
     TASK_DEFINITIONS,
-    TASK_INTERACTION_RADIUS,
-    TASK_RESPAWN_COOLDOWN,
-    VENT_INTERACTION_RADIUS,
     TaskDefinition,
 )
-from app.game.voting import SKIP_TARGET, all_chaos_eliminated
-from app.game.voting import tally as _tally_votes
-from app.game.walls import resolve_wall_collision
+from app.game.voting import all_chaos_eliminated
+from app.protocol import MeetingContext
 
 MAX_PLAYERS = 12
+"""Hard cap per room. Tier 1.5 raised this from 8."""
+
 MIN_PLAYERS_TO_START = 4
+"""Below this count ``start()`` raises NOT_ENOUGH_PLAYERS unless demo=True."""
+
 PLAYER_RADIUS = 12
+"""Hitbox radius (px) used for movement and interaction tests."""
+
 ROUND_SECONDS = 900.0
+"""Default time-budget per round (15 minutes). Once expired the chaos
+team wins by exhaustion."""
+
 RECONNECT_GRACE_SECONDS = 30.0
+"""How long a disconnected player keeps their seat before
+``_sweep_disconnected`` removes them."""
 
-INCIDENTS_LOSS_THRESHOLD = 100  # chaos wins once incidents reach this
-
-MEETING_DURATION_SECONDS = 60.0
-
-TAKEDOWN_RADIUS = 40.0  # px
-TAKEDOWN_COOLDOWN = 25.0  # seconds
-REPORT_RADIUS = 40.0  # px
-
-_MEETING_TITLES = [
-    "Wer hat auf main gepusht?",
-    "Warum sind die Tests rot?",
-    "Wieso ist der Kunde im Sprint?",
-    "Wer hat den KI-Agenten unbeaufsichtigt gelassen?",
-    "Wer hat den Coffee Token verbraucht?",
-]
+INCIDENTS_LOSS_THRESHOLD = 100
+"""Chaos win threshold: once room.incidents reaches this, the round ends."""
 
 # Feste 12er-Palette: paarweise distinkt, sechs „klassische" Hues (Doc 07 Farbsystem)
 # plus sechs zusaetzliche, gut unterscheidbare Toene fuer 7..12 Spieler.
@@ -84,64 +78,6 @@ _COLOR_PALETTE = [
     "#94a3b8",  # slate
     "#e879f9",  # fuchsia
 ]
-
-
-@dataclass
-class GameRoomError(Exception):
-    code: str
-    message: str
-
-    def __str__(self) -> str:
-        return f"{self.code}: {self.message}"
-
-
-_VALID_EVENT_SEVERITIES = ("info", "warn", "danger")
-
-
-@dataclass
-class EventEntry:
-    seq: int  # monotonic per room, starts at 1, only increases
-    severity: str  # "info" | "warn" | "danger"
-    message: str  # plain German text shown to all players
-
-
-@dataclass
-class TaskRuntime:
-    definition: TaskDefinition
-    x: float
-    y: float
-    status: str = "available"  # "available" | "in_progress" | "cooldown"
-    cooldown_remaining: float = 0.0
-    per_player_progress: dict[str, float] = field(default_factory=dict)
-
-
-@dataclass
-class SabotageRuntime:
-    definition: SabotageDefinition
-    cooldown_remaining: float = 0.0
-    active: bool = (
-        False  # True for coffee_outage while coffee==0, for meeting while meeting_active_for>0
-    )
-
-
-@dataclass
-class Body:
-    id: str  # uuid hex
-    x: float
-    y: float
-    victim_player_id: str
-    victim_name: str
-    color: str  # victim's color, for rendering
-
-
-@dataclass
-class MiniGameSession:
-    """Tier 3.1: per-player live mini-game state. The framework owns this
-    dict; the plugin owns its inner ``state`` schema."""
-
-    plugin_id: str
-    task_id: str
-    state: dict
 
 
 class GameRoom:
@@ -162,7 +98,11 @@ class GameRoom:
         self.players: dict[str, Player] = {}
         self.remaining_seconds: float = ROUND_SECONDS
 
-        # Global gameplay stats (0 in LOBBY, reset on start()).
+        # Global gameplay stats (0 in LOBBY, reset on start()). NOTE:
+        # ``coffee_level`` is the TEAM-LEVEL int 0..100 — UI pill, gates
+        # the coffee_outage sabotage trigger, and feeds movement_speed
+        # floor when at 0. Per-player coffee state lives on Player as
+        # ``coffee_energy: float`` (Tier 3.5) and is independent.
         self.release_progress: int = 0
         self.pipeline_stability: int = 100
         self.coffee_level: int = 100
@@ -198,8 +138,10 @@ class GameRoom:
         self.players_with_meeting_left: dict[str, bool] = {}  # player_id -> True if can still call
         self.last_voting_result: dict | None = None
         # Tier 3.6: meeting context snapshot taken when the round flips to
-        # MEETING. Lets the overlay show body location, recent events, etc.
-        self.meeting_context: dict | None = None
+        # MEETING. Modeled via Pydantic (`MeetingContext`) so camelCase on the
+        # wire is enforced by the same alias generator as the rest of the
+        # protocol. Lets the overlay show body location, recent events, etc.
+        self.meeting_context: MeetingContext | None = None
         # Tier 3.7: per-round endscreen summary (Awards + AI postmortem text).
         self.final_summary: dict | None = None
 
@@ -219,6 +161,22 @@ class GameRoom:
         # by the WS layer once per tick / on_input. Each entry is a tuple
         # (player_id, kind, payload) where kind is 'started'|'state'|'completed'.
         self.pending_mini_game_events: list[tuple[str, str, dict]] = []
+
+        # Slice 2 refactor: domain controllers. The room owns the data; each
+        # controller owns its rules. Controllers reach back via self._room
+        # for cross-domain reads (e.g. mini-game completion triggers a task
+        # reward).
+        from app.game.controllers.meeting import MeetingController
+        from app.game.controllers.mini_game import MiniGameController
+        from app.game.controllers.movement import MovementController
+        from app.game.controllers.sabotages import SabotagesController
+        from app.game.controllers.tasks import TasksController
+
+        self._mini_games = MiniGameController(self)
+        self._sabotages_ctl = SabotagesController(self)
+        self._tasks_ctl = TasksController(self)
+        self._movement_ctl = MovementController(self)
+        self._meeting_ctl = MeetingController(self)
 
     def _emit_event(self, severity: str, message: str) -> None:
         """Append an event to the rolling buffer. Internal use only."""
@@ -533,82 +491,19 @@ class GameRoom:
             return
         if self.phase is not Phase.PLAYING:
             return
-        for player in self.players.values():
-            # Tier 3.1: a player inside a mini-game is locked in place — their
-            # WASD inputs are ignored until the session ends.
-            if player.id in self.active_mini_games:
-                continue
-            dx = int(player.input_state.right) - int(player.input_state.left)
-            dy = int(player.input_state.down) - int(player.input_state.up)
-            if dx or dy:
-                # Ghosts ignore the slow-down sabotages and pass through walls.
-                speed = self._current_speed_for(player.id) if player.is_alive else NORMAL_SPEED
-                length = (dx * dx + dy * dy) ** 0.5
-                step_x = (dx / length) * speed * dt
-                step_y = (dy / length) * speed * dt
-
-                if player.is_alive:
-                    # Move along x first, then resolve walls.
-                    new_x = player.x + step_x
-                    if step_x != 0:
-                        new_x, _ = resolve_wall_collision(
-                            new_x,
-                            player.y,
-                            step_x,
-                            0.0,
-                            self._walls,
-                        )
-                    # Then y.
-                    new_y = player.y + step_y
-                    if step_y != 0:
-                        _, new_y = resolve_wall_collision(
-                            new_x,
-                            new_y,
-                            0.0,
-                            step_y,
-                            self._walls,
-                        )
-                else:
-                    # Ghosts: no wall collision resolution.
-                    new_x = player.x + step_x
-                    new_y = player.y + step_y
-                player.x = new_x
-                player.y = new_y
-
-                # Map-edge clamp (perimeter) — applies to ghosts too.
-                if player.x < 0:
-                    player.x = 0.0
-                elif player.x > self.map.size.width:
-                    player.x = float(self.map.size.width)
-                if player.y < 0:
-                    player.y = 0.0
-                elif player.y > self.map.size.height:
-                    player.y = float(self.map.size.height)
-        self._tick_tasks(dt)
-        self._tick_sabotages(dt)
-        self._tick_takedown_cooldowns(dt)
-        self._tick_coffee_energy(dt)
+        self._movement_ctl.tick_movement(dt)
+        self._tasks_ctl.tick(dt)
+        self._sabotages_ctl.tick(dt)
+        self._movement_ctl.tick_takedown_cooldowns(dt)
+        self._movement_ctl.tick_coffee_energy(dt)
         self.remaining_seconds = max(0.0, self.remaining_seconds - dt)
         self._sweep_disconnected()
         self._check_win_conditions()
 
-    # --- coffee energy (Tier 3.5) -----------------------------------------
+    # --- coffee energy (Tier 3.5) — delegated to MovementController -------
 
     def _tick_coffee_energy(self, dt: float) -> None:
-        """Each alive player's personal coffee_energy decays over time. Decay
-        rate scales with the role's coffee_decay_modifier (DevOps drains fast,
-        Caffeine Collector / QA Lead sip slowly). Ghosts don't decay — they
-        no longer interact with the team economy."""
-        if dt <= 0:
-            return
-        base_decay = 1.4  # points per second at modifier=1.0
-        for player in self.players.values():
-            if not player.is_alive:
-                continue
-            rd = role_by_id(player.role)
-            decay = base_decay * rd.coffee_decay_modifier * dt
-            new_energy = max(0.0, player.coffee_energy - decay)
-            player.coffee_energy = new_energy
+        self._movement_ctl.tick_coffee_energy(dt)
 
     # --- win conditions ----------------------------------------------------
 
@@ -662,220 +557,58 @@ class GameRoom:
             self.final_summary = self._build_final_summary()
         except Exception:  # noqa: BLE001 — endscreen flavor must never crash a round
             self.final_summary = None
+        # Tier 3.7.6: per-round metrics line. No-op unless MCM_METRICS_DIR is
+        # set in the environment (production deploy ships with it; tests
+        # leave it unset). Errors are swallowed — never crash a round end.
+        try:
+            from app.game.metrics_export import export_round
+
+            export_round(self)
+        except Exception:  # noqa: BLE001
+            pass
 
     # --- speed helpers -----------------------------------------------------
 
     def _current_speed_for(self, player_id: str) -> float:
-        """Effective movement speed in px/s for this player this tick.
-
-        Floor is COFFEE_SLOW_SPEED (set by global coffee_outage / mandatory
-        meeting), otherwise NORMAL_SPEED scaled by the player's role + own
-        coffee_energy (Tier 3.5)."""
-        if self.coffee_level == 0 or self.meeting_active_for > 0:
-            return COFFEE_SLOW_SPEED
-        player = self.players.get(player_id)
-        if player is None:
-            return NORMAL_SPEED
-        return NORMAL_SPEED * movement_speed_multiplier(player.role, player.coffee_energy)
+        return self._movement_ctl.current_speed_for(player_id)
 
     # --- personal-task allocation (Tier 3.5) -------------------------------
 
     def _allocate_personal_tasks(self, rng: random.Random) -> None:
-        """Pick 3 task ids per player. Release players favour their role's
-        strength categories; chaos players get a plausible cover-persona
-        list. Stored on Player.assigned_task_ids for the wire."""
-        all_task_ids = [t.id for t in TASK_DEFINITIONS]
-        for player in self.players.values():
-            rd = role_by_id(player.role)
-            strong_pool = [t.id for t in TASK_DEFINITIONS if t.category in rd.strength_categories]
-            other_pool = [t.id for t in TASK_DEFINITIONS if t.id not in strong_pool]
-            picks: list[str] = []
-            shuffled_strong = list(strong_pool)
-            rng.shuffle(shuffled_strong)
-            shuffled_other = list(other_pool)
-            rng.shuffle(shuffled_other)
-            # Two from strengths if possible, then fill with others. Chaos
-            # roles have empty strength_categories → falls through to random.
-            for tid in shuffled_strong[:2]:
-                picks.append(tid)
-            for tid in shuffled_other:
-                if len(picks) >= 3:
-                    break
-                if tid not in picks:
-                    picks.append(tid)
-            # Defensive: if a role somehow has zero strengths AND zero others
-            # (impossible today), fall back to all_task_ids.
-            if not picks:
-                picks = list(all_task_ids[:3])
-            player.assigned_task_ids = picks[:3]
+        self._tasks_ctl.allocate_personal(rng)
 
-    # --- tasks -------------------------------------------------------------
+    # --- tasks (delegators to TasksController) ----------------------------
 
     def _task_in_range(self, player_id: str, task: "TaskRuntime") -> bool:
-        player = self.players.get(player_id)
-        if player is None:
-            return False
-        dx = player.x - task.x
-        dy = player.y - task.y
-        return (dx * dx + dy * dy) <= (TASK_INTERACTION_RADIUS * TASK_INTERACTION_RADIUS)
+        return self._tasks_ctl.in_range(player_id, task)
 
     def apply_task_hold_start(self, player_id: str, task_id: str) -> None:
-        if self.phase is not Phase.PLAYING:
-            raise GameRoomError(code="WRONG_PHASE", message="Tasks only during playing.")
-        # Tier 2.5: Slack-Down — release team can't see or progress tasks.
-        if self.comms_down:
-            raise GameRoomError(code="COMMS_DOWN", message="Slack ist down — keine Tasks.")
-        # Ghosts may complete tasks — they help the release-team win.
-        player = self.players.get(player_id)
-        if player is None:
-            raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
-        task = self.tasks.get(task_id)
-        if task is None:
-            raise GameRoomError(code="UNKNOWN_TASK", message=f"Unknown task {task_id!r}.")
-        if task.status == "cooldown":
-            raise GameRoomError(code="TASK_ON_COOLDOWN", message="Task in cooldown.")
-        if not self._task_in_range(player_id, task):
-            raise GameRoomError(code="TASK_TOO_FAR", message="Too far from task.")
-        # Tier 3.1: when the task has an associated mini-game, switch into the
-        # mini-game flow instead of starting hold-E progress. Hold-E remains
-        # the default for tasks without mini_game set.
-        if task.definition.mini_game:
-            if player_id in self.active_mini_games:
-                raise GameRoomError(
-                    code="MINI_GAME_ALREADY_ACTIVE",
-                    message="Finish the current mini-game first.",
-                )
-            self._start_mini_game(player_id, task_id, task.definition.mini_game)
-            return
-        task.status = "in_progress"
-        task.per_player_progress.setdefault(player_id, 0.0)
+        self._tasks_ctl.hold_start(player_id, task_id)
 
     def apply_task_hold_stop(self, player_id: str, task_id: str) -> None:
-        # Tier 3.1: a stop on a mini-game-bearing task cancels the mini-game.
-        if player_id in self.active_mini_games:
-            session = self.active_mini_games[player_id]
-            if session.task_id == task_id:
-                self._cancel_mini_game(player_id, "cancelled")
-                return
-        task = self.tasks.get(task_id)
-        if task is None:
-            return
-        task.per_player_progress.pop(player_id, None)
-        if not task.per_player_progress and task.status == "in_progress":
-            task.status = "available"
+        self._tasks_ctl.hold_stop(player_id, task_id)
 
     # --- mini-game framework (Tier 3.1) -----------------------------------
 
-    def _start_mini_game(self, player_id: str, task_id: str, mini_game_id: str) -> None:
-        """Internal: open a mini-game session for ``player_id`` on ``task_id``.
+    # --- mini-game delegators ---------------------------------------------
+    # Real implementation lives in ``MiniGameController``; these thin shims
+    # preserve the WS-facing API and the internal call sites. Tests still
+    # call ``room.apply_mini_game_input`` etc. directly.
 
-        Called from apply_task_hold_start when the task carries a mini_game
-        field. Emits a 'started' event for the WS layer.
-        """
-        if not mini_game_is_known(mini_game_id):
-            raise GameRoomError(
-                code="UNKNOWN_MINI_GAME", message=f"Unknown mini-game {mini_game_id!r}."
-            )
-        plugin = get_mini_game_plugin(mini_game_id)
-        seed = random.getrandbits(31)
-        state = plugin.init_state(seed)
-        session = MiniGameSession(plugin_id=mini_game_id, task_id=task_id, state=state)
-        self.active_mini_games[player_id] = session
-        # Mark the task as in_progress so other players see "Sven is at the
-        # task" through the same UI affordances as hold-E.
-        task = self.tasks.get(task_id)
-        if task is not None and task.status == "available":
-            task.status = "in_progress"
-        self.pending_mini_game_events.append(
-            (
-                player_id,
-                "started",
-                {
-                    "taskId": task_id,
-                    "miniGameId": mini_game_id,
-                    "title": plugin.title,
-                    "view": plugin.public_view(state),
-                },
-            )
-        )
+    def _start_mini_game(self, player_id: str, task_id: str, mini_game_id: str) -> None:
+        self._mini_games.start(player_id, task_id, mini_game_id)
 
     def apply_mini_game_input(self, player_id: str, action: str, params: dict) -> None:
-        """WS-facing entry point for a player's mini-game action."""
-        session = self.active_mini_games.get(player_id)
-        if session is None:
-            raise GameRoomError(
-                code="NO_ACTIVE_MINI_GAME", message="No mini-game running for this player."
-            )
-        plugin = get_mini_game_plugin(session.plugin_id)
-        try:
-            session.state = plugin.handle_input(session.state, action, params)
-        except MiniGamePluginError as exc:
-            # Translate plugin-level cheat/format errors to GameRoomError so
-            # the WS layer surfaces them consistently with other guards.
-            raise GameRoomError(code=exc.code, message=exc.message) from exc
-        # Echo the new public view back to the player.
-        self.pending_mini_game_events.append(
-            (
-                player_id,
-                "state",
-                {"taskId": session.task_id, "view": plugin.public_view(session.state)},
-            )
-        )
-        # Completion check.
-        if plugin.is_complete(session.state):
-            self._complete_mini_game(player_id)
-
-    def _complete_mini_game(self, player_id: str) -> None:
-        session = self.active_mini_games.pop(player_id, None)
-        if session is None:
-            return
-        # Apply the same reward + cooldown the hold-E path uses.
-        task = self.tasks.get(session.task_id)
-        if task is not None:
-            self._apply_task_reward(task.definition, completed_by=player_id)
-            self.completed_tasks_by_player[player_id] = (
-                self.completed_tasks_by_player.get(player_id, 0) + 1
-            )
-            task.per_player_progress.clear()
-            task.status = "cooldown"
-            task.cooldown_remaining = TASK_RESPAWN_COOLDOWN
-        self.pending_mini_game_events.append(
-            (
-                player_id,
-                "completed",
-                {"taskId": session.task_id, "success": True, "reason": "solved"},
-            )
-        )
+        self._mini_games.apply_input(player_id, action, params)
 
     def _cancel_mini_game(self, player_id: str, reason: str) -> None:
-        """Drop a player's active mini-game without applying the reward."""
-        session = self.active_mini_games.pop(player_id, None)
-        if session is None:
-            return
-        # Release the task back to "available" — kein Cooldown bei Cancel.
-        task = self.tasks.get(session.task_id)
-        if task is not None and task.status == "in_progress":
-            task.per_player_progress.pop(player_id, None)
-            if not task.per_player_progress:
-                task.status = "available"
-        self.pending_mini_game_events.append(
-            (
-                player_id,
-                "completed",
-                {"taskId": session.task_id, "success": False, "reason": reason},
-            )
-        )
+        self._mini_games.cancel(player_id, reason)
 
     def _cancel_all_mini_games(self, reason: str) -> None:
-        """Used on round end / meeting start / reset to drop every session."""
-        for pid in list(self.active_mini_games.keys()):
-            self._cancel_mini_game(pid, reason)
+        self._mini_games.cancel_all(reason)
 
     def drain_pending_mini_game_events(self) -> list[tuple[str, str, dict]]:
-        """WS layer pulls events here once per tick / after each input."""
-        events = self.pending_mini_game_events
-        self.pending_mini_game_events = []
-        return events
+        return self._mini_games.drain_events()
 
     def _apply_incidents_delta(self, delta: int) -> None:
         """Clamp incidents into 0..100 after applying delta. Internal use only."""
@@ -884,412 +617,40 @@ class GameRoom:
     def _apply_task_reward(
         self, definition: TaskDefinition, completed_by: str | None = None
     ) -> None:
-        if definition.release_progress_reward:
-            self.release_progress = min(
-                100, self.release_progress + definition.release_progress_reward
-            )
-        if definition.pipeline_stability_reward:
-            self.pipeline_stability = min(
-                100, self.pipeline_stability + definition.pipeline_stability_reward
-            )
-        if definition.coffee_level_set is not None:
-            self.coffee_level = definition.coffee_level_set
-            # Tier 3.5: refilling the team coffee also tops up the player's
-            # own coffee_energy fully (and a small splash to nearby teammates).
-            if completed_by and completed_by in self.players:
-                p = self.players[completed_by]
-                p.coffee_energy = p.max_coffee
-                self._splash_coffee_to_neighbours(completed_by, amount=15.0, radius=180.0)
-        if definition.incidents_change:
-            self._apply_incidents_delta(definition.incidents_change)
+        self._tasks_ctl.apply_reward(definition, completed_by=completed_by)
 
     def _splash_coffee_to_neighbours(
         self, source_player_id: str, amount: float, radius: float
     ) -> None:
-        """Tier 3.5: small per-task coffee splash to nearby teammates so the
-        kitchen is a real social hub. Used by refill_coffee + Coffee-Run."""
-        source = self.players.get(source_player_id)
-        if source is None:
-            return
-        r2 = radius * radius
-        for pid, p in self.players.items():
-            if pid == source_player_id or not p.is_alive:
-                continue
-            dx = p.x - source.x
-            dy = p.y - source.y
-            if dx * dx + dy * dy <= r2:
-                p.coffee_energy = min(p.max_coffee, p.coffee_energy + amount)
+        self._tasks_ctl.splash_coffee(source_player_id, amount, radius)
 
     def _tick_tasks(self, dt: float) -> None:
-        for task in self.tasks.values():
-            if task.status == "cooldown":
-                task.cooldown_remaining -= dt
-                if task.cooldown_remaining <= 0:
-                    task.cooldown_remaining = 0.0
-                    task.status = "available"
-            elif task.status == "in_progress":
-                finishers: list[str] = []
-                still_progressing: dict[str, float] = {}
-                for pid, progress in task.per_player_progress.items():
-                    if not self._task_in_range(pid, task):
-                        continue  # player left the radius; drop their progress
-                    # Tier 3.5: role + coffee speed up / slow down task work.
-                    player = self.players.get(pid)
-                    if player is not None:
-                        mult = task_speed_multiplier(
-                            player.role, task.definition.category, player.coffee_energy
-                        )
-                    else:
-                        mult = 1.0
-                    new_progress = progress + dt * mult
-                    if new_progress >= task.definition.required_seconds:
-                        finishers.append(pid)
-                    else:
-                        still_progressing[pid] = new_progress
-                if finishers:
-                    # Deterministic tiebreak: lexicographically smallest player id.
-                    winner_pid = sorted(finishers)[0]
-                    self._apply_task_reward(task.definition, completed_by=winner_pid)
-                    self.completed_tasks_by_player[winner_pid] = (
-                        self.completed_tasks_by_player.get(winner_pid, 0) + 1
-                    )
-                    self._emit_event("info", f"{task.definition.title} erledigt.")
-                    task.per_player_progress = {}
-                    task.status = "cooldown"
-                    task.cooldown_remaining = TASK_RESPAWN_COOLDOWN
-                else:
-                    task.per_player_progress = still_progressing
-                    if not still_progressing:
-                        task.status = "available"
+        self._tasks_ctl.tick(dt)
 
     # --- sabotages ---------------------------------------------------------
 
     def apply_sabotage(self, player_id: str, sabotage_id: str) -> None:
-        if self.phase is not Phase.PLAYING:
-            raise GameRoomError(code="WRONG_PHASE", message="Sabotages only during playing.")
-        player = self.players.get(player_id)
-        if player is None:
-            raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
-        if not player.is_alive:
-            raise GameRoomError(
-                code="PLAYER_ELIMINATED", message="Eliminated players cannot sabotage."
-            )
-        if player.team != "chaos_agents":
-            raise GameRoomError(
-                code="NOT_CHAOS_AGENT",
-                message="Only chaos agents can trigger sabotages.",
-            )
-        sab = self.sabotages.get(sabotage_id)
-        if sab is None:
-            raise GameRoomError(code="UNKNOWN_SABOTAGE", message=f"Unknown {sabotage_id!r}.")
-        if sab.cooldown_remaining > 0:
-            raise GameRoomError(code="SABOTAGE_ON_COOLDOWN", message="Sabotage on cooldown.")
-        # Tier 2.5: while comms are down, no other sabotage can be triggered.
-        # Comms-outage itself is exempt so chaos can chain it (and the repair
-        # path runs through repair_sabotage anyway, not here).
-        if self.comms_down and sabotage_id != "comms_outage":
-            raise GameRoomError(
-                code="COMMS_DOWN", message="Slack ist down — keine weitere Sabotage."
-            )
-        # Tier 2.7 (rework): chaos must stand at a task anchor whose
-        # ``object_type`` matches the sabotage's ``trigger_object_types``. Same
-        # physical spot as the matching release task → observers can't tell
-        # sabotage from work. Maps with zero typed anchors fall back to the
-        # legacy "trigger from anywhere" path so editor maps don't break.
-        if self._map_has_typed_anchors() and not self._near_object_for_sabotage(
-            player, sab.definition
-        ):
-            hint = sab.definition.object_hint or "passendes Terminal"
-            raise GameRoomError(
-                code="NOT_NEAR_OBJECT",
-                message=f"Stell dich an {hint}, um zu sabotieren.",
-            )
-
-        # Apply the effect.
-        if sabotage_id == "ci_cd_red":
-            self.pipeline_stability = max(0, self.pipeline_stability - 20)
-        elif sabotage_id == "coffee_outage":
-            self.coffee_level = 0
-            # Tier 3.5: outage also halves every player's personal energy.
-            for p in self.players.values():
-                p.coffee_energy = min(p.coffee_energy, p.max_coffee * 0.4)
-        elif sabotage_id == "mandatory_meeting":
-            self.meeting_active_for = MEETING_DURATION
-        elif sabotage_id == "merge_conflict_storm":
-            self.pipeline_stability = max(0, self.pipeline_stability - 10)
-        elif sabotage_id == "fake_customer_request":
-            self.release_progress = max(0, self.release_progress - 15)
-        elif sabotage_id == "flaky_tests":
-            pass  # Effect lives entirely in incidents_increase.
-        elif sabotage_id == "lights_out":
-            self.lights_off = True
-        elif sabotage_id == "comms_outage":
-            self.comms_down = True
-        # Future sabotages: add here.
-
-        if sab.definition.incidents_increase:
-            self._apply_incidents_delta(sab.definition.incidents_increase)
-
-        sab.cooldown_remaining = sab.definition.cooldown_seconds
-        self.triggered_sabotages_by_player[player_id] = (
-            self.triggered_sabotages_by_player.get(player_id, 0) + 1
-        )
-
-        if sabotage_id == "ci_cd_red":
-            self._emit_event("danger", "Die Pipeline ist rot. Niemand weiß warum.")
-        elif sabotage_id == "coffee_outage":
-            self._emit_event("warn", "Die Kaffeemaschine ist offline.")
-        elif sabotage_id == "mandatory_meeting":
-            self._emit_event("warn", "Ein Meeting ohne Agenda wurde gestartet.")
-        elif sabotage_id == "merge_conflict_storm":
-            self._emit_event("danger", "Merge-Konflikt-Apokalypse — die Pipeline ringt um Luft.")
-        elif sabotage_id == "fake_customer_request":
-            self._emit_event("warn", "Eine kleine Kundenänderung. Scope explodiert.")
-        elif sabotage_id == "flaky_tests":
-            self._emit_event("warn", "Die Tests schlagen fehl, aber nur manchmal.")
-        elif sabotage_id == "lights_out":
-            self._emit_event("danger", "PagerDuty-Storm — alle starren auf ihre Telefone.")
-        elif sabotage_id == "comms_outage":
-            self._emit_event("danger", "Slack ist down. Niemand kommuniziert.")
+        self._sabotages_ctl.trigger(player_id, sabotage_id)
 
     def use_vent(self, player_id: str, target_vent_id: str) -> None:
-        """Tier 2.3: chaos-only teleport through the vent network.
-
-        The player must currently be next to a vent ('source'); target_vent_id
-        must be in that source vent's connected_to list. Teleport snaps the
-        player to the target's coordinates. Wall collision is bypassed by
-        construction (the move is a discrete jump, not a swept motion).
-        """
-        if self.phase is not Phase.PLAYING:
-            raise GameRoomError(
-                code="WRONG_PHASE", message="Vents only work during a running round."
-            )
-        player = self.players.get(player_id)
-        if player is None:
-            raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
-        if not player.is_alive:
-            raise GameRoomError(code="PLAYER_ELIMINATED", message="Eliminated players cannot vent.")
-        if player.team != "chaos_agents":
-            raise GameRoomError(code="NOT_CHAOS_AGENT", message="Only chaos agents can use vents.")
-        # Find source vent: closest vent within reach.
-        source = None
-        best_dist_sq = VENT_INTERACTION_RADIUS * VENT_INTERACTION_RADIUS
-        for v in self.map.vents:
-            dx = player.x - v.x
-            dy = player.y - v.y
-            d2 = dx * dx + dy * dy
-            if d2 <= best_dist_sq:
-                source = v
-                best_dist_sq = d2
-        if source is None:
-            raise GameRoomError(code="NO_VENT_NEARBY", message="No vent in reach.")
-        if target_vent_id not in source.connected_to:
-            raise GameRoomError(
-                code="VENT_NOT_CONNECTED",
-                message=f"Vent {target_vent_id!r} is not reachable from {source.id!r}.",
-            )
-        target = next((v for v in self.map.vents if v.id == target_vent_id), None)
-        if target is None:
-            raise GameRoomError(
-                code="UNKNOWN_VENT", message=f"Vent {target_vent_id!r} does not exist."
-            )
-        player.x = float(target.x)
-        player.y = float(target.y)
+        self._movement_ctl.use_vent(player_id, target_vent_id)
 
     def repair_sabotage(self, player_id: str, sabotage_id: str) -> None:
-        """Tier 2.4: a player at the matching sabotage panel clears the effect.
-
-        One-shot interact (no hold) — Among Us classic uses a mini-puzzle, but
-        for the MVP we keep the cost a positional one. The chaos agent has to
-        physically reach the panel, which usually means crossing the map and
-        risking detection.
-        """
-        if self.phase not in (Phase.PLAYING, Phase.MEETING):
-            raise GameRoomError(
-                code="WRONG_PHASE", message="Repair only allowed during a running round."
-            )
-        player = self.players.get(player_id)
-        if player is None:
-            raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
-        if not player.is_alive:
-            raise GameRoomError(
-                code="PLAYER_ELIMINATED", message="Eliminated players cannot repair."
-            )
-        sab = self.sabotages.get(sabotage_id)
-        if sab is None:
-            raise GameRoomError(code="UNKNOWN_SABOTAGE", message=f"Unknown {sabotage_id!r}.")
-        # Only currently-active sabotages can be repaired.
-        if sabotage_id == "lights_out":
-            if not self.lights_off:
-                raise GameRoomError(code="SABOTAGE_NOT_ACTIVE", message="lights_out is not active.")
-        elif sabotage_id == "comms_outage":
-            if not self.comms_down:
-                raise GameRoomError(
-                    code="SABOTAGE_NOT_ACTIVE", message="comms_outage is not active."
-                )
-        else:
-            raise GameRoomError(
-                code="SABOTAGE_NOT_REPAIRABLE",
-                message=f"{sabotage_id!r} has no repair panel.",
-            )
-        panel = next(
-            (p for p in self.map.sabotage_panels if p.sabotage_id == sabotage_id),
-            None,
-        )
-        if panel is None:
-            raise GameRoomError(code="NO_PANEL", message=f"Map has no panel for {sabotage_id!r}.")
-        dx = player.x - panel.x
-        dy = player.y - panel.y
-        if (
-            dx * dx + dy * dy
-            > SABOTAGE_PANEL_INTERACTION_RADIUS * SABOTAGE_PANEL_INTERACTION_RADIUS
-        ):
-            raise GameRoomError(code="TOO_FAR", message="Move closer to the panel.")
-
-        if sabotage_id == "lights_out":
-            self.lights_off = False
-            self._emit_event("info", f"{player.name} hat das PagerDuty-Storm beendet.")
-        elif sabotage_id == "comms_outage":
-            self.comms_down = False
-            self._emit_event("info", f"{player.name} hat Slack wieder online gebracht.")
+        self._sabotages_ctl.repair(player_id, sabotage_id)
 
     def _tick_sabotages(self, dt: float) -> None:
-        for sab in self.sabotages.values():
-            if sab.cooldown_remaining > 0:
-                sab.cooldown_remaining = max(0.0, sab.cooldown_remaining - dt)
-            # Recompute active flag for UI:
-            if sab.definition.id == "coffee_outage":
-                sab.active = self.coffee_level == 0
-            elif sab.definition.id == "mandatory_meeting":
-                sab.active = self.meeting_active_for > 0
-            elif sab.definition.id == "lights_out":
-                sab.active = self.lights_off
-            elif sab.definition.id == "comms_outage":
-                sab.active = self.comms_down
-            else:
-                sab.active = False
-        if self.meeting_active_for > 0:
-            self.meeting_active_for = max(0.0, self.meeting_active_for - dt)
+        self._sabotages_ctl.tick(dt)
 
     # --- take-down + body-report ------------------------------------------
 
     def _tick_takedown_cooldowns(self, dt: float) -> None:
-        for pid, cd in list(self.takedown_cooldowns.items()):
-            if cd > 0:
-                self.takedown_cooldowns[pid] = max(0.0, cd - dt)
+        self._movement_ctl.tick_takedown_cooldowns(dt)
 
     def apply_takedown(self, killer_id: str, target_id: str) -> Body:
-        """
-        Eliminate the target via stealth take-down. Authoritative.
-        No event emission -- a take-down must not leak to the public feed.
-        """
-        if self.phase is not Phase.PLAYING:
-            raise GameRoomError(code="WRONG_PHASE", message="Take-Down nur im PLAYING.")
-        killer = self.players.get(killer_id)
-        if killer is None or not killer.is_connected:
-            raise GameRoomError(code="UNKNOWN_PLAYER", message="Killer nicht im Raum.")
-        if not killer.is_alive:
-            raise GameRoomError(
-                code="PLAYER_ELIMINATED", message="Eliminierte Spieler koennen nichts tun."
-            )
-        if killer.team != "chaos_agents":
-            raise GameRoomError(
-                code="NOT_CHAOS_AGENT", message="Nur Chaos-Agenten koennen Take-Down nutzen."
-            )
-        target = self.players.get(target_id)
-        if target is None:
-            raise GameRoomError(code="UNKNOWN_TARGET", message="Ziel nicht im Raum.")
-        if not target.is_connected:
-            raise GameRoomError(code="UNKNOWN_TARGET", message="Ziel nicht verbunden.")
-        if not target.is_alive:
-            raise GameRoomError(code="TARGET_ELIMINATED", message="Ziel ist bereits ausgeschaltet.")
-        if target_id == killer_id:
-            raise GameRoomError(
-                code="INVALID_TARGET", message="Du kannst dich nicht selbst killen."
-            )
-        if target.team == "chaos_agents":
-            raise GameRoomError(
-                code="INVALID_TARGET",
-                message="Chaos-Agenten koennen sich nicht gegenseitig ausschalten.",
-            )
-        dx = killer.x - target.x
-        dy = killer.y - target.y
-        if (dx * dx + dy * dy) > (TAKEDOWN_RADIUS * TAKEDOWN_RADIUS):
-            raise GameRoomError(code="OUT_OF_RANGE", message="Ziel ist zu weit weg.")
-        if self.takedown_cooldowns.get(killer_id, 0.0) > 0:
-            raise GameRoomError(code="TAKEDOWN_ON_COOLDOWN", message="Take-Down auf Cooldown.")
-
-        # Snapshot the victim's position before any state mutation.
-        body = Body(
-            id=uuid.uuid4().hex,
-            x=target.x,
-            y=target.y,
-            victim_player_id=target.id,
-            victim_name=target.name,
-            color=target.color,
-        )
-        target.is_alive = False
-        target.input_state = InputState()
-        # Drop any task holds the target had (mirror mark_disconnected cleanup).
-        for task in self.tasks.values():
-            if target_id in task.per_player_progress:
-                task.per_player_progress.pop(target_id)
-                if not task.per_player_progress and task.status == "in_progress":
-                    task.status = "available"
-        # Tier 3.1: a take-down victim drops their mini-game (and the modal
-        # snaps shut on the client when the framework forwards 'killed').
-        if target_id in self.active_mini_games:
-            self._cancel_mini_game(target_id, "killed")
-        self.bodies[body.id] = body
-        self.takedown_cooldowns[killer_id] = TAKEDOWN_COOLDOWN
-        return body
+        return self._meeting_ctl.apply_takedown(killer_id, target_id)
 
     def apply_report_body(self, reporter_id: str, body_id: str, rng=None) -> None:
-        """
-        Reporter discovers a body. Triggers a meeting that bypasses the
-        war-room requirement and the per-round emergency meeting quota.
-        """
-        if self.phase is not Phase.PLAYING:
-            raise GameRoomError(code="WRONG_PHASE", message="Report nur im PLAYING.")
-        reporter = self.players.get(reporter_id)
-        if reporter is None or not reporter.is_connected:
-            raise GameRoomError(code="UNKNOWN_PLAYER", message="Reporter nicht im Raum.")
-        if not reporter.is_alive:
-            raise GameRoomError(
-                code="PLAYER_ELIMINATED", message="Eliminierte Spieler koennen nichts melden."
-            )
-        body = self.bodies.get(body_id)
-        if body is None:
-            raise GameRoomError(code="UNKNOWN_BODY", message="Unbekannter Body.")
-        dx = reporter.x - body.x
-        dy = reporter.y - body.y
-        if (dx * dx + dy * dy) > (REPORT_RADIUS * REPORT_RADIUS):
-            raise GameRoomError(code="OUT_OF_RANGE", message="Body ist zu weit weg.")
-
-        # Pop the body and emit the public danger event.
-        self.bodies.pop(body_id, None)
-        self._emit_event(
-            "danger",
-            f"{reporter.name} hat einen Body gefunden: {body.victim_name}.",
-        )
-
-        # Direct transition into MEETING. Bypass war-room + meeting quota.
-        self.meeting_caller_id = reporter_id
-        self.meeting_remaining_seconds = MEETING_DURATION_SECONDS
-        self.votes = {}
-        self.meeting_title = f"Body Report: {body.victim_name}"
-        self.phase = Phase.MEETING
-        # Cancel ongoing task holds -- frozen during meeting.
-        for task in self.tasks.values():
-            task.per_player_progress = {}
-            if task.status == "in_progress":
-                task.status = "available"
-        # Tier 3.1: end any active mini-games — modals snap shut as players
-        # are pulled into the meeting overlay.
-        self._cancel_all_mini_games("meeting_started")
-        # Tier 3.6: snapshot meeting context (reporter, body location, recent
-        # events) so the UI can give people something concrete to discuss.
-        self._snapshot_meeting_context(reporter_id=reporter_id, body=body)
+        self._meeting_ctl.apply_report_body(reporter_id, body_id, rng=rng)
 
     def private_state_for(self, player_id: str) -> dict:
         """Per-viewer private state (Tier 3.5 expanded). Includes own coffee
@@ -1310,45 +671,13 @@ class GameRoom:
     # --- meeting + voting -------------------------------------------------
 
     def _map_has_typed_anchors(self) -> bool:
-        """True if the loaded map has at least one task_anchor with object_type.
-        Used as the gate for Tier 2.7's themed-object sabotage binding — maps
-        that haven't been ported yet fall back to the legacy "from anywhere"
-        path so editor maps stay playable."""
-        return any(a.object_type for a in self.map.task_anchors)
-
-    def _near_object_for_sabotage(self, player, sab_def: SabotageDefinition) -> bool:
-        """Tier 2.7 rework: True iff the player stands within reach of any task
-        anchor whose object_type matches one of the sabotage's allowed trigger
-        types. Same anchor as the corresponding release task — sabotage looks
-        like normal terminal work to outsiders."""
-        if not sab_def.trigger_object_types:
-            return True  # legacy sabotages without binding (defensive default)
-        allowed = set(sab_def.trigger_object_types)
-        r2 = SABOTAGE_OBJECT_INTERACTION_RADIUS * SABOTAGE_OBJECT_INTERACTION_RADIUS
-        for a in self.map.task_anchors:
-            if a.object_type and a.object_type in allowed:
-                dx = player.x - a.x
-                dy = player.y - a.y
-                if dx * dx + dy * dy <= r2:
-                    return True
-        return False
+        return self._sabotages_ctl.has_typed_anchors()
 
     def _object_type_for_task(self, task_id: str) -> str | None:
-        for a in self.map.task_anchors:
-            if a.task_id == task_id:
-                return a.object_type
-        return None
+        return self._sabotages_ctl.object_type_for_task(task_id)
 
     def _object_anchors_for(self, sab_def: SabotageDefinition) -> list[tuple[float, float]]:
-        """Position list (x, y) of every anchor matching this sabotage's allowed
-        types — used by client-facing public state so the UI can show hints and
-        decide button availability without needing the sabotages module."""
-        if not sab_def.trigger_object_types:
-            return []
-        allowed = set(sab_def.trigger_object_types)
-        return [
-            (a.x, a.y) for a in self.map.task_anchors if a.object_type and a.object_type in allowed
-        ]
+        return self._sabotages_ctl.object_anchors_for(sab_def)
 
     def _is_in_war_room(self, player) -> bool:
         x_min, y_min, x_max, y_max = self._war_room_bounds
@@ -1413,19 +742,18 @@ class GameRoom:
 
         elif ability == "standup":
             # Like emergency meeting but waives the war-room location rule and
-            # doesn't consume the player's normal meeting allowance.
-            self.meeting_caller_id = player_id
-            self.meeting_remaining_seconds = MEETING_DURATION_SECONDS
-            self.votes = {}
-            self.meeting_title = "STANDUP — Scrum Master called it"
-            self.phase = Phase.MEETING
-            for task in self.tasks.values():
-                task.per_player_progress = {}
-                if task.status == "in_progress":
-                    task.status = "available"
-            self._cancel_all_mini_games("meeting_started")
+            # doesn't consume the player's normal meeting allowance. Goes
+            # through the meeting controller so the PLAYING->MEETING
+            # transition is centralised (task holds cleared, mini-games
+            # cancelled, context snapshotted) — no copy/paste of the eight
+            # mutations that step entails.
             self._emit_event("warn", f"{player.name} ruft ein Standup ein. Alle in den Slack-Call.")
-            self._snapshot_meeting_context(reporter_id=player_id, body=None)
+            self._meeting_ctl.begin_meeting(
+                caller_id=player_id,
+                title="STANDUP — Scrum Master called it",
+                body=None,
+                consume_quota=False,
+            )
 
         elif ability == "reproduce_bug":
             # Flavor / placeholder hook for now — emits an event and consumes
@@ -1448,43 +776,7 @@ class GameRoom:
         requesting_player_id: str,
         rng: random.Random | None = None,
     ) -> None:
-        if self.phase is not Phase.PLAYING:
-            raise GameRoomError(code="WRONG_PHASE", message="Meetings only during playing.")
-        player = self.players.get(requesting_player_id)
-        if player is None:
-            raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
-        if not player.is_alive:
-            raise GameRoomError(
-                code="PLAYER_ELIMINATED", message="Eliminated players cannot call meetings."
-            )
-        if not self._is_in_war_room(player):
-            raise GameRoomError(
-                code="NOT_IN_WAR_ROOM",
-                message="Emergency meetings can only be called from the War Room.",
-            )
-        if not self.players_with_meeting_left.get(requesting_player_id, False):
-            raise GameRoomError(
-                code="NO_MEETING_LEFT",
-                message="You already used your emergency meeting this round.",
-            )
-
-        # Transition to MEETING.
-        self.players_with_meeting_left[requesting_player_id] = False
-        self.meeting_caller_id = requesting_player_id
-        self.meeting_remaining_seconds = MEETING_DURATION_SECONDS
-        self.votes = {}
-        r = rng or random.SystemRandom()
-        self.meeting_title = r.choice(_MEETING_TITLES)
-        self.phase = Phase.MEETING
-        # Cancel ongoing task holds -- frozen during meeting.
-        for task in self.tasks.values():
-            task.per_player_progress = {}
-            if task.status == "in_progress":
-                task.status = "available"
-        # Tier 3.1: end any active mini-games when the round flips to MEETING.
-        self._cancel_all_mini_games("meeting_started")
-        # Tier 3.6: meeting context snapshot.
-        self._snapshot_meeting_context(reporter_id=requesting_player_id, body=None)
+        self._meeting_ctl.call_emergency_meeting(requesting_player_id, rng=rng)
 
     # --- endscreen + summary (Tier 3.7) ------------------------------------
 
@@ -1586,127 +878,28 @@ class GameRoom:
         return awards
 
     def _snapshot_meeting_context(self, reporter_id: str | None, body: "Body | None") -> None:
-        """Tier 3.6: capture context for the meeting overlay. Hints, never
-        proofs — list of recent events, body location, reporter name,
-        approximate death window. The client renders this verbatim."""
-        reporter_name = ""
-        if reporter_id and reporter_id in self.players:
-            reporter_name = self.players[reporter_id].name
-
-        recent = [
-            {"severity": e.severity, "message": e.message, "seq": e.seq}
-            for e in list(self.events)[-6:]
-        ]
-
-        body_block: dict | None = None
-        if body is not None:
-            body_block = {
-                "victimName": body.victim_name,
-                "x": round(body.x, 1),
-                "y": round(body.y, 1),
-                "room": self._room_label_for(body.x, body.y),
-            }
-
-        self.meeting_context = {
-            "reporterName": reporter_name,
-            "body": body_block,
-            "recentEvents": recent,
-            "alive": [{"id": p.id, "name": p.name} for p in self.players.values() if p.is_alive],
-        }
+        self._meeting_ctl.snapshot_context(reporter_id, body)
 
     def _room_label_for(self, x: float, y: float) -> str:
-        """Best-effort lookup of which room a coordinate falls in. Used by
-        meeting context so the body's location is human-friendly ('Server
-        Room' instead of '(800, 2400)')."""
-        for room in self.map.rooms:
-            if room.x <= x <= room.x + room.width and room.y <= y <= room.y + room.height:
-                return room.title
-        return "irgendwo"
+        return self._meeting_ctl._room_label_for(x, y)
 
     def cast_vote(self, voter_id: str, target_id: str) -> None:
-        if self.phase is not Phase.MEETING:
-            raise GameRoomError(code="WRONG_PHASE", message="No meeting active.")
-        voter = self.players.get(voter_id)
-        if voter is None or not voter.is_alive:
-            raise GameRoomError(code="CANNOT_VOTE", message="Only living players can vote.")
-        target = self.players.get(target_id)
-        if target is None or not target.is_alive:
-            raise GameRoomError(
-                code="INVALID_TARGET", message="Vote target must be a living player."
-            )
-        self.votes[voter_id] = target_id
+        self._meeting_ctl.cast_vote(voter_id, target_id)
 
     def skip_vote(self, voter_id: str) -> None:
-        if self.phase is not Phase.MEETING:
-            raise GameRoomError(code="WRONG_PHASE", message="No meeting active.")
-        voter = self.players.get(voter_id)
-        if voter is None or not voter.is_alive:
-            raise GameRoomError(code="CANNOT_VOTE", message="Only living players can vote.")
-        self.votes[voter_id] = SKIP_TARGET
+        self._meeting_ctl.skip_vote(voter_id)
 
     def _living_player_ids(self) -> list[str]:
-        return [pid for pid, p in self.players.items() if p.is_alive]
+        return self._meeting_ctl._living_player_ids()
 
     def _all_alive_voted(self) -> bool:
-        living = set(self._living_player_ids())
-        return living.issubset(set(self.votes.keys()))
+        return self._meeting_ctl.all_alive_voted()
 
     def _resolve_meeting(self) -> str | None:
-        """Tally votes, eliminate the loser if any, transition back to PLAYING.
-        Returns the eliminated player_id or None.
-        """
-        eliminated_id = _tally_votes(self.votes)
-        # Compute extra fields the client needs in voting_result.
-        counts: dict[str, int] = {}
-        for target in self.votes.values():
-            counts[target] = counts.get(target, 0) + 1
-        max_count = max(counts.values()) if counts else 0
-        winners = [t for t, c in counts.items() if c == max_count]
-        skip_won = (eliminated_id is None) and (
-            counts.get(SKIP_TARGET, 0) == max_count and max_count > 0
-        )
-        named_tie = (
-            eliminated_id is None and len(winners) > 1 and all(w != SKIP_TARGET for w in winners)
-        )
-
-        was_chaos = False
-        removed_name = ""
-        if eliminated_id and eliminated_id in self.players:
-            self.players[eliminated_id].is_alive = False
-            was_chaos = self.players[eliminated_id].team == "chaos_agents"
-            removed_name = self.players[eliminated_id].name
-
-        self.last_voting_result = {
-            "removed_player_id": eliminated_id or "",
-            "removed_player_name": removed_name,
-            "was_chaos_agent": was_chaos,
-            "tie": named_tie,
-            "skipped": skip_won,
-        }
-
-        # Emit a public, role-neutral event. The text MUST NOT depend on
-        # was_chaos -- doing so would leak role info to spectators.
-        if eliminated_id:
-            self._emit_event("info", f"{removed_name} wurde aus dem Team entfernt.")
-        elif named_tie:
-            self._emit_event("warn", "Patt — niemand wurde entfernt.")
-        elif skip_won:
-            self._emit_event("info", "Niemand wurde entfernt.")
-
-        # Reset meeting state and return to PLAYING.
-        self.meeting_remaining_seconds = 0.0
-        self.meeting_caller_id = None
-        self.meeting_title = ""
-        self.votes = {}
-        self.phase = Phase.PLAYING
-        return eliminated_id
+        return self._meeting_ctl.resolve_meeting()
 
     def _aggregate_vote_counts(self) -> dict[str, int]:
-        """Return {target_id: count} aggregating cast votes; SKIP_TARGET stays as ''."""
-        counts: dict[str, int] = {}
-        for target in self.votes.values():
-            counts[target] = counts.get(target, 0) + 1
-        return counts
+        return self._meeting_ctl.aggregate_vote_counts()
 
     # --- helper accessors -------------------------------------------------
 
@@ -1782,8 +975,13 @@ class GameRoom:
                     "votesCount": self._aggregate_vote_counts(),
                     "alreadyVoted": list(self.votes.keys()),
                     # Tier 3.6: discussion fuel — reporter, body location,
-                    # recent events. Hints, never proofs.
-                    "context": self.meeting_context,
+                    # recent events. Hints, never proofs. Pydantic serialises
+                    # the model with `by_alias=True` so the wire stays camelCase.
+                    "context": (
+                        self.meeting_context.model_dump(by_alias=True)
+                        if self.meeting_context is not None
+                        else None
+                    ),
                 }
                 if self.phase is Phase.MEETING
                 else None
@@ -1910,8 +1108,12 @@ class GameRoom:
             p.preferred_role = None
 
     def private_role_for(self, player_id: str) -> RoleInfo:
-        p = self.players[player_id]
-        if p.role is None or p.team is None:
+        # Caller-side guards (`main.py`) already check `player.role and team`
+        # before invoking this. The defensive lookup here lets us return a
+        # clean GameRoomError instead of a bare KeyError if a stale ws frame
+        # arrives mid-disconnect-sweep.
+        p = self.players.get(player_id)
+        if p is None or p.role is None or p.team is None:
             raise GameRoomError(
                 code="NO_ROLE",
                 message="Player has no role assigned yet.",
@@ -1935,31 +1137,7 @@ class GameRoom:
         )
 
     def assigned_tasks_for(self, player_id: str) -> list[dict]:
-        """Return [{taskId, title, room, category, isFake}] for the player.
-        For chaos players the same shape is used but isFake=True so the UI
-        can render them with a 'Cover' badge."""
-        p = self.players.get(player_id)
-        if p is None or not p.assigned_task_ids:
-            return []
-        is_chaos = p.team == "chaos_agents"
-        out = []
-        from app.game.tasks import TASK_DEFINITIONS as _TD
-
-        by_id = {t.id: t for t in _TD}
-        for tid in p.assigned_task_ids:
-            td = by_id.get(tid)
-            if td is None:
-                continue
-            out.append(
-                {
-                    "taskId": tid,
-                    "title": td.title,
-                    "room": td.room,
-                    "category": td.category,
-                    "isFake": is_chaos,
-                }
-            )
-        return out
+        return self._tasks_ctl.assigned_for(player_id)
 
     def reset_for_new_round(self) -> None:
         """

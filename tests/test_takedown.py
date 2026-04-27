@@ -9,12 +9,8 @@ import random
 
 import pytest
 
-from app.game.game_room import (
-    TAKEDOWN_COOLDOWN,
-    TAKEDOWN_RADIUS,
-    GameRoom,
-    GameRoomError,
-)
+from app.game.controllers.meeting import TAKEDOWN_COOLDOWN, TAKEDOWN_RADIUS
+from app.game.game_room import GameRoom, GameRoomError
 from app.game.models import Phase
 
 
@@ -22,6 +18,8 @@ def _started_room(player_count: int = 4, seed: int = 0) -> tuple[GameRoom, list[
     """Spawn a started GameRoom with at least 4 players (1 chaos + 3 release)
     so the Tier 2.1 chaos-parity rule does not interfere with mid-test ticks.
     """
+    from tests.conftest import make_task_hold_e
+
     if player_count < 4:
         player_count = 4
     room = GameRoom(code="TKDN")
@@ -29,6 +27,7 @@ def _started_room(player_count: int = 4, seed: int = 0) -> tuple[GameRoom, list[
     for i in range(player_count):
         ids.append(room.add_player(f"p{i}").id)
     room.start(requesting_player_id=ids[0], rng=random.Random(seed))
+    make_task_hold_e(room, "review_pr")
     return room, ids
 
 

@@ -48,6 +48,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         room="open_space",
         required_seconds=5.0,
         release_progress_reward=8,
+        mini_game="diff_review",
         category="code",
     ),
     TaskDefinition(
@@ -83,6 +84,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         room="legacy_basement",
         required_seconds=8.0,
         incidents_change=-20,
+        mini_game="stability_balance",
         category="legacy",
     ),
     TaskDefinition(
@@ -100,6 +102,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         room="meeting_room",
         required_seconds=4.0,
         release_progress_reward=6,
+        mini_game="release_notes",
         category="code",
     ),
 ]

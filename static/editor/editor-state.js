@@ -11,6 +11,7 @@ export const blankMap = () => ({
   wallLines: [],
   spawnPoints: [],
   taskAnchors: [],
+  mapObjects: [],
   warRoomId: "",
 });
 
@@ -39,6 +40,19 @@ export function serializeMap(map) {
       taskId: t.taskId,
       x: t.x,
       y: t.y,
+    })),
+    mapObjects: (map.mapObjects || []).map((o) => ({
+      id: o.id,
+      x: o.x,
+      y: o.y,
+      width: o.width,
+      height: o.height,
+      kind: o.kind,
+      rotation: o.rotation || 0,
+      blocksMovement: o.blocksMovement !== false,
+      ...(o.taskId ? { taskId: o.taskId } : {}),
+      ...(o.sabotageRepairId ? { sabotageRepairId: o.sabotageRepairId } : {}),
+      ...(o.objectType ? { objectType: o.objectType } : {}),
     })),
     warRoomId: map.warRoomId,
   };
@@ -104,6 +118,21 @@ export function deserializeMap(jsonText) {
           y: Number(t.y),
         }))
       : [],
+    mapObjects: Array.isArray(raw.mapObjects)
+      ? raw.mapObjects.map((o) => ({
+          id: String(o.id),
+          x: Number(o.x),
+          y: Number(o.y),
+          width: Number(o.width),
+          height: Number(o.height),
+          kind: String(o.kind),
+          rotation: Number(o.rotation) || 0,
+          blocksMovement: o.blocksMovement !== false,
+          taskId: o.taskId ? String(o.taskId) : null,
+          sabotageRepairId: o.sabotageRepairId ? String(o.sabotageRepairId) : null,
+          objectType: o.objectType ? String(o.objectType) : null,
+        }))
+      : [],
     warRoomId: String(raw.warRoomId || ""),
   };
 }
@@ -142,6 +171,14 @@ export function validateMap(map) {
   for (const ta of map.taskAnchors || []) {
     if (ta.x < 0 || ta.x > w || ta.y < 0 || ta.y > h) {
       warnings.push(`Task-Anker "${ta.taskId}" (${ta.x}, ${ta.y}) ausserhalb der Map.`);
+    }
+  }
+  for (const o of map.mapObjects || []) {
+    if (o.x < 0 || o.x > w || o.y < 0 || o.y > h) {
+      warnings.push(`Object "${o.id}" (${o.x}, ${o.y}) ausserhalb der Map.`);
+    }
+    if (o.width <= 0 || o.height <= 0) {
+      warnings.push(`Object "${o.id}" hat Breite oder Hoehe <= 0.`);
     }
   }
   return warnings;

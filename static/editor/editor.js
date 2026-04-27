@@ -196,6 +196,28 @@ function render() {
     ctx2d.fillText(t.taskId, t.x + 22, t.y + 4);
   }
 
+  // Map objects (Tier 4 props — drawn as bounding-box rectangles with kind
+  // label so the editor matches the in-game placeholder render).
+  if (Array.isArray(state.map.mapObjects)) {
+    for (let i = 0; i < state.map.mapObjects.length; i++) {
+      const o = state.map.mapObjects[i];
+      const dw = o.rotation === 90 || o.rotation === 270 ? o.height : o.width;
+      const dh = o.rotation === 90 || o.rotation === 270 ? o.width : o.height;
+      ctx2d.fillStyle = o.blocksMovement === false ? "rgba(120, 130, 160, 0.4)" : "#5b6478";
+      ctx2d.fillRect(o.x - dw / 2, o.y - dh / 2, dw, dh);
+      ctx2d.strokeStyle = "#0a0a0a";
+      ctx2d.lineWidth = 1 / state.view.scale;
+      ctx2d.strokeRect(o.x - dw / 2, o.y - dh / 2, dw, dh);
+      ctx2d.fillStyle = "#ffffff";
+      ctx2d.font = `${Math.max(10, 12 / state.view.scale)}px monospace`;
+      ctx2d.textAlign = "center";
+      ctx2d.textBaseline = "middle";
+      ctx2d.fillText(o.kind || "?", o.x, o.y);
+      ctx2d.textAlign = "left";
+      ctx2d.textBaseline = "alphabetic";
+    }
+  }
+
   // Selection highlight.
   drawSelectionHighlight();
 
@@ -322,6 +344,13 @@ function drawSelectionHighlight() {
     if (t) {
       ctx2d.strokeRect(t.x - 24, t.y - 24, 48, 48);
     }
+  } else if (sel.kind === "object") {
+    const o = state.map.mapObjects?.[sel.index];
+    if (o) {
+      const dw = o.rotation === 90 || o.rotation === 270 ? o.height : o.width;
+      const dh = o.rotation === 90 || o.rotation === 270 ? o.width : o.height;
+      ctx2d.strokeRect(o.x - dw / 2 - 4, o.y - dh / 2 - 4, dw + 8, dh + 8);
+    }
   }
   ctx2d.restore();
 }
@@ -402,6 +431,8 @@ function deleteSelection() {
     state.map.spawnPoints.splice(sel.index, 1);
   } else if (sel.kind === "task") {
     state.map.taskAnchors.splice(sel.index, 1);
+  } else if (sel.kind === "object") {
+    state.map.mapObjects.splice(sel.index, 1);
   }
   state.selection = null;
   toolContext.markDirty();
@@ -478,6 +509,7 @@ function renderPropsSidebar() {
   if (sel.kind === "wall") return renderWallProps(sel.index);
   if (sel.kind === "spawn") return renderSpawnProps(sel.index);
   if (sel.kind === "task") return renderTaskProps(sel.index);
+  if (sel.kind === "object") return renderObjectProps(sel.index);
 }
 
 function makeField(label, value, onChange, type = "text") {
@@ -754,6 +786,78 @@ function renderTaskProps(i) {
       "number"
     )
   );
+  appendDeleteButton(root);
+}
+
+function renderObjectProps(i) {
+  const o = state.map.mapObjects?.[i];
+  if (!o) return;
+  const root = dom.propsContent;
+  const numField = (label, key) =>
+    root.appendChild(
+      makeField(
+        label,
+        o[key],
+        (v) => {
+          const n = parseFloat(v);
+          if (Number.isFinite(n)) {
+            o[key] = n;
+            toolContext.markDirty();
+            requestRender();
+          }
+        },
+        "number"
+      )
+    );
+  const strField = (label, key) =>
+    root.appendChild(
+      makeField(label, o[key] || "", (v) => {
+        o[key] = v.trim() || null;
+        toolContext.markDirty();
+        requestRender();
+      })
+    );
+  strField("ID", "id");
+  strField("Kind", "kind");
+  numField("x (Center)", "x");
+  numField("y (Center)", "y");
+  numField("width", "width");
+  numField("height", "height");
+  // Rotation: only 0/90/180/270.
+  const rotWrap = document.createElement("label");
+  rotWrap.textContent = "Rotation";
+  const rotSel = document.createElement("select");
+  for (const r of [0, 90, 180, 270]) {
+    const opt = document.createElement("option");
+    opt.value = String(r);
+    opt.textContent = `${r}°`;
+    if ((o.rotation || 0) === r) opt.selected = true;
+    rotSel.appendChild(opt);
+  }
+  rotSel.addEventListener("change", () => {
+    o.rotation = parseInt(rotSel.value, 10) || 0;
+    toolContext.markDirty();
+    requestRender();
+  });
+  rotWrap.appendChild(rotSel);
+  root.appendChild(rotWrap);
+  // blocksMovement checkbox.
+  const blkWrap = document.createElement("label");
+  const blkInput = document.createElement("input");
+  blkInput.type = "checkbox";
+  blkInput.checked = o.blocksMovement !== false;
+  blkInput.addEventListener("change", () => {
+    o.blocksMovement = blkInput.checked;
+    toolContext.markDirty();
+    requestRender();
+  });
+  blkWrap.appendChild(blkInput);
+  blkWrap.appendChild(document.createTextNode(" blockt Bewegung"));
+  root.appendChild(blkWrap);
+  // Optional bindings.
+  strField("task_id (optional)", "taskId");
+  strField("sabotage_repair_id (optional)", "sabotageRepairId");
+  strField("object_type (optional, Tier 2.7 sabotage trigger)", "objectType");
   appendDeleteButton(root);
 }
 

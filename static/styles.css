@@ -1250,6 +1250,220 @@ button:hover {
   word-break: break-word;
 }
 
+/* --- Tier 3.7 diff_review ---------------------------------------------- */
+
+.mini-game-diff-list {
+  list-style: decimal inside;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+  counter-reset: diffline;
+}
+
+.mini-game-diff-line {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #10152a;
+  border-left: 4px solid #475569;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.mini-game-diff-line .mini-game-diff-code {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.85rem;
+  color: #cbd5e1;
+}
+
+.mini-game-diff-line.marked {
+  background: #163d2c;
+  border-left-color: #34d399;
+  cursor: default;
+  opacity: 0.9;
+}
+
+.mini-game-diff-line.marked .mini-game-diff-code {
+  color: #bbf7d0;
+}
+
+/* --- Tier 3.7 stability_balance ---------------------------------------- */
+
+.mini-game-stability-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.mini-game-stability-row {
+  display: grid;
+  grid-template-columns: 36px 100px 1fr 36px;
+  align-items: center;
+  gap: 12px;
+}
+
+.mini-game-stability-btn {
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid #475569;
+  background: #1f2937;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.mini-game-stability-btn:hover {
+  background: #334155;
+}
+
+.mini-game-stability-labelwrap {
+  display: flex;
+  flex-direction: column;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.85rem;
+}
+
+.mini-game-stability-label {
+  color: #94a3b8;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.mini-game-stability-value {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.mini-game-stability-bar {
+  position: relative;
+  height: 22px;
+  border-radius: 6px;
+  background: #10152a;
+  border: 1px solid #1f2937;
+  overflow: hidden;
+}
+
+.mini-game-stability-green {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(52, 211, 153, 0.18);
+  border-left: 1px dashed rgba(52, 211, 153, 0.5);
+  border-right: 1px dashed rgba(52, 211, 153, 0.5);
+  pointer-events: none;
+}
+
+.mini-game-stability-fill {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  border-radius: 4px;
+  background: #f87171;
+  transition:
+    width 0.15s linear,
+    background 0.15s linear;
+}
+
+.mini-game-stability-fill.in-green {
+  background: #34d399;
+}
+
+/* --- Tier 3.7 release_notes -------------------------------------------- */
+
+.mini-game-release-list {
+  list-style: decimal inside;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.mini-game-release-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #10152a;
+  border-left: 4px solid #475569;
+  cursor: pointer;
+}
+
+.mini-game-release-row:hover {
+  background: #161c33;
+}
+
+.mini-game-release-msg {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  flex: 1 1 auto;
+  word-break: break-word;
+}
+
+.mini-game-release-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  flex: 0 0 auto;
+}
+
+.mini-game-release-badge.cat-unassigned {
+  background: #1f2937;
+  color: #94a3b8;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.mini-game-release-badge.cat-feature {
+  background: #14532d;
+  color: #bbf7d0;
+}
+.mini-game-release-badge.cat-bugfix {
+  background: #1e3a8a;
+  color: #bfdbfe;
+}
+.mini-game-release-badge.cat-breaking {
+  background: #7f1d1d;
+  color: #fecaca;
+}
+.mini-game-release-badge.cat-noprod {
+  background: #4a044e;
+  color: #f5d0fe;
+}
+
+.mini-game-release-submit {
+  margin-top: 14px;
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: none;
+  background: #475569;
+  color: #cbd5e1;
+  font-weight: 600;
+  cursor: not-allowed;
+}
+
+.mini-game-release-submit.ready {
+  background: var(--accent);
+  color: #0f172a;
+  cursor: pointer;
+}
+
 /* --- Tier 3.6 sprint_trim ----------------------------------------------- */
 
 .mini-game-sprint-list {

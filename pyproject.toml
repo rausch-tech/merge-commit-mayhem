@@ -11,8 +11,11 @@ dependencies = [
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
+    "hypothesis>=6.115.0",
+    "mypy>=1.13.0",
     "pre-commit>=4.6.0",
     "pytest>=9.0.3",
+    "pytest-cov>=6.0.0",
     "ruff>=0.15.12",
 ]
 
@@ -21,6 +24,47 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-ra --strict-markers"
 pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["app/game"]
+# main.py is the WS layer — TestClient-driven coverage of it is brittle
+# and lives in test_ws_protocol.py. The CI gate cares about the domain
+# layer (controllers + game_room + plugins) being well-tested.
+
+[tool.coverage.report]
+# Slice 6 baseline: 92% on app/game/. The 88% floor leaves a small
+# buffer for edits that touch hot paths without immediately bumping a
+# matching test.
+fail_under = 88
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
+[tool.mypy]
+# Tightened in Slice 6 — runs against app/ on every PR. Strict mode is
+# the eventual goal; current baseline keeps the moderate set so the
+# initial wave is just real bugs, not annotation churn.
+python_version = "3.12"
+files = ["app"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+no_implicit_optional = true
+strict_optional = true
+# Pydantic v2 + FastAPI emit some Any-heavy edges that mypy can't see
+# through. Suppress the framework noise; everything else is fair game.
+disable_error_code = ["import-untyped"]
+
+[[tool.mypy.overrides]]
+# Plugins are dict-shape heavy; full typing would cost more than it's
+# worth right now. Keep them at default mypy strictness (still catches
+# the real bugs).
+module = "app.game.minigames.*"
+disable_error_code = ["misc", "arg-type"]
 
 [tool.ruff]
 line-length = 100

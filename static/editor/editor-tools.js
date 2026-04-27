@@ -28,6 +28,15 @@ export function hitTest(map, mx, my) {
       return { kind: "task", index: i };
     }
   }
+  // Map objects: hit-test against their bounding box (after rotation swap).
+  for (let i = (map.mapObjects || []).length - 1; i >= 0; i--) {
+    const o = map.mapObjects[i];
+    const dw = o.rotation === 90 || o.rotation === 270 ? o.height : o.width;
+    const dh = o.rotation === 90 || o.rotation === 270 ? o.width : o.height;
+    if (mx >= o.x - dw / 2 && mx <= o.x + dw / 2 && my >= o.y - dh / 2 && my <= o.y + dh / 2) {
+      return { kind: "object", index: i };
+    }
+  }
   // Wall lines: hit a thin band around the line.
   const bandHalf = 12;
   for (let i = (map.wallLines || []).length - 1; i >= 0; i--) {
@@ -242,10 +251,44 @@ export class TaskAnchorTool {
   drawPreview() {}
 }
 
+// --- Object tool: click + prompt for kind (Tier 4 props) -------------------
+//
+// Default size: 80x40 (desk-sized). Adjust via JSON afterward — the editor
+// MVP keeps placement-only; rotation is settable in JSON, future polish
+// adds resize handles + rotate-shortcut to the editor.
+
+const DEFAULT_OBJECT_KIND = "desk";
+const DEFAULT_OBJECT_SIZE = { width: 80, height: 40 };
+
+export class ObjectTool {
+  onDown(ctx, mx, my) {
+    const kind = (window.prompt("Object-Kind", DEFAULT_OBJECT_KIND) || "").trim();
+    if (!kind) return;
+    if (!Array.isArray(ctx.map.mapObjects)) ctx.map.mapObjects = [];
+    const id = `obj-${ctx.map.mapObjects.length + 1}`;
+    ctx.map.mapObjects.push({
+      id,
+      x: mx,
+      y: my,
+      width: DEFAULT_OBJECT_SIZE.width,
+      height: DEFAULT_OBJECT_SIZE.height,
+      kind,
+      rotation: 0,
+      blocksMovement: true,
+    });
+    ctx.markDirty();
+    ctx.setSelection({ kind: "object", index: ctx.map.mapObjects.length - 1 });
+  }
+  onMove() {}
+  onUp() {}
+  drawPreview() {}
+}
+
 export const TOOLS = {
   select: SelectTool,
   room: RoomTool,
   wall: WallTool,
   spawn: SpawnTool,
   task: TaskAnchorTool,
+  object: ObjectTool,
 };

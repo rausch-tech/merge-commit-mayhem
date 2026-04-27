@@ -112,6 +112,36 @@ class Vent(BaseModel):
     connected_to: list[str] = Field(default_factory=list)
 
 
+class MapObject(BaseModel):
+    """Tier 4 prop on the map — desks, server racks, kitchen counters,
+    plants. Bounding box for server-side collision plus a logical ``kind``
+    that each client maps to its own visual asset (browser: coloured
+    rectangle with label, Godot: PackedScene from a kind→.gltf table).
+
+    Optional bindings let one MapObject replace the legacy standalone
+    ``TaskAnchor`` / ``SabotagePanel`` so a single physical desk can be a
+    release-team task spot AND a sabotage trigger AND a repair panel.
+
+    Rotation is axis-aligned only (0/90/180/270 in 90deg steps). 90 and
+    270 swap width and height for collision; visual rotation is the
+    client's responsibility.
+    """
+
+    model_config = _camel()
+    id: str
+    x: float
+    y: float
+    width: float
+    height: float
+    kind: str
+    rotation: Literal[0, 90, 180, 270] = 0
+    blocks_movement: bool = True
+    # Optional gameplay bindings:
+    task_id: str | None = None
+    sabotage_repair_id: str | None = None
+    object_type: str | None = None  # Tier 2.7 sabotage trigger binding
+
+
 class GameMap(BaseModel):
     model_config = _camel()
     name: str
@@ -122,6 +152,11 @@ class GameMap(BaseModel):
     task_anchors: list[TaskAnchor] = Field(default_factory=list)
     sabotage_panels: list[SabotagePanel] = Field(default_factory=list)
     vents: list[Vent] = Field(default_factory=list)
+    # Tier 4: optional list of props (furniture, server racks, decor).
+    # Legacy maps without this field default to an empty list and keep
+    # working — open floors plus standalone TaskAnchor / SabotagePanel
+    # remain valid until a map opts in by populating ``map_objects``.
+    map_objects: list[MapObject] = Field(default_factory=list)
     war_room_id: str
 
 
@@ -131,8 +166,27 @@ def load_map(path: Path) -> GameMap:
     return GameMap.model_validate(raw)
 
 
+def map_object_aabb(obj: "MapObject") -> tuple[int, int, int, int]:
+    """AABB (x1, y1, x2, y2) for a MapObject. The object's ``x``/``y`` is
+    the CENTER; rotation 90/270 swaps width and height for collision."""
+    half_w = obj.width / 2.0
+    half_h = obj.height / 2.0
+    if obj.rotation in (90, 270):
+        half_w, half_h = half_h, half_w
+    return (
+        int(round(obj.x - half_w)),
+        int(round(obj.y - half_h)),
+        int(round(obj.x + half_w)),
+        int(round(obj.y + half_h)),
+    )
+
+
 def compute_walls(game_map: GameMap) -> list[tuple[int, int, int, int]]:
-    """Concrete wall rectangles for the map. Computed once per map; pure."""
+    """Concrete wall rectangles for the map. Computed once per map; pure.
+
+    Includes both ``wall_lines`` (axis-aligned segments with door cutouts)
+    and ``map_objects`` with ``blocks_movement=True`` (Tier 4 props).
+    """
     out: list[tuple[int, int, int, int]] = []
     for line in game_map.wall_lines:
         doors_pairs = [(d.center, d.width) for d in line.doors]
@@ -140,6 +194,9 @@ def compute_walls(game_map: GameMap) -> list[tuple[int, int, int, int]]:
             out.extend(vertical_wall_segments(line.position, doors_pairs, game_map.size.height))
         else:
             out.extend(horizontal_wall_segments(line.position, doors_pairs, game_map.size.width))
+    for obj in game_map.map_objects:
+        if obj.blocks_movement:
+            out.append(map_object_aabb(obj))
     return out
 
 
@@ -152,8 +209,18 @@ def war_room_bounds_for(game_map: GameMap) -> tuple[int, int, int, int]:
 
 
 def task_position_map(game_map: GameMap) -> dict[str, tuple[float, float]]:
-    """Return {task_id: (x, y)} from the map's task_anchors."""
-    return {a.task_id: (a.x, a.y) for a in game_map.task_anchors}
+    """Return ``{task_id: (x, y)}`` for every task anchored on the map.
+
+    Both legacy ``task_anchors`` and Tier-4 ``map_objects`` with a
+    ``task_id`` contribute. When the same task id appears in both, the
+    MapObject wins because that's the newer system — but in practice,
+    a map should pick one or the other.
+    """
+    out: dict[str, tuple[float, float]] = {a.task_id: (a.x, a.y) for a in game_map.task_anchors}
+    for obj in game_map.map_objects:
+        if obj.task_id:
+            out[obj.task_id] = (obj.x, obj.y)
+    return out
 
 
 # Default map loaded at module import time. Tests can override.

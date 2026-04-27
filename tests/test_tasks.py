@@ -5,6 +5,7 @@ import pytest
 from app.game.game_room import GameRoom, GameRoomError
 from app.game.models import InputState
 from app.game.tasks import TASK_INTERACTION_RADIUS, TASK_RESPAWN_COOLDOWN
+from tests.conftest import make_task_hold_e
 
 
 def _room_with_players(n: int) -> tuple[GameRoom, list[str]]:
@@ -14,6 +15,10 @@ def _room_with_players(n: int) -> tuple[GameRoom, list[str]]:
     n=2 just to grab the first two ids; we silently bump to 4. Tier 2.1's
     chaos-parity rule (chaos_alive >= release_alive) is satisfied with
     4 players (1 chaos + 3 release).
+
+    ``review_pr`` is forced into hold-E mode so the existing tests that
+    cover hold-E mechanics keep working after Tier 3.7 wired ``review_pr``
+    to the diff_review mini-game.
     """
     if n < 4:
         n = 4
@@ -24,6 +29,7 @@ def _room_with_players(n: int) -> tuple[GameRoom, list[str]]:
         ids.append(p.id)
     host_id = ids[0]
     room.start(requesting_player_id=host_id, rng=random.Random(0))
+    make_task_hold_e(room, "review_pr")
     return room, ids
 
 

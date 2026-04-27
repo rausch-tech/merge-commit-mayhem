@@ -289,7 +289,11 @@ class _IncomingEnvelope(BaseModel):
 
 
 def parse_incoming(raw: dict[str, Any]) -> IncomingMessage:
-    return _IncomingEnvelope(root=raw).root
+    # Pydantic resolves the discriminated union from the raw dict — mypy
+    # can't follow that flow through ``_IncomingEnvelope``, so suppress the
+    # arg-type complaint here. Round-trip behaviour is covered by
+    # tests/test_protocol.py.
+    return _IncomingEnvelope(root=raw).root  # type: ignore[arg-type]
 
 
 # --- outgoing messages ------------------------------------------------------
@@ -310,6 +314,40 @@ class LobbyStateMsg(BaseModel):
     available_maps: list[dict[str, Any]] = Field(default_factory=list)
     selected_map_id: str = ""
     map: dict[str, Any] = Field(default_factory=dict)
+
+
+class MeetingBody(BaseModel):
+    model_config = _camel_config()
+    victim_name: str
+    x: float
+    y: float
+    room: str
+
+
+class MeetingRecentEvent(BaseModel):
+    model_config = _camel_config()
+    severity: str
+    message: str
+    seq: int
+
+
+class MeetingAlive(BaseModel):
+    model_config = _camel_config()
+    id: str
+    name: str
+
+
+class MeetingContext(BaseModel):
+    """Tier 3.6: discussion fuel block embedded in `meeting`. Keys are
+    camelCase on the wire (the frontend reads `reporterName`, `recentEvents`).
+    Modelling this explicitly keeps the alias generator authoritative — manual
+    dict-building was drifting from the rest of the protocol."""
+
+    model_config = _camel_config()
+    reporter_name: str = ""
+    body: MeetingBody | None = None
+    recent_events: list[MeetingRecentEvent] = Field(default_factory=list)
+    alive: list[MeetingAlive] = Field(default_factory=list)
 
 
 class GameStateMsg(BaseModel):

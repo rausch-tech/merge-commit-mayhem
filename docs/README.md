@@ -4,21 +4,25 @@ Hier liegen alle Projekt-Docs. Wenn du neu hier bist, fang mit der Roadmap an.
 
 ## Lebende Dokumente
 
-| Doc                        | Was                                                                                                                            |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| [`ROADMAP.md`](ROADMAP.md) | **Der eine Plan.** Vision, Stand, sechs Tier mit konkreten Slices, „was ist nächstes?". Alle anderen Docs erklären Sub-Themen. |
-| [`maps.md`](maps.md)       | Map-JSON-Schema. Was darf in einer `maps/*.json` stehen, wie wird daraus das Spiel?                                            |
-| [`DEPLOY.md`](DEPLOY.md)   | Deploy-Workflow: Auto-Deploy via GitHub Actions, manueller Deploy, Server-Innenleben, Caddy, Rollback.                         |
+| Doc                                    | Was                                                                                                                            |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| [`ROADMAP.md`](ROADMAP.md)             | **Der eine Plan.** Vision, Stand, sechs Tier mit konkreten Slices, „was ist nächstes?". Alle anderen Docs erklären Sub-Themen. |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md)   | High-Level-Overview, Tick-Loop, Backend-Layout (Controller-Struktur), Performance-Baseline.                                    |
+| [`PROTOCOL.md`](PROTOCOL.md)           | Vollständiger WebSocket-Vertrag — alle Messages mit Schema, Phase-Übergänge, Error-Codes.                                      |
+| [`DEV.md`](DEV.md)                     | Lokale Entwicklung, Branch-Konventionen, Testing.                                                                              |
+| [`DEPLOY.md`](DEPLOY.md)               | Deploy-Workflow: Auto-Deploy via GitHub Actions, manueller Deploy, Server-Innenleben, Caddy, Rollback.                         |
+| [`maps.md`](maps.md)                   | Map-JSON-Schema. Was darf in einer `maps/*.json` stehen, wie wird daraus das Spiel?                                            |
+| [`GAME_OVERVIEW.md`](GAME_OVERVIEW.md) | Shareable Markdown-Tour für externe Brainstorm-Runden.                                                                         |
 
-## Kommt im Tier 0 dazu
+## Erweiterungs-HOWTOs
 
-Diese Docs werden im weiteren Sauberkeits-Sprint geschrieben (siehe Roadmap Tier 0):
+Step-by-step für die häufigsten Erweiterungen, geschrieben für neue Team-Mitglieder:
 
-| Doc               | Was                                                                                      |
-| ----------------- | ---------------------------------------------------------------------------------------- |
-| `PROTOCOL.md`     | Vollständiger WebSocket-Vertrag — alle Messages mit Schema, Phase-Übergänge, Error-Codes |
-| `ARCHITECTURE.md` | High-Level-Overview, Tick-Loop, Datenfluss                                               |
-| `DEV.md`          | Lokale Entwicklung, Branch-Konventionen, Testing                                         |
+| Doc                                      | Was                                                                                                           |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| [`HOWTO-SABOTAGE.md`](HOWTO-SABOTAGE.md) | Neue Sabotage hinzufügen — Definition, Effekt-Switch, Object-Binding, Tests. ~30 LoC pro Sabotage.            |
+| [`HOWTO-MINIGAME.md`](HOWTO-MINIGAME.md) | Neues Mini-Game-Plugin — `init_state` / `handle_input` / `is_complete` / `public_view`. Frontend-Plugin dazu. |
+| [`HOWTO-ROLE.md`](HOWTO-ROLE.md)         | Neue Rolle definieren — `RoleDefinition`, Coffee-Profil, optional Ability + Singleton-Cap.                    |
 
 ## Im Repo, aber nicht hier
 

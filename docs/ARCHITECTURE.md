@@ -120,18 +120,42 @@ app/
 ├── ws.py                   ConnectionManager — per-ws session tracking
 └── game/
     ├── game_map.py         GameMap Pydantic + load_map + walls/war-room helpers
-    ├── game_room.py        Per-room state machine: phase, players, tasks,
-    │                       sabotages, voting, tick(), win-conditions
+    ├── game_room.py        Orchestrator: phase, players, lifecycle, tick(),
+    │                       win-conditions, public-state serialisation
+    ├── runtime.py          Shared dataclasses (TaskRuntime, SabotageRuntime,
+    │                       Body, MiniGameSession) + GameRoomError
+    ├── controllers/
+    │   ├── tasks.py        TasksController — hold-E flow, per-tick progress,
+    │   │                   rewards, personal-task allocation, coffee splash
+    │   ├── sabotages.py    SabotagesController — trigger / repair / tick,
+    │   │                   Tier 2.7 object-binding
+    │   ├── meeting.py      MeetingController — emergency meetings, voting,
+    │   │                   take-downs, body reports, context snapshot
+    │   ├── mini_game.py    MiniGameController — start / input / complete /
+    │   │                   cancel + pending-events queue
+    │   └── movement.py     MovementController — per-tick step + collision,
+    │                       coffee decay, current-speed-for, vent teleport
+    ├── minigames/          Per-task plugins (test_suite_repair, cable_pairing, …)
     ├── models.py           Phase enum + Player domain model
     ├── room_code.py        4-char ABCD generator (alphabet without I/O)
-    ├── roles.py            assign(player_ids) → 1× vibe_coder, rest developers
+    ├── roles.py            5 release + 3 chaos roles + assign()
     ├── sabotages.py        SabotageDefinition + speed constants
     ├── tasks.py            TaskDefinition + interaction constants
     ├── voting.py           tally() + chaos-eliminated check (pure helpers)
     └── walls.py            wall-segment generators + axis-aligned collision
 ```
 
-**Trennungs-Prinzip:** `game_room.py` ist die Domain-Schicht — kennt keine FastAPI, keine WebSockets, keine JSON. Nur `main.py` und `ws.py` kennen das Transport-Layer. Daher kann `game_room.py` direkt in pytest getestet werden, ohne TestClient.
+**Trennungs-Prinzip:** `game_room.py` ist der Daten- und Lifecycle-Halter; jeder Controller besitzt seine Domänen-Regeln und greift via `self._room.<feld>` auf den geteilten State zu. Hard-split in Slice 2 des v1-Hardening-Releases — vorher war alles als Methoden-Wand auf `GameRoom` (~2k LoC).
+
+`game_room.py` kennt weiterhin keine FastAPI, keine WebSockets, keine JSON-Wire — nur `main.py` und `ws.py` kennen das Transport-Layer. Tests sprechen `room.apply_<x>(...)` direkt an, ohne `TestClient`.
+
+**Wenn du Domain-Logik anfasst:** finde den richtigen Controller über die Methode (z.B. `apply_sabotage` → `SabotagesController.trigger`). `GameRoom` selbst behält dünne Delegator-Methoden für die WS-API; das ist die Stabilitäts-Garantie für den Wire-Vertrag.
+
+**HOWTO-Guides** für die häufigsten Erweiterungen:
+
+- [`HOWTO-SABOTAGE.md`](HOWTO-SABOTAGE.md) — neue Sabotage hinzufügen
+- [`HOWTO-MINIGAME.md`](HOWTO-MINIGAME.md) — neues Mini-Game-Plugin
+- [`HOWTO-ROLE.md`](HOWTO-ROLE.md) — neue Rolle definieren
 
 ---
 

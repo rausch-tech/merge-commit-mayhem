@@ -47,7 +47,13 @@ def test_task_with_mini_game_routes_into_session_not_hold_e():
 
 
 def test_task_without_mini_game_still_uses_hold_e():
+    """Tier 3.7 wired a mini-game to every production task. Strip
+    ``review_pr``'s mini_game binding for this test so the hold-E
+    fallback path stays covered."""
+    from tests.conftest import make_task_hold_e
+
     room, _, dev_id = _room_with_roles()
+    make_task_hold_e(room, "review_pr")
     _place_at_task(room, dev_id, "review_pr")
     room.apply_task_hold_start(dev_id, "review_pr")
     assert dev_id not in room.active_mini_games

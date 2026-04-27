@@ -1,7 +1,22 @@
 """Shared pytest helpers."""
 
+from dataclasses import replace
+
 from app.game.game_room import GameRoom
 from app.game.sabotages import sabotage_by_id
+
+
+def make_task_hold_e(room: GameRoom, task_id: str) -> None:
+    """Strip the ``mini_game`` field from a task's runtime definition so
+    hold-E mechanics tests still work after Tier 3.7 wired every task to
+    a mini-game plugin. Mutates the in-room TaskRuntime — the global
+    TASK_DEFINITIONS list is unchanged. Call after ``room.start()``."""
+    task = room.tasks.get(task_id)
+    if task is None:
+        return
+    if task.definition.mini_game is None:
+        return
+    task.definition = replace(task.definition, mini_game=None)
 
 
 def snap_to_object_for_sabotage(room: GameRoom, player_id: str, sabotage_id: str) -> None:
