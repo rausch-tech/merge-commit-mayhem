@@ -1,0 +1,246 @@
+{
+  "_meta": {
+    "version": 1,
+    "description": "Single source of truth fuer MapObject-Kinds. Konsumenten: godot-3d/scripts/map_builder.gd (Godot 3D), static/render.js (Browser 2D Fallback), static/editor/editor-kinds.js (Editor-Palette), app/game/game_map.py (Pydantic-Validation, optional). docs/maps.md verweist hierher.",
+    "field_docs": {
+      "category": "Editor-Palette-Gruppierung (Workstation, Server, Meeting, Kitchen, Decor, Legacy).",
+      "label": "Editor-Palette + Browser-Fallback-Anzeigetext.",
+      "default_size": "[width_px, height_px] in Server-Pixeln. CENTER-basiert. Editor-Default beim Platzieren.",
+      "blocks_movement": "Default fuer Server-Side Collision; pro MapObject ueberschreibbar.",
+      "browser_2d": "Browser-Renderer-Style (fill = HEX, label = Top-Text auf der 2D-Box).",
+      "godot_asset": "Godot res://-Pfad zur PackedScene (gltf). null = Fallback-Box mit Kind-Label.",
+      "kaykit_source": "Pfad innerhalb KayKit_Bits_Bundle1_1.1 (FBX). Asset-Pipeline-Quelle fuer den Import nach godot-3d/assets/."
+    }
+  },
+
+  "desk": {
+    "category": "Workstation",
+    "label": "Desk",
+    "default_size": [110, 60],
+    "blocks_movement": true,
+    "browser_2d": { "fill": "#7c5a3a", "label": "DESK" },
+    "godot_asset": "res://assets/furniture/desk.gltf",
+    "kaykit_source": "Furniture/desk.fbx"
+  },
+  "desk_large": {
+    "category": "Workstation",
+    "label": "Desk (groß)",
+    "default_size": [180, 80],
+    "blocks_movement": true,
+    "browser_2d": { "fill": "#7c5a3a", "label": "DESK" },
+    "godot_asset": null,
+    "kaykit_source": "Furniture/desk_large.fbx"
+  },
+  "desk_decorated": {
+    "category": "Workstation",
+    "label": "Desk (decorated)",
+    "default_size": [110, 60],
+    "blocks_movement": true,
+    "browser_2d": { "fill": "#7c5a3a", "label": "DESK" },
+    "godot_asset": null,
+    "kaykit_source": "Furniture/desk_decorated.fbx"
+  },
+  "chair_desk": {
+    "category": "Workstation",
+    "label": "Chair (desk)",
+    "default_size": [50, 50],
+    "blocks_movement": false,
+    "browser_2d": { "fill": "#3f3128", "label": "" },
+    "godot_asset": "res://assets/furniture/chair_desk_A.gltf",
+    "kaykit_source": "Furniture/chair_desk_A.fbx"
+  },
+  "monitor": {
+    "category": "Workstation",
+    "label": "Monitor",
+    "default_size": [60, 30],
+    "blocks_movement": false,
+    "browser_2d": { "fill": "#1f2937", "label": "MON" },
+    "godot_asset": "res://assets/furniture/monitor.gltf",
+    "kaykit_source": "Furniture/monitor.fbx"
+  },
+  "keyboard": {
+    "category": "Workstation",
+    "label": "Keyboard",
+    "default_size": [50, 20],
+    "blocks_movement": false,
+    "browser_2d": { "fill": "#1f2937", "label": "" },
+    "godot_asset": null,
+    "kaykit_source": "Furniture/keyboard.fbx"
+  },
+  "mug": {
+    "category": "Workstation",
+    "label": "Mug",
+    "default_size": [20, 20],
+    "blocks_movement": false,
+    "browser_2d": { "fill": "#a16207", "label": "" },
+    "godot_asset": null,
+    "kaykit_source": "Furniture/mug_A.fbx"
+  },
+  "lamp_desk": {
+    "category": "Workstation",
+    "label": "Desk lamp",
+    "default_size": [30, 30],
+    "blocks_movement": false,
+    "browser_2d": { "fill": "#fbbf24", "label": "" },
+    "godot_asset": null,
+    "kaykit_source": "Furniture/lamp_desk.fbx"
+  },
+
+  "server_rack": {
+    "category": "Server",
+    "label": "Server rack",
+    "default_size": [80, 100],
+    "blocks_movement": true,
+    "browser_2d": { "fill": "#1e293b", "label": "RACK" },
+    "godot_asset": null,
+    "kaykit_source": "Space Base/structure_tall.fbx"
+  },
+  "monitoring_panel": {
+    "category": "Server",
+    "label": "Monitoring panel",
+    "default_size": [200, 60],
+    "blocks_movement": false,
+    "browser_2d": { "fill": "#0ea5e9", "label": "PANEL" },
+    "godot_asset": null,
+    "kaykit_source": "Furniture/pictureframe_large_A.fbx"
+  },
+  "cabinet": {
+    "category": "Server",
+    "label": "Cabinet",
+    "default_size": [80, 80],
+    "blocks_movement": true,
+    "browser_2d": { "fill": "#3f3f46", "label": "" },
+    "godot_asset": null,
+    "kaykit_source": "Furniture/cabinet_medium.fbx"
+  },
+
+  "meeting_table": {
+    "category": "Meeting",
+    "label": "Meeting table",
+    "default_size": [480, 140],
+    "blocks_movement": true,
+    "browser_2d": { "fill": "#52525b", "label": "TABLE" },
+    "godot_asset": null,
+    "kaykit_source": "Furniture/table_medium_long.fbx"
+  },
+  "presentation_screen": {
+    "category": "Meeting",
+    "label": "Presentation screen",
+    "default_size": [200, 30],
+    "blocks_movement": false,
+    "browser_2d": { "fill": "#1e1b4b", "label": "SCRN" },
+    "godot_asset": null,
+    "kaykit_source": "Furniture/pictureframe_large_B.fbx"
+  },
+  "chair_meeting": {
+    "category": "Meeting",
+    "label": "Chair (meeting)",
+    "default_size": [50, 50],
+    "blocks_movement": false,
+    "browser_2d": { "fill": "#3f3128", "label": "" },
+    "godot_asset": null,
+    "kaykit_source": "Furniture/chair_A.fbx"
+  },
+
+  "kitchen_counter": {
+    "category": "Kitchen",
+    "label": "Kitchen counter",
+    "default_size": [320, 80],
+    "blocks_movement": true,
+    "browser_2d": { "fill": "#9ca3af", "label": "CNTR" },
+    "godot_asset": null,
+    "kaykit_source": "Restaurant/kitchencounter_straight_A.fbx"
+  },
+  "kitchen_corner": {
+    "category": "Kitchen",
+    "label": "Kitchen corner",
+    "default_size": [120, 120],
+    "blocks_movement": true,
+    "browser_2d": { "fill": "#9ca3af", "label": "CNTR" },
+    "godot_asset": null,
+    "kaykit_source": "Restaurant/kitchencounter_innercorner.fbx"
+  },
+  "kitchen_sink": {
+    "category": "Kitchen",
+    "label": "Kitchen sink",
+    "default_size": [120, 80],
+    "blocks_movement": true,
+    "browser_2d": { "fill": "#94a3b8", "label": "SINK" },
+    "godot_asset": null,
+    "kaykit_source": "Restaurant/kitchencounter_sink.fbx"
+  },
+  "coffee_machine": {
+    "category": "Kitchen",
+    "label": "Coffee machine",
+    "default_size": [90, 90],
+    "blocks_movement": false,
+    "browser_2d": { "fill": "#854d0e", "label": "COFFEE" },
+    "godot_asset": null,
+    "kaykit_source": "Restaurant/icecream_machine.fbx"
+  },
+  "fridge": {
+    "category": "Kitchen",
+    "label": "Fridge",
+    "default_size": [100, 130],
+    "blocks_movement": true,
+    "browser_2d": { "fill": "#cbd5e1", "label": "FRIDGE" },
+    "godot_asset": null,
+    "kaykit_source": "Restaurant/fridge_A.fbx"
+  },
+  "chair_stool": {
+    "category": "Kitchen",
+    "label": "Stool",
+    "default_size": [50, 50],
+    "blocks_movement": false,
+    "browser_2d": { "fill": "#3f3128", "label": "" },
+    "godot_asset": null,
+    "kaykit_source": "Furniture/chair_stool.fbx"
+  },
+
+  "plant_cactus": {
+    "category": "Decor",
+    "label": "Plant (cactus)",
+    "default_size": [60, 60],
+    "blocks_movement": false,
+    "browser_2d": { "fill": "#15803d", "label": "" },
+    "godot_asset": null,
+    "kaykit_source": "Furniture/cactus_medium_A.fbx"
+  },
+  "picture_frame": {
+    "category": "Decor",
+    "label": "Picture frame",
+    "default_size": [80, 30],
+    "blocks_movement": false,
+    "browser_2d": { "fill": "#a78bfa", "label": "" },
+    "godot_asset": null,
+    "kaykit_source": "Furniture/pictureframe_medium.fbx"
+  },
+  "rug": {
+    "category": "Decor",
+    "label": "Rug",
+    "default_size": [200, 120],
+    "blocks_movement": false,
+    "browser_2d": { "fill": "#7e22ce", "label": "" },
+    "godot_asset": null,
+    "kaykit_source": "Furniture/rug_rectangle_A.fbx"
+  },
+
+  "crate": {
+    "category": "Legacy",
+    "label": "Crate",
+    "default_size": [70, 70],
+    "blocks_movement": true,
+    "browser_2d": { "fill": "#78350f", "label": "CRATE" },
+    "godot_asset": null,
+    "kaykit_source": "Space Base/cargo_A.fbx"
+  },
+  "old_workstation": {
+    "category": "Legacy",
+    "label": "Old workstation",
+    "default_size": [110, 60],
+    "blocks_movement": true,
+    "browser_2d": { "fill": "#44403c", "label": "OLD" },
+    "godot_asset": null,
+    "kaykit_source": "Furniture/desk_decorated.fbx"
+  }
+}

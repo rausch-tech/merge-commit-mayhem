@@ -169,9 +169,16 @@ map can use either system or mix them during migration.
 
 ### Kind catalogue
 
-The browser placeholder palette + the Godot asset mapping are both keyed
-on `kind`. Here's the current vocabulary (extend both clients in lockstep
-when adding new entries):
+**Source of truth: [`maps/kinds.json`](../maps/kinds.json).** Beim
+Hinzufuegen eines Kinds nur dort ergaenzen — Godot-Client (
+`godot-3d/scripts/map_builder.gd`) liest die Registry zur Laufzeit.
+Browser-Renderer (`static/render.js:MAP_OBJECT_STYLE`) und Editor-Palette
+(`static/editor/editor-kinds.js`) migrieren in einem Folge-Slice; bis
+dahin pflege diese drei Stellen weiterhin in Lockstep mit kinds.json.
+Auch der Server-side Pydantic-Validator (`app/game/game_map.py`) wird
+in einem Backend-Folge-Slice gegen kinds.json hardenen.
+
+Die Tabelle unten ist eine human-readable Mirror der JSON-Registry:
 
 | Kind                  | Default size | Blocks?  | Mockup region              | Browser colour        | KayKit asset (Godot)                        |
 | --------------------- | ------------ | -------- | -------------------------- | --------------------- | ------------------------------------------- |

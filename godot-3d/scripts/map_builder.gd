@@ -22,15 +22,21 @@ const WALL_THICKNESS: float = 0.12
 const FLOOR_THICKNESS: float = 0.05
 const WORLD_SCALE: float = Protocol.WORLD_SCALE
 
-# kind → PackedScene mapping. Kinds, die hier nicht aufgelistet sind, fallen
-# auf einen grauen Fallback-Box mit Kind-Label zurück (siehe _make_map_object).
-# Wenn neue Assets dazukommen: hier registrieren, Eintrag aus `docs/maps.md`
-# Kind-Catalogue als Wahrheits-Source nutzen.
-const KIND_ASSETS: Dictionary = {
-	"desk":       preload("res://assets/furniture/desk.gltf"),
-	"chair_desk": preload("res://assets/furniture/chair_desk_A.gltf"),
-	"monitor":    preload("res://assets/furniture/monitor.gltf"),
-}
+# Kind-Registry — single source of truth fuer alle MapObject-Kinds. Wird
+# beim ersten Build-Aufruf einmal aus res://maps/kinds.json geparsed und
+# anschliessend gecached. Konsumenten: KIND_ASSETS (siehe _get_asset_for_kind),
+# kuenftig auch das Browser-Frontend + der Map-Editor (eigene Slices).
+#
+# Schema: { "<kind>": { "godot_asset": "res://...gltf" | null, "default_size":
+# [w, h], "blocks_movement": bool, "browser_2d": {...}, "kaykit_source": ... } }
+#
+# Wenn ein neues Asset registriert wird: nur in maps/kinds.json eintragen, und
+# die zwei Demo-Kopien godot-3d/maps/kinds.json + (irgendwann) den Sync-Hook
+# aktualisieren. Hier im GDScript ist nichts mehr zu pflegen.
+const KINDS_REGISTRY_PATH: String = "res://maps/kinds.json"
+
+static var _kinds_registry: Dictionary = {}
+static var _kinds_registry_loaded: bool = false
 
 # Fallback-Box-Farbe + Höhe für Kinds ohne Asset. Höhe ist absichtlich klein
 # damit er nicht visuell mit Wänden konkurriert.
@@ -557,13 +563,55 @@ static func _make_map_object(kind: String, obj: Dictionary) -> Node3D:
 	holder.position = Protocol.server_to_world(ox, oy)
 	holder.rotation.y = deg_to_rad(float(rot_deg))
 
-	if KIND_ASSETS.has(kind):
-		var asset := (KIND_ASSETS[kind] as PackedScene).instantiate() as Node3D
-		holder.add_child(asset)
+	var asset := _get_asset_for_kind(kind)
+	if asset != null:
+		holder.add_child(asset.instantiate() as Node3D)
 	else:
 		holder.add_child(_make_fallback_prop(kind, obj))
 
 	return holder
+
+# Looks up the PackedScene for a kind via the kinds.json registry. Returns
+# null if (a) the kind is unknown, (b) the kind has no godot_asset registered,
+# or (c) the registered asset path failed to load. Caller renders a fallback
+# box in those cases.
+static func _get_asset_for_kind(kind: String) -> PackedScene:
+	_load_kinds_registry()
+	if not _kinds_registry.has(kind):
+		return null
+	var spec_raw = _kinds_registry[kind]
+	if typeof(spec_raw) != TYPE_DICTIONARY:
+		return null
+	var spec: Dictionary = spec_raw
+	var asset_path_raw = spec.get("godot_asset", null)
+	if asset_path_raw == null or asset_path_raw is bool:
+		return null
+	var asset_path: String = str(asset_path_raw)
+	if asset_path == "":
+		return null
+	var res := load(asset_path)
+	if res is PackedScene:
+		return res
+	push_warning("MapBuilder: kind '%s' godot_asset='%s' did not resolve to a PackedScene." % [kind, asset_path])
+	return null
+
+static func _load_kinds_registry() -> void:
+	if _kinds_registry_loaded:
+		return
+	_kinds_registry_loaded = true
+	if not FileAccess.file_exists(KINDS_REGISTRY_PATH):
+		push_warning("MapBuilder: kinds registry not found at %s — every kind falls back to gray box." % KINDS_REGISTRY_PATH)
+		return
+	var file := FileAccess.open(KINDS_REGISTRY_PATH, FileAccess.READ)
+	var parsed = JSON.parse_string(file.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		push_warning("MapBuilder: kinds registry parse failed at %s." % KINDS_REGISTRY_PATH)
+		return
+	# _meta-Block ueberspringen, nur echte Kind-Entries cachen.
+	for key in parsed.keys():
+		if str(key).begins_with("_"):
+			continue
+		_kinds_registry[str(key)] = parsed[key]
 
 # Fallback-Visual für Kinds ohne registriertes Asset: graue Box mit Kind-Label.
 # Bewusst hässlich, damit man auf einen Blick sieht, welche Assets noch
