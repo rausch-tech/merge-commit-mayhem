@@ -14,6 +14,7 @@ import {
   serializeMap,
   validateMap,
 } from "/static/editor/editor-state.js";
+import { KIND_BY_NAME, KIND_CATALOGUE, KIND_CATEGORIES } from "/static/editor/editor-kinds.js";
 import { snap, TOOLS } from "/static/editor/editor-tools.js";
 
 const state = {
@@ -21,6 +22,7 @@ const state = {
   tool: "select",
   toolInstance: null,
   selection: null, // { kind, index } or null
+  pendingKind: null, // active kind from the library palette (used by ObjectTool)
   dirty: false,
   shiftHeld: false,
   view: { scale: 1, offsetX: 0, offsetY: 0 },
@@ -41,6 +43,10 @@ const dom = {
   cursorCoords: document.getElementById("cursor-coords"),
   propsEmpty: document.getElementById("props-empty"),
   propsContent: document.getElementById("props-content"),
+  kindLibrary: document.getElementById("kind-library"),
+  kindPending: document.getElementById("kind-library-pending"),
+  kindPendingName: document.getElementById("kind-library-pending-name"),
+  kindClear: document.getElementById("kind-library-clear"),
 };
 
 const ctx2d = dom.canvas.getContext("2d");
@@ -50,6 +56,9 @@ const ctx2d = dom.canvas.getContext("2d");
 const toolContext = {
   get map() {
     return state.map;
+  },
+  get pendingKind() {
+    return state.pendingKind;
   },
   setSelection(sel) {
     state.selection = sel;
@@ -64,6 +73,9 @@ const toolContext = {
   refreshWarRoomChoices() {
     refreshWarRoomChoices();
   },
+  refreshPropsSidebar() {
+    renderPropsSidebar();
+  },
   requestRender,
 };
 
@@ -74,7 +86,20 @@ function setTool(name) {
   const ToolClass = TOOLS[name] || TOOLS.select;
   state.toolInstance = new ToolClass();
   // Switching tools clears any in-progress drag, but not the current selection.
+  if (name !== "object") {
+    // Pending kind is only meaningful for the Object tool — clear it so the
+    // library highlight goes away when the user picks a different tool.
+    state.pendingKind = null;
+    renderKindPending();
+  }
+  updateCanvasCursor();
   requestRender();
+}
+
+function updateCanvasCursor() {
+  if (state.tool === "select") dom.canvas.style.cursor = "default";
+  else if (state.tool === "object" && !state.pendingKind) dom.canvas.style.cursor = "not-allowed";
+  else dom.canvas.style.cursor = "crosshair";
 }
 
 document.querySelectorAll('input[name="tool"]').forEach((input) => {
@@ -998,8 +1023,95 @@ window.addEventListener("beforeunload", (e) => {
   }
 });
 
+// --- Kind library ----------------------------------------------------------
+//
+// Build a sidebar palette of all known MapObject kinds, grouped by category.
+// Clicking a tile activates the Object tool with that kind pre-filled — no
+// more typing kind names into a prompt. The tile palette uses the same fill
+// color as the in-game placeholder so the editor visually matches the
+// browser render.
+
+function renderKindLibrary() {
+  const root = dom.kindLibrary;
+  if (!root) return;
+  root.innerHTML = "";
+  for (const category of KIND_CATEGORIES) {
+    const section = document.createElement("div");
+    section.className = "kind-category";
+    const heading = document.createElement("h4");
+    heading.textContent = category;
+    section.appendChild(heading);
+    const grid = document.createElement("div");
+    grid.className = "kind-grid";
+    for (const entry of KIND_CATALOGUE) {
+      if (entry.category !== category) continue;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "kind-tile";
+      btn.dataset.kind = entry.kind;
+      btn.title = `${entry.kind} — ${entry.width}×${entry.height}${
+        entry.blocksMovement ? " (blockt)" : ""
+      }`;
+      const swatch = document.createElement("div");
+      swatch.className = "kind-tile-swatch";
+      swatch.style.background = entry.fill;
+      btn.appendChild(swatch);
+      const name = document.createElement("div");
+      name.className = "kind-tile-name";
+      name.textContent = entry.kind;
+      btn.appendChild(name);
+      const meta = document.createElement("div");
+      meta.className = "kind-tile-meta";
+      meta.textContent = `${entry.width}×${entry.height}${entry.blocksMovement ? "" : " · open"}`;
+      btn.appendChild(meta);
+      btn.addEventListener("click", () => activateKind(entry.kind));
+      grid.appendChild(btn);
+    }
+    section.appendChild(grid);
+    root.appendChild(section);
+  }
+}
+
+function activateKind(kind) {
+  state.pendingKind = kind;
+  if (state.tool !== "object") {
+    const radio = document.querySelector('input[name="tool"][value="object"]');
+    if (radio) radio.checked = true;
+    setTool("object");
+  } else {
+    updateCanvasCursor();
+  }
+  renderKindPending();
+}
+
+function clearPendingKind() {
+  state.pendingKind = null;
+  renderKindPending();
+  updateCanvasCursor();
+}
+
+function renderKindPending() {
+  if (!dom.kindPending) return;
+  if (state.pendingKind && KIND_BY_NAME.has(state.pendingKind)) {
+    dom.kindPending.classList.remove("hidden");
+    dom.kindPendingName.textContent = state.pendingKind;
+  } else {
+    dom.kindPending.classList.add("hidden");
+    dom.kindPendingName.textContent = "";
+  }
+  // Highlight the active tile.
+  if (dom.kindLibrary) {
+    for (const tile of dom.kindLibrary.querySelectorAll(".kind-tile")) {
+      tile.classList.toggle("selected", tile.dataset.kind === state.pendingKind);
+    }
+  }
+}
+
+dom.kindClear?.addEventListener("click", clearPendingKind);
+
 // --- Boot ------------------------------------------------------------------
 
+renderKindLibrary();
 setTool("select");
 syncTopbarFields();
 renderPropsSidebar();

@@ -238,3 +238,101 @@ h3 {
   padding-top: 8px;
   border-top: 1px solid #3a3f47;
 }
+
+/* Kind library --------------------------------------------------------- */
+
+#kind-library {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kind-pending {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  background: #1c2a3a;
+  border: 1px solid #3a4f6a;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.kind-pending strong {
+  flex: 1;
+  font-family: monospace;
+}
+
+.kind-pending button {
+  background: transparent;
+  color: #c0c4c8;
+  border: 1px solid #3a4f6a;
+  border-radius: 3px;
+  padding: 0 6px;
+  cursor: pointer;
+  line-height: 1.6;
+}
+
+.kind-pending button:hover {
+  background: #3a4f6a;
+}
+
+.kind-category h4 {
+  margin: 0 0 4px 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #a0a4a8;
+  letter-spacing: 0.05em;
+}
+
+.kind-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+
+.kind-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  background: #1c1f24;
+  border: 1px solid #3a3f47;
+  border-radius: 3px;
+  padding: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  color: #d0d4d8;
+  text-align: left;
+  font-family: inherit;
+}
+
+.kind-tile:hover {
+  background: #2a3140;
+  border-color: #5a6478;
+}
+
+.kind-tile.selected {
+  background: #1c2a3a;
+  border-color: #6c93c0;
+  color: #ffffff;
+}
+
+.kind-tile-swatch {
+  height: 18px;
+  border-radius: 2px;
+  margin-bottom: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+}
+
+.kind-tile-name {
+  font-family: monospace;
+  font-size: 10px;
+  color: #c0c4c8;
+  word-break: break-all;
+}
+
+.kind-tile-meta {
+  font-size: 10px;
+  color: #7a808a;
+}
