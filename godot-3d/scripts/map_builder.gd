@@ -25,15 +25,15 @@ const MONITOR_SCENE: PackedScene = preload("res://assets/furniture/monitor.gltf"
 
 # Visual tone per room id — falls back to room.color from JSON.
 const ROOM_TINT_OVERRIDE: Dictionary = {
-	"open_space":      Color(0.32, 0.40, 0.55),
-	"meeting_room":    Color(0.45, 0.32, 0.55),
-	"kitchen":         Color(0.55, 0.42, 0.28),
-	"server_room":     Color(0.22, 0.34, 0.50),
-	"war_room":        Color(0.22, 0.45, 0.55),
-	"legacy_basement": Color(0.32, 0.50, 0.32),
+	"open_space":      Color(0.42, 0.50, 0.62),
+	"meeting_room":    Color(0.50, 0.40, 0.60),
+	"kitchen":         Color(0.62, 0.50, 0.34),
+	"server_room":     Color(0.30, 0.42, 0.58),
+	"war_room":        Color(0.30, 0.52, 0.60),
+	"legacy_basement": Color(0.38, 0.55, 0.40),
 }
 
-const COLOR_WALL: Color = Color(0.78, 0.80, 0.86)
+const COLOR_WALL: Color = Color(0.92, 0.93, 0.96)
 const COLOR_FLOOR_FALLBACK: Color = Color(0.30, 0.34, 0.40)
 const COLOR_SPAWN_MARKER: Color = Color(0.30, 0.95, 0.50, 0.6)
 const COLOR_TASK_MARKER: Color = Color(0.95, 0.85, 0.20, 0.8)
@@ -116,41 +116,30 @@ static func _build_environment(map_w: float, map_h: float) -> Node3D:
 	env_node.name = "WorldEnvironment"
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.04, 0.07, 0.10)
+	env.background_color = Color(0.06, 0.09, 0.14)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.55, 0.62, 0.75)
-	env.ambient_light_energy = 0.35
-	env.fog_enabled = true
-	env.fog_density = 0.005
-	env.fog_light_color = Color(0.10, 0.14, 0.20)
+	env.ambient_light_color = Color(0.65, 0.72, 0.85)
+	env.ambient_light_energy = 0.45
 	env_node.environment = env
 	holder.add_child(env_node)
 
 	var sun := DirectionalLight3D.new()
 	sun.name = "Sun"
-	sun.transform = Transform3D(Basis().rotated(Vector3(1, 0, 0), -0.9).rotated(Vector3(0, 1, 0), 0.5), Vector3.ZERO)
-	sun.light_energy = 1.6
-	sun.light_color = Color(1.0, 0.96, 0.88)
+	sun.transform = Transform3D(Basis().rotated(Vector3(1, 0, 0), -1.05).rotated(Vector3(0, 1, 0), 0.6), Vector3.ZERO)
+	sun.light_energy = 1.0
+	sun.light_color = Color(1.0, 0.97, 0.92)
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 80.0
+	sun.directional_shadow_max_distance = 100.0
+	sun.shadow_bias = 0.05
 	holder.add_child(sun)
 
 	var fill := DirectionalLight3D.new()
 	fill.name = "Fill"
-	fill.transform = Transform3D(Basis().rotated(Vector3(1, 0, 0), -0.4).rotated(Vector3(0, 1, 0), -1.8), Vector3.ZERO)
-	fill.light_energy = 0.45
+	fill.transform = Transform3D(Basis().rotated(Vector3(1, 0, 0), -0.5).rotated(Vector3(0, 1, 0), -2.0), Vector3.ZERO)
+	fill.light_energy = 0.35
 	fill.light_color = Color(0.7, 0.85, 1.0)
 	fill.shadow_enabled = false
 	holder.add_child(fill)
-
-	# Subtle accent: large area-spot above the map center for that "Among Us"-volume look.
-	var accent := OmniLight3D.new()
-	accent.name = "Accent"
-	accent.position = Vector3(map_w * 0.5 * WORLD_SCALE, 18.0, map_h * 0.5 * WORLD_SCALE)
-	accent.light_color = Color(0.8, 0.95, 1.0)
-	accent.light_energy = 0.25
-	accent.omni_range = 60.0
-	holder.add_child(accent)
 
 	return holder
 

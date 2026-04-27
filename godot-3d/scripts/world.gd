@@ -12,6 +12,13 @@ const MAIN_SCENE: String = "res://scenes/main.tscn"
 # Camera placement (Godot units, relative to player).
 const CAMERA_OFFSET: Vector3 = Vector3(0, 28, 22)
 const CAMERA_LERP_SPEED: float = 6.0
+# Pitch from horizontal: atan2(offset.y, offset.z) = atan2(28, 22) ≈ 51.84°.
+const CAMERA_PITCH_RAD: float = -0.9046  # = -deg_to_rad(51.84)
+
+# Demo mode: when true, camera is parked above the map center, orthographic,
+# showing all rooms at once (screenshots / team presentations). When false,
+# camera follows the local player. Toggleable via set_camera_mode().
+@export var aerial_demo_camera: bool = false
 
 # State (set by main.gd before scene is added to the tree)
 var ws_client: WSClient
@@ -38,18 +45,16 @@ func _ready() -> void:
 		_return_to_main()
 		return
 
+	print("[world] _ready map=", map_data.get("name", "?"), " rooms=", map_data.get("rooms", []).size())
 	_world_root = MapBuilder.build(map_data)
+	print("[world] map built, child count=", _world_root.get_child_count())
 	add_child(_world_root)
 
 	_camera_rig = Node3D.new()
 	_camera_rig.name = "CameraRig"
 	add_child(_camera_rig)
 	_camera = Camera3D.new()
-	_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-	_camera.fov = 38
-	_camera.position = CAMERA_OFFSET
-	_camera.look_at(Vector3.ZERO, Vector3.UP)
-	_camera.current = true
+	_setup_camera()
 	_camera_rig.add_child(_camera)
 
 	_input_sender = InputSender.new()
@@ -81,8 +86,15 @@ func _ready() -> void:
 	# Apply initial game state if provided
 	if not initial_state.is_empty():
 		_apply_state(initial_state)
+		print("[world] applied initial state, players=", _players_by_id.size())
+		for pid in _players_by_id:
+			var ch: Node3D = _players_by_id[pid]
+			print("[world]   player ", pid, " at ", ch.global_position)
 
 func _process(delta: float) -> void:
+	# In aerial demo-camera mode the rig stays parked at map center.
+	if aerial_demo_camera:
+		return
 	# Camera follow: aim CameraRig at the local player's position.
 	var anchor: Vector3 = _local_player_position()
 	var current := _camera_rig.position
@@ -161,9 +173,11 @@ func _apply_state(state: Dictionary) -> void:
 		_hud.call("apply_game_state", state)
 
 	# On first state apply: snap camera onto local player so we don't drift in.
+	# Aerial-demo mode keeps the rig parked at map center, so skip the snap.
 	if not _world_initialized:
-		var anchor := _local_player_position()
-		_camera_rig.position = anchor
+		if not aerial_demo_camera:
+			var anchor := _local_player_position()
+			_camera_rig.position = anchor
 		_world_initialized = true
 
 func _local_player_position() -> Vector3:
@@ -171,6 +185,33 @@ func _local_player_position() -> Vector3:
 		var ch: Node3D = _players_by_id[player_id]
 		return ch.global_position
 	return Vector3.ZERO
+
+func _setup_camera() -> void:
+	if aerial_demo_camera:
+		# Aerial demo view — orthographic top-down at map center.
+		var size_dict: Dictionary = map_data.get("size", {})
+		var map_w: float = float(size_dict.get("width", 4800)) * Protocol.WORLD_SCALE
+		var map_h: float = float(size_dict.get("height", 3200)) * Protocol.WORLD_SCALE
+		_camera_rig.position = Vector3(map_w * 0.5, 0.0, map_h * 0.5)
+		_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+		# size is the vertical extent. No padding — frame the map exactly so we
+		# don't see the void beyond the perimeter walls.
+		_camera.size = map_h
+		_camera.position = Vector3(0, 50, 0)
+		_camera.rotation = Vector3(-PI * 0.5, 0.0, 0.0)  # straight down
+		_camera.near = 0.1
+		_camera.far = 200.0
+	else:
+		_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+		_camera.fov = 42
+		_camera.position = CAMERA_OFFSET
+		_camera.rotation = Vector3(CAMERA_PITCH_RAD, 0.0, 0.0)
+	_camera.current = true
+
+func set_camera_mode(aerial: bool) -> void:
+	aerial_demo_camera = aerial
+	if _camera != null:
+		_setup_camera()
 
 func _toggle_pause_menu() -> void:
 	if _pause_menu == null:

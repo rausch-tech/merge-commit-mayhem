@@ -17,7 +17,7 @@ const ANIM_SCENE: PackedScene = preload("res://assets/character/Rig_Medium_Movem
 const POSITION_LERP_SPEED: float = 14.0
 const ROTATION_LERP_SPEED: float = 10.0
 const MOVE_DEADZONE: float = 0.04
-const NAMEPLATE_HEIGHT: float = 2.4
+const NAMEPLATE_HEIGHT: float = 3.4
 
 const COLOR_SELF_RING: Color = Color(0.30, 0.95, 0.50)
 
@@ -53,7 +53,10 @@ func setup(player_id: String, player_name: String, color_hex: String, is_alive: 
 func _ready() -> void:
 	_dummy = DUMMY_SCENE.instantiate() as Node3D
 	add_child(_dummy)
-	_dummy.scale = Vector3(0.55, 0.55, 0.55)  # KayKit characters scale nicely at ~0.55
+	# KayKit Dummy is ~1.7 units tall raw; scale up so we read clearly when the
+	# camera is parked aerial. WORLD_SCALE=0.01 means 1 server-pixel = 1cm in
+	# our world, and a 0.6m-tall character would barely be a pixel from above.
+	_dummy.scale = Vector3(1.4, 1.4, 1.4)
 
 	_anim_player = _dummy.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	if _anim_player != null:
