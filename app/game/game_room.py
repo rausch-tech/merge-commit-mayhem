@@ -14,7 +14,6 @@ from app.game.game_map import (
 from app.game.models import InputState, Phase, Player
 from app.game.roles import (
     RoleInfo,
-    movement_speed_multiplier,
     role_by_id,
 )
 from app.game.roles import assign as assign_roles
@@ -33,19 +32,15 @@ from app.game.runtime import (
     TaskRuntime,
 )
 from app.game.sabotages import (
-    COFFEE_SLOW_SPEED,
-    NORMAL_SPEED,
     SABOTAGE_DEFINITIONS,
     SabotageDefinition,
 )
 from app.game.tasks import (
     TASK_DEFINITIONS,
-    VENT_INTERACTION_RADIUS,
     TaskDefinition,
 )
 from app.game.voting import SKIP_TARGET, all_chaos_eliminated
 from app.game.voting import tally as _tally_votes
-from app.game.walls import resolve_wall_collision
 from app.protocol import MeetingAlive, MeetingBody, MeetingContext, MeetingRecentEvent
 
 MAX_PLAYERS = 12
@@ -171,12 +166,14 @@ class GameRoom:
         # for cross-domain reads (e.g. mini-game completion triggers a task
         # reward).
         from app.game.controllers.mini_game import MiniGameController
+        from app.game.controllers.movement import MovementController
         from app.game.controllers.sabotages import SabotagesController
         from app.game.controllers.tasks import TasksController
 
         self._mini_games = MiniGameController(self)
         self._sabotages_ctl = SabotagesController(self)
         self._tasks_ctl = TasksController(self)
+        self._movement_ctl = MovementController(self)
 
     def _emit_event(self, severity: str, message: str) -> None:
         """Append an event to the rolling buffer. Internal use only."""
@@ -491,82 +488,19 @@ class GameRoom:
             return
         if self.phase is not Phase.PLAYING:
             return
-        for player in self.players.values():
-            # Tier 3.1: a player inside a mini-game is locked in place — their
-            # WASD inputs are ignored until the session ends.
-            if player.id in self.active_mini_games:
-                continue
-            dx = int(player.input_state.right) - int(player.input_state.left)
-            dy = int(player.input_state.down) - int(player.input_state.up)
-            if dx or dy:
-                # Ghosts ignore the slow-down sabotages and pass through walls.
-                speed = self._current_speed_for(player.id) if player.is_alive else NORMAL_SPEED
-                length = (dx * dx + dy * dy) ** 0.5
-                step_x = (dx / length) * speed * dt
-                step_y = (dy / length) * speed * dt
-
-                if player.is_alive:
-                    # Move along x first, then resolve walls.
-                    new_x = player.x + step_x
-                    if step_x != 0:
-                        new_x, _ = resolve_wall_collision(
-                            new_x,
-                            player.y,
-                            step_x,
-                            0.0,
-                            self._walls,
-                        )
-                    # Then y.
-                    new_y = player.y + step_y
-                    if step_y != 0:
-                        _, new_y = resolve_wall_collision(
-                            new_x,
-                            new_y,
-                            0.0,
-                            step_y,
-                            self._walls,
-                        )
-                else:
-                    # Ghosts: no wall collision resolution.
-                    new_x = player.x + step_x
-                    new_y = player.y + step_y
-                player.x = new_x
-                player.y = new_y
-
-                # Map-edge clamp (perimeter) — applies to ghosts too.
-                if player.x < 0:
-                    player.x = 0.0
-                elif player.x > self.map.size.width:
-                    player.x = float(self.map.size.width)
-                if player.y < 0:
-                    player.y = 0.0
-                elif player.y > self.map.size.height:
-                    player.y = float(self.map.size.height)
-        self._tick_tasks(dt)
-        self._tick_sabotages(dt)
-        self._tick_takedown_cooldowns(dt)
-        self._tick_coffee_energy(dt)
+        self._movement_ctl.tick_movement(dt)
+        self._tasks_ctl.tick(dt)
+        self._sabotages_ctl.tick(dt)
+        self._movement_ctl.tick_takedown_cooldowns(dt)
+        self._movement_ctl.tick_coffee_energy(dt)
         self.remaining_seconds = max(0.0, self.remaining_seconds - dt)
         self._sweep_disconnected()
         self._check_win_conditions()
 
-    # --- coffee energy (Tier 3.5) -----------------------------------------
+    # --- coffee energy (Tier 3.5) — delegated to MovementController -------
 
     def _tick_coffee_energy(self, dt: float) -> None:
-        """Each alive player's personal coffee_energy decays over time. Decay
-        rate scales with the role's coffee_decay_modifier (DevOps drains fast,
-        Caffeine Collector / QA Lead sip slowly). Ghosts don't decay — they
-        no longer interact with the team economy."""
-        if dt <= 0:
-            return
-        base_decay = 1.4  # points per second at modifier=1.0
-        for player in self.players.values():
-            if not player.is_alive:
-                continue
-            rd = role_by_id(player.role)
-            decay = base_decay * rd.coffee_decay_modifier * dt
-            new_energy = max(0.0, player.coffee_energy - decay)
-            player.coffee_energy = new_energy
+        self._movement_ctl.tick_coffee_energy(dt)
 
     # --- win conditions ----------------------------------------------------
 
@@ -624,17 +558,7 @@ class GameRoom:
     # --- speed helpers -----------------------------------------------------
 
     def _current_speed_for(self, player_id: str) -> float:
-        """Effective movement speed in px/s for this player this tick.
-
-        Floor is COFFEE_SLOW_SPEED (set by global coffee_outage / mandatory
-        meeting), otherwise NORMAL_SPEED scaled by the player's role + own
-        coffee_energy (Tier 3.5)."""
-        if self.coffee_level == 0 or self.meeting_active_for > 0:
-            return COFFEE_SLOW_SPEED
-        player = self.players.get(player_id)
-        if player is None:
-            return NORMAL_SPEED
-        return NORMAL_SPEED * movement_speed_multiplier(player.role, player.coffee_energy)
+        return self._movement_ctl.current_speed_for(player_id)
 
     # --- personal-task allocation (Tier 3.5) -------------------------------
 
@@ -697,48 +621,7 @@ class GameRoom:
         self._sabotages_ctl.trigger(player_id, sabotage_id)
 
     def use_vent(self, player_id: str, target_vent_id: str) -> None:
-        """Tier 2.3: chaos-only teleport through the vent network.
-
-        The player must currently be next to a vent ('source'); target_vent_id
-        must be in that source vent's connected_to list. Teleport snaps the
-        player to the target's coordinates. Wall collision is bypassed by
-        construction (the move is a discrete jump, not a swept motion).
-        """
-        if self.phase is not Phase.PLAYING:
-            raise GameRoomError(
-                code="WRONG_PHASE", message="Vents only work during a running round."
-            )
-        player = self.players.get(player_id)
-        if player is None:
-            raise GameRoomError(code="UNKNOWN_PLAYER", message="Player not in room.")
-        if not player.is_alive:
-            raise GameRoomError(code="PLAYER_ELIMINATED", message="Eliminated players cannot vent.")
-        if player.team != "chaos_agents":
-            raise GameRoomError(code="NOT_CHAOS_AGENT", message="Only chaos agents can use vents.")
-        # Find source vent: closest vent within reach.
-        source = None
-        best_dist_sq = VENT_INTERACTION_RADIUS * VENT_INTERACTION_RADIUS
-        for v in self.map.vents:
-            dx = player.x - v.x
-            dy = player.y - v.y
-            d2 = dx * dx + dy * dy
-            if d2 <= best_dist_sq:
-                source = v
-                best_dist_sq = d2
-        if source is None:
-            raise GameRoomError(code="NO_VENT_NEARBY", message="No vent in reach.")
-        if target_vent_id not in source.connected_to:
-            raise GameRoomError(
-                code="VENT_NOT_CONNECTED",
-                message=f"Vent {target_vent_id!r} is not reachable from {source.id!r}.",
-            )
-        target = next((v for v in self.map.vents if v.id == target_vent_id), None)
-        if target is None:
-            raise GameRoomError(
-                code="UNKNOWN_VENT", message=f"Vent {target_vent_id!r} does not exist."
-            )
-        player.x = float(target.x)
-        player.y = float(target.y)
+        self._movement_ctl.use_vent(player_id, target_vent_id)
 
     def repair_sabotage(self, player_id: str, sabotage_id: str) -> None:
         self._sabotages_ctl.repair(player_id, sabotage_id)
@@ -749,9 +632,7 @@ class GameRoom:
     # --- take-down + body-report ------------------------------------------
 
     def _tick_takedown_cooldowns(self, dt: float) -> None:
-        for pid, cd in list(self.takedown_cooldowns.items()):
-            if cd > 0:
-                self.takedown_cooldowns[pid] = max(0.0, cd - dt)
+        self._movement_ctl.tick_takedown_cooldowns(dt)
 
     def apply_takedown(self, killer_id: str, target_id: str) -> Body:
         """
