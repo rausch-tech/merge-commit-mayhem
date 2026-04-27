@@ -557,6 +557,15 @@ class GameRoom:
             self.final_summary = self._build_final_summary()
         except Exception:  # noqa: BLE001 — endscreen flavor must never crash a round
             self.final_summary = None
+        # Tier 3.7.6: per-round metrics line. No-op unless MCM_METRICS_DIR is
+        # set in the environment (production deploy ships with it; tests
+        # leave it unset). Errors are swallowed — never crash a round end.
+        try:
+            from app.game.metrics_export import export_round
+
+            export_round(self)
+        except Exception:  # noqa: BLE001
+            pass
 
     # --- speed helpers -----------------------------------------------------
 

@@ -183,15 +183,15 @@ Naming-Prinzip: nerdig, dev-thematisch, „kill" wird vermieden zugunsten von ha
 
 **Aufwand:** ~1.5 Wochen.
 
-| #     | Was                                                                                                                                                                                                                        | Status     |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| 3.7.1 | **Endscreen-Story + Per-Player-Stats** — `final_summary` mit Per-Player (Tasks, Sabotagen, Coffee-final, Ability-used), Awards (Pipeline Whisperer, Vibe of the Round, Held der Kaffeemaschine, Most Suspicious Innocent). | ✅ done    |
-| 3.7.2 | **AI-Postmortem-Generator** — `generate_postmortem(summary)` produziert mehrzeiligen LLM-styled Text. Im Endscreen unter `<pre>` gerendert.                                                                                | ✅ done    |
-| 3.7.3 | **`review_pr` Mini-Game** — Diff-Review: 5–8 Code-Zeilen, 2 problematische markieren (hardcoded API key, `catch(Exception){}`, `console.log`, …). Pattern: Spot-the-Bug.                                                   | ⏳ open    |
-| 3.7.4 | **`calm_legacy_service` Mini-Game** — Stabilitäts-Balancing: CPU/Memory/Queue in grünem Bereich halten, jede Korrektur drückt einen anderen Wert leicht weg.                                                               | ⏳ open    |
-| 3.7.5 | **`write_release_notes` Mini-Game** — Drag/Click-Sort: Commits in Feature/Bugfix/Breaking-Change/Should-Not-Be-Mentioned-Publicly einordnen.                                                                               | ⏳ open    |
-| 3.7.6 | **Metrik-Export (JSONL)** — pro Runde: Winrate, Rundendauer, Meetings, Force-Reboots, Tasks/Rolle, Sabotagen, Repairs, Coffee-Avg. Datei pro Runde unter `data/playtest/`.                                                 | ⏳ open    |
-| 3.7.7 | **Heatmaps (optional, später)** — Movement, Kills, Body-Discovery, Sabotage-Trigger pro Map. Hilft Map-Balancing.                                                                                                          | 🔮 backlog |
+| #     | Was                                                                                                                                                                                                                         | Status     |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| 3.7.1 | **Endscreen-Story + Per-Player-Stats** — `final_summary` mit Per-Player (Tasks, Sabotagen, Coffee-final, Ability-used), Awards (Pipeline Whisperer, Vibe of the Round, Held der Kaffeemaschine, Most Suspicious Innocent).  | ✅ done    |
+| 3.7.2 | **AI-Postmortem-Generator** — `generate_postmortem(summary)` produziert mehrzeiligen LLM-styled Text. Im Endscreen unter `<pre>` gerendert.                                                                                 | ✅ done    |
+| 3.7.3 | **`review_pr` Mini-Game** — Diff-Review: 6 Code-Zeilen, 2 problematische markieren (hardcoded API key, leerer except, debug log, SQLi, …). Pattern: Multi-Select-by-Criterion (mirror of log_filter).                       | ✅ done    |
+| 3.7.4 | **`calm_legacy_service` Mini-Game** — Stabilitäts-Balancing: CPU/Memory/Queue in grünem Band [40,60] halten, jede Korrektur drückt die nächste Metrik leicht weg (Rotation cpu→mem→queue→cpu).                              | ✅ done    |
+| 3.7.5 | **`write_release_notes` Mini-Game** — Click-to-Cycle-Sort: 6 Commits in Feature/Bugfix/Breaking-Change/Don't-mention-publicly einordnen. Drag-and-Drop verworfen (Mobile-tricky).                                           | ✅ done    |
+| 3.7.6 | **Metrik-Export (JSONL)** — pro Runde: Winner, Reason, Rundendauer, Meetings, Force-Reboots, Tasks/Rolle, Sabotagen, Repairs, Coffee-Avg. Eine `<YYYY-MM-DD>.jsonl` pro Tag unter `MCM_METRICS_DIR` (Env-Var, Tests no-op). | ✅ done    |
+| 3.7.7 | **Heatmaps (optional, später)** — Movement, Kills, Body-Discovery, Sabotage-Trigger pro Map. Hilft Map-Balancing.                                                                                                           | 🔮 backlog |
 
 **Done-Kriterium:** Endscreen erzählt die Runde, alle 8 Tasks haben Mini-Games, Server logged Balance-Metriken.
 
