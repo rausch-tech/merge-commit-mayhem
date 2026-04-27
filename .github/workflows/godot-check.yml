@@ -1,0 +1,46 @@
+name: godot-check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "godot-3d/**"
+      - "scripts/godot-check.sh"
+      - ".github/workflows/godot-check.yml"
+  pull_request:
+    paths:
+      - "godot-3d/**"
+      - "scripts/godot-check.sh"
+      - ".github/workflows/godot-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  godot-check:
+    name: godot --check-only
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Godot binary
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot-bin
+          key: godot-4.6-stable-linux-x86_64
+      - name: Install Godot 4.6 (cache miss)
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot-bin && cd ~/godot-bin
+          curl -fL -o godot.zip "https://github.com/godotengine/godot/releases/download/4.6-stable/Godot_v4.6-stable_linux.x86_64.zip"
+          unzip -q godot.zip && rm godot.zip
+          chmod +x Godot_v4.6-stable_linux.x86_64
+      - name: Add godot to PATH
+        run: |
+          mkdir -p ~/.local/bin
+          ln -sf ~/godot-bin/Godot_v4.6-stable_linux.x86_64 ~/.local/bin/godot
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Show Godot version
+        run: godot --version
+      - name: Parse-check GDScripts
+        run: ./scripts/godot-check.sh -v
