@@ -400,6 +400,12 @@ DEFAULT_MAP_ID: Final[str] = "default"
 _MAPS_DIR: Final[Path] = Path(__file__).parent.parent.parent / "maps"
 _log = logging.getLogger("mcm.maps")
 
+# Files in the maps/ directory that aren't game maps. Currently just the
+# kinds-registry (Tier 3.8.7) — the discovery loop skips these instead
+# of trying to validate them as GameMap (and noisily logging the failure
+# at every save_map / reload_map_registry call).
+_NON_MAP_FILES: Final[frozenset[str]] = frozenset({"kinds.json"})
+
 # Lazy-populated cache of {stem: GameMap}. Tests can call ``reload_map_registry``
 # to force a re-scan; production code typically reads via ``get_map_registry``.
 _MAP_REGISTRY_CACHE: dict[str, GameMap] | None = None
@@ -421,6 +427,8 @@ def discover_maps(maps_dir: Path | None = None) -> dict[str, GameMap]:
     if not maps_dir.exists():
         return out
     for path in sorted(maps_dir.glob("*.json")):
+        if path.name in _NON_MAP_FILES:
+            continue
         try:
             out[path.stem] = load_map(path)
         except Exception:
