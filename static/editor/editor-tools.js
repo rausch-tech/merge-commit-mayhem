@@ -5,7 +5,10 @@
 // trigger a re-render. Coordinates passed in are already mapped from screen
 // space to map space (and snapped, unless Shift is held).
 
+import { KIND_BY_NAME } from "/static/editor/editor-kinds.js";
+
 const SNAP = 50;
+const DRAG_THRESHOLD_PX = 4; // movement below this is treated as a click, not a drag
 
 export function snap(value, enabled) {
   if (!enabled) return Math.round(value);
@@ -47,15 +50,90 @@ export function hitTest(map, mx, my) {
   return null;
 }
 
-// --- Select tool ------------------------------------------------------------
+// --- Select tool: click to select, drag to move ----------------------------
+//
+// Drag works for rooms, spawns, task anchors, map objects. The handle records
+// the click point relative to the entity's reference point (top-left for
+// rooms, center for everything else) so the drag motion stays consistent.
+// Doors are not draggable here — Slice-4 owns the door UX.
 
 export class SelectTool {
+  constructor() {
+    this.drag = null; // { kind, index, offsetX, offsetY, downX, downY, moved }
+  }
   onDown(ctx, mx, my) {
     const hit = hitTest(ctx.map, mx, my);
+    if (!hit) {
+      ctx.setSelection(null);
+      this.drag = null;
+      return;
+    }
     ctx.setSelection(hit);
+    this.drag = {
+      kind: hit.kind,
+      index: hit.index,
+      offsetX: 0,
+      offsetY: 0,
+      downX: mx,
+      downY: my,
+      moved: false,
+    };
+    if (hit.kind === "room") {
+      const r = ctx.map.rooms[hit.index];
+      this.drag.offsetX = mx - r.x;
+      this.drag.offsetY = my - r.y;
+    } else if (hit.kind === "spawn") {
+      const s = ctx.map.spawnPoints[hit.index];
+      this.drag.offsetX = mx - s.x;
+      this.drag.offsetY = my - s.y;
+    } else if (hit.kind === "task") {
+      const t = ctx.map.taskAnchors[hit.index];
+      this.drag.offsetX = mx - t.x;
+      this.drag.offsetY = my - t.y;
+    } else if (hit.kind === "object") {
+      const o = ctx.map.mapObjects[hit.index];
+      this.drag.offsetX = mx - o.x;
+      this.drag.offsetY = my - o.y;
+    }
   }
-  onMove() {}
-  onUp() {}
+  onMove(ctx, mx, my) {
+    if (!this.drag) return;
+    if (
+      !this.drag.moved &&
+      Math.hypot(mx - this.drag.downX, my - this.drag.downY) < DRAG_THRESHOLD_PX
+    ) {
+      return;
+    }
+    this.drag.moved = true;
+    const nx = mx - this.drag.offsetX;
+    const ny = my - this.drag.offsetY;
+    if (this.drag.kind === "room") {
+      const r = ctx.map.rooms[this.drag.index];
+      if (!r) return;
+      r.x = nx;
+      r.y = ny;
+    } else if (this.drag.kind === "spawn") {
+      const s = ctx.map.spawnPoints[this.drag.index];
+      if (!s) return;
+      s.x = nx;
+      s.y = ny;
+    } else if (this.drag.kind === "task") {
+      const t = ctx.map.taskAnchors[this.drag.index];
+      if (!t) return;
+      t.x = nx;
+      t.y = ny;
+    } else if (this.drag.kind === "object") {
+      const o = ctx.map.mapObjects[this.drag.index];
+      if (!o) return;
+      o.x = nx;
+      o.y = ny;
+    }
+    ctx.markDirty();
+    ctx.refreshPropsSidebar();
+  }
+  onUp() {
+    this.drag = null;
+  }
   drawPreview() {}
 }
 
@@ -170,30 +248,37 @@ export class TaskAnchorTool {
   drawPreview() {}
 }
 
-// --- Object tool: click + prompt for kind (Tier 4 props) -------------------
+// --- Object tool: click to place a MapObject from the kind library ---------
 //
-// Default size: 80x40 (desk-sized). Adjust via JSON afterward — the editor
-// MVP keeps placement-only; rotation is settable in JSON, future polish
-// adds resize handles + rotate-shortcut to the editor.
-
-const DEFAULT_OBJECT_KIND = "desk";
-const DEFAULT_OBJECT_SIZE = { width: 80, height: 40 };
+// `ctx.pendingKind` is set when the user clicks an entry in the library
+// sidebar. The catalogue entry provides default size and blocks-movement so
+// new objects match the in-game look without needing JSON tweaks.
 
 export class ObjectTool {
   onDown(ctx, mx, my) {
-    const kind = (window.prompt("Object-Kind", DEFAULT_OBJECT_KIND) || "").trim();
-    if (!kind) return;
+    const kind = ctx.pendingKind;
+    if (!kind) {
+      window.alert(
+        "Wähle zuerst einen Objekt-Typ in der Bibliothek (linke Sidebar) und klicke dann auf die Karte."
+      );
+      return;
+    }
+    const entry = KIND_BY_NAME.get(kind) || {
+      width: 80,
+      height: 40,
+      blocksMovement: true,
+    };
     if (!Array.isArray(ctx.map.mapObjects)) ctx.map.mapObjects = [];
     const id = `obj-${ctx.map.mapObjects.length + 1}`;
     ctx.map.mapObjects.push({
       id,
       x: mx,
       y: my,
-      width: DEFAULT_OBJECT_SIZE.width,
-      height: DEFAULT_OBJECT_SIZE.height,
+      width: entry.width,
+      height: entry.height,
       kind,
       rotation: 0,
-      blocksMovement: true,
+      blocksMovement: entry.blocksMovement !== false,
     });
     ctx.markDirty();
     ctx.setSelection({ kind: "object", index: ctx.map.mapObjects.length - 1 });
