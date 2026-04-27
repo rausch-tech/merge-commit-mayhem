@@ -226,7 +226,16 @@ export class MapPreview3D {
     this.scene.add(this.mapGroup);
 
     this.gltfLoader = new GLTFLoader();
-    this.gltfCache = new Map(); // url -> Promise<gltf.scene.clone>
+    this.gltfCache = new Map(); // url -> Promise<gltf.scene>
+
+    // Materials shared across many meshes. Building them once costs less GPU
+    // memory and keeps re-builds snappy.
+    this.wallMaterial = this._makeWallMaterial();
+
+    // Epoch counter — async GLTF loads check it on resolution so a stale
+    // load from a previous applyMap() can't pollute the new mapGroup with
+    // ghost objects from an earlier map state.
+    this._epoch = 0;
 
     this._loop = this._loop.bind(this);
     this._resizeObserver = new ResizeObserver(() => this._onResize());
@@ -276,12 +285,14 @@ export class MapPreview3D {
   // well below 16ms even in dev tools, and incremental diff is not worth
   // the complexity at this scale.
   applyMap(map) {
+    this._epoch += 1;
+    const epoch = this._epoch;
     this._disposeChildren(this.mapGroup);
     if (!map || !Array.isArray(map.rooms)) return { stats: this._emptyStats() };
 
     this._buildFloors(map);
     const wallCount = this._buildWalls(map);
-    const objStats = this._buildMapObjects(map);
+    const objStats = this._buildMapObjects(map, epoch);
     const taskCount = this._buildTaskAnchors(map);
     this._buildPlayerPlaceholder(map);
     this._frameMap(map);
@@ -335,18 +346,19 @@ export class MapPreview3D {
   }
 
   _buildWalls(map) {
-    const wallMat = new THREE.MeshStandardMaterial({
-      color: 0xe8eaef,
-      roughness: 0.7,
-      metalness: 0.05,
-    });
     const walls = computeWallsLocal(map);
     for (const [x1, y1, x2, y2] of walls) {
       const w = (x2 - x1) * WORLD_SCALE;
       const d = (y2 - y1) * WORLD_SCALE;
       if (w <= 0 || d <= 0) continue;
       const geom = new THREE.BoxGeometry(w, WALL_HEIGHT, d);
-      const mesh = new THREE.Mesh(geom, wallMat);
+      // UV-scale the texture so each ~2m of wall ~= one texture tile,
+      // independent of the wall's actual length. Without per-mesh UVs
+      // long walls would stretch the noise pattern visibly.
+      const uvScaleU = Math.max(0.5, Math.max(w, d) / 2);
+      const uvScaleV = WALL_HEIGHT / 2;
+      this._scaleBoxUVs(geom, uvScaleU, uvScaleV);
+      const mesh = new THREE.Mesh(geom, this.wallMaterial);
       mesh.position.set(
         (x1 + x2) * 0.5 * WORLD_SCALE,
         WALL_HEIGHT / 2,
@@ -359,29 +371,59 @@ export class MapPreview3D {
     return walls.length;
   }
 
-  _buildMapObjects(map) {
+  // BoxGeometry's default UVs go 0..1 per face. For a tiled texture we
+  // want larger numbers so the texture repeats. Set per-vertex UVs by
+  // scaling the existing 0..1 values.
+  _scaleBoxUVs(geom, scaleU, scaleV) {
+    const uvAttr = geom.attributes.uv;
+    if (!uvAttr) return;
+    const arr = uvAttr.array;
+    for (let i = 0; i < arr.length; i += 2) {
+      arr[i] = arr[i] * scaleU;
+      arr[i + 1] = arr[i + 1] * scaleV;
+    }
+    uvAttr.needsUpdate = true;
+  }
+
+  _buildMapObjects(map, epoch) {
     const objects = Array.isArray(map.mapObjects) ? map.mapObjects : [];
     let meshLoaded = 0;
     let meshFallback = 0;
     for (const obj of objects) {
-      const placed = this._placeMapObject(obj);
+      const placed = this._placeMapObject(obj, epoch);
       if (placed === "mesh") meshLoaded += 1;
       else if (placed === "fallback") meshFallback += 1;
     }
     return { meshLoaded, meshFallback };
   }
 
-  _placeMapObject(obj) {
+  _placeMapObject(obj, epoch) {
     const url = KIND_TO_GLB[obj.kind];
     if (url) {
-      this._loadGltfInstance(url).then((root) => {
-        if (this._disposed) return;
-        this._positionObject(root, obj);
-        this.mapGroup.add(root);
-      });
+      this._loadGltfInstance(url).then(
+        (root) => {
+          // Drop stale loads: applyMap() may have been called again while
+          // we were loading. Skipping prevents a previous map's furniture
+          // from leaking into the current scene.
+          if (this._disposed || epoch !== this._epoch) return;
+          this._positionObject(root, obj);
+          this.mapGroup.add(root);
+        },
+        // GLTF load failed — fall back to a coloured box so the slot at
+        // least has something visible. Logged so it's debuggable.
+        (err) => {
+          // eslint-disable-next-line no-console
+          console.error(`[preview-3d] GLTF load failed for ${obj.kind} (${url})`, err);
+          if (this._disposed || epoch !== this._epoch) return;
+          this._placeFallbackBox(obj);
+        }
+      );
       return "mesh";
     }
-    // Fallback: coloured box at full mapObject footprint.
+    return this._placeFallbackBox(obj);
+  }
+
+  _placeFallbackBox(obj) {
     const w =
       ((obj.rotation === 90 || obj.rotation === 270 ? obj.height : obj.width) || 0) * WORLD_SCALE;
     const d =
@@ -434,7 +476,14 @@ export class MapPreview3D {
       });
       this.gltfCache.set(url, promise);
     }
-    return this.gltfCache.get(url).then((proto) => proto.clone(true));
+    return this.gltfCache.get(url).then((proto) => {
+      // Mark the clone so _disposeChildren skips disposing its geometry/
+      // material — those are SHARED with the cached prototype, and disposing
+      // them once would empty the cache for every subsequent clone.
+      const clone = proto.clone(true);
+      clone.userData.fromGltf = true;
+      return clone;
+    });
   }
 
   _buildTaskAnchors(map) {
@@ -494,14 +543,72 @@ export class MapPreview3D {
     while (group.children.length > 0) {
       const child = group.children[0];
       group.remove(child);
+      // GLTF clones SHARE geometry/material with the cached prototype. Disposing
+      // them would invalidate the cache so subsequent clones render as empty
+      // — the bug that made all furniture vanish on the second applyMap().
+      // Walls share `this.wallMaterial` and shouldn't dispose it either; the
+      // generic disposer below handles per-wall geometries correctly.
+      const isShared = child.userData?.fromGltf === true;
+      if (isShared) continue;
       child.traverse?.((node) => {
         if (node.geometry) node.geometry.dispose();
-        if (node.material) {
+        if (node.material && node.material !== this.wallMaterial) {
           if (Array.isArray(node.material)) node.material.forEach((m) => m.dispose());
           else node.material.dispose();
         }
       });
     }
+  }
+
+  // Procedural drywall material — subtle off-white with low-frequency speckle
+  // and faint horizontal banding for "office wall" feel without shipping an
+  // image asset. Tiled via per-wall UV scaling in _buildWalls.
+  _makeWallMaterial() {
+    const size = 256;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+
+    // Base gradient: slightly warmer near the floor, cooler near the ceiling.
+    const grad = ctx.createLinearGradient(0, 0, 0, size);
+    grad.addColorStop(0, "#f1ede4");
+    grad.addColorStop(1, "#e5dfd1");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+
+    // Speckle: many tiny semi-transparent dots scattered across the surface.
+    for (let i = 0; i < 1600; i++) {
+      const x = Math.random() * size;
+      const y = Math.random() * size;
+      const r = 0.3 + Math.random() * 0.9;
+      const grey = 200 + Math.floor(Math.random() * 30);
+      ctx.fillStyle = `rgba(${grey}, ${grey - 6}, ${grey - 16}, 0.18)`;
+      ctx.fillRect(x, y, r, r);
+    }
+
+    // Faint horizontal banding for drywall sheet seams. Stays subtle so it
+    // reads as texture, not as obvious stripes.
+    ctx.strokeStyle = "rgba(40, 30, 20, 0.05)";
+    ctx.lineWidth = 1;
+    for (let y = size / 4; y < size; y += size / 4) {
+      ctx.beginPath();
+      ctx.moveTo(0, y + Math.random() * 2 - 1);
+      ctx.lineTo(size, y + Math.random() * 2 - 1);
+      ctx.stroke();
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    return new THREE.MeshStandardMaterial({
+      map: tex,
+      color: 0xffffff,
+      roughness: 0.9,
+      metalness: 0.02,
+    });
   }
 
   _parseHex(hex, fallback) {
