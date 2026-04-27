@@ -17,6 +17,9 @@ import {
 import { History } from "/static/editor/editor-history.js";
 import { KIND_BY_NAME, KIND_CATALOGUE, KIND_CATEGORIES } from "/static/editor/editor-kinds.js";
 import { snap, TOOLS } from "/static/editor/editor-tools.js";
+// 3D-Preview is loaded lazily so a CDN-blocked dev environment still gets
+// a working 2D editor. Errors are shown in the preview status bar.
+let MapPreview3D = null;
 
 // Layers the user can hide. Each key matches a draw-call below; toggling
 // hides the layer in the canvas without removing the data from the model.
@@ -79,6 +82,10 @@ const dom = {
   btnRedo: document.getElementById("btn-redo"),
   layerToggles: document.getElementById("layer-toggles"),
   validationStrip: document.getElementById("validation-strip"),
+  editorMain: document.getElementById("editor-main"),
+  preview3DHost: document.getElementById("preview-3d-host"),
+  previewStats: document.getElementById("preview-stats"),
+  toggle3DPreview: document.getElementById("toggle-3d-preview"),
 };
 
 const ctx2d = dom.canvas.getContext("2d");
@@ -189,8 +196,61 @@ function requestRender() {
   requestAnimationFrame(() => {
     renderQueued = false;
     render();
+    // 3D preview live-syncs off the same RAF tick. Cheap rebuild; with
+    // <500 nodes the cost stays well below 16 ms.
+    syncPreview3D();
   });
 }
+
+// --- 3D-Preview-Pane -------------------------------------------------------
+
+let preview3D = null;
+let preview3DLoadFailed = false;
+
+async function ensurePreview3D() {
+  if (preview3D || preview3DLoadFailed) return preview3D;
+  if (!dom.preview3DHost) return null;
+  try {
+    if (!MapPreview3D) {
+      const mod = await import("/static/editor/editor-preview-3d.js");
+      MapPreview3D = mod.MapPreview3D;
+    }
+    preview3D = new MapPreview3D(dom.preview3DHost);
+    return preview3D;
+  } catch (err) {
+    preview3DLoadFailed = true;
+    if (dom.previewStats) {
+      dom.previewStats.textContent = `3D-Vorschau nicht verfügbar (${err.message ?? err})`;
+    }
+    return null;
+  }
+}
+
+function syncPreview3D() {
+  if (!preview3D) return;
+  const result = preview3D.applyMap(state.map);
+  if (dom.previewStats && result?.stats) {
+    const s = result.stats;
+    dom.previewStats.textContent =
+      `${s.rooms} Räume · ${s.doors} Türen · ${s.walls} Wände · ` +
+      `${s.mapObjects} Objekte (${s.meshLoaded} Mesh / ${s.meshFallback} Fallback) · ` +
+      `${s.taskAnchors} Tasks`;
+  }
+}
+
+function setPreview3DEnabled(on) {
+  if (!dom.editorMain) return;
+  dom.editorMain.classList.toggle("preview-off", !on);
+  if (on) {
+    ensurePreview3D().then((preview) => {
+      if (preview) syncPreview3D();
+    });
+  }
+}
+
+dom.toggle3DPreview?.addEventListener("change", (e) => {
+  setPreview3DEnabled(e.target.checked);
+});
 
 function render() {
   const cw = dom.canvas.width;
@@ -1378,3 +1438,8 @@ renderPropsSidebar();
 refreshValidationStrip();
 refreshUndoButtons();
 fitCanvas();
+// 3D preview is on by default (toggle is checked in HTML). Lazy-load + first
+// render fires once the module resolves.
+if (dom.toggle3DPreview?.checked) {
+  setPreview3DEnabled(true);
+}

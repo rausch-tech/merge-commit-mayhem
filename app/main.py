@@ -730,10 +730,16 @@ async def _handle_disconnect(ws: WebSocket) -> None:
 _static_dir = Path(__file__).parent.parent / "static"
 _images_dir = Path(__file__).parent.parent / "images"
 _sounds_dir = Path(__file__).parent.parent / "sounds"
+# 3D meshes live under godot-3d/assets/. The Map-Editor's 3D-Preview-Pane
+# consumes the same .glb/.gltf files the Godot client uses, so editor and
+# game stay visually in lock-step. Mount as /assets/3d/.
+_godot_3d_assets_dir = Path(__file__).parent.parent / "godot-3d" / "assets"
 if _images_dir.exists():
     app.mount("/images", StaticFiles(directory=_images_dir), name="images")
 if _sounds_dir.exists():
     app.mount("/sounds", StaticFiles(directory=_sounds_dir), name="sounds")
+if _godot_3d_assets_dir.exists():
+    app.mount("/assets/3d", StaticFiles(directory=_godot_3d_assets_dir), name="godot_3d_assets")
 app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
 

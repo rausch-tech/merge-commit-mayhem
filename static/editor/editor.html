@@ -5,6 +5,19 @@
     <title>MCM Map-Editor</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="/static/editor/editor.css" />
+    <!--
+      Three.js via importmap + esm.sh CDN. The editor is a dev-only tool, so
+      a CDN dependency is acceptable. Pinned version keeps the build
+      deterministic — bump consciously when upgrading.
+    -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://esm.sh/three@0.160.0",
+          "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
   </head>
   <body>
     <header id="editor-topbar">
@@ -35,6 +48,12 @@
         <label>
           Map-Höhe
           <input id="map-height" type="number" min="100" step="50" />
+        </label>
+      </div>
+      <div class="topbar-group">
+        <label>
+          <input id="toggle-3d-preview" type="checkbox" checked />
+          3D-Vorschau
         </label>
       </div>
       <div class="topbar-group" id="dirty-indicator">
@@ -107,6 +126,13 @@
         <div id="status-bar">
           <span id="cursor-coords">--, --</span>
           <span id="validation-strip" class="validation-strip"></span>
+        </div>
+      </section>
+      <section id="preview-area">
+        <div id="preview-3d-host"></div>
+        <div id="preview-status">
+          <span id="preview-stats">3D-Vorschau wird geladen…</span>
+          <span id="preview-hint">Linke Maustaste = drehen · Rechte = pannen · Scroll = Zoom</span>
         </div>
       </section>
     </main>
