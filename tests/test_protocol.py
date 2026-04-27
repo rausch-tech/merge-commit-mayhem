@@ -234,6 +234,7 @@ def test_voting_result_default_dump():
         "wasChaosAgent": False,
         "tie": False,
         "skipped": False,
+        "lastWords": "",
     }
 
 

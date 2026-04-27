@@ -419,6 +419,9 @@ class VotingResultMsg(BaseModel):
     was_chaos_agent: bool = False
     tie: bool = False
     skipped: bool = False
+    # Tier 3.6.5: optional one-liner shown under the voting toast and in the
+    # endscreen postmortem. Empty when nobody was eliminated (skip / tie).
+    last_words: str = ""
 
 
 class MiniGameStartedMsg(BaseModel):

@@ -171,7 +171,26 @@ export class VotingResultToast {
     } else {
       text = "Niemand wurde entfernt.";
     }
-    this.textEl.textContent = text;
+    // Tier 3.6.5: AI-flavored "last words" line, dimmed under the verdict.
+    // Server omits the field on skip/tie so we never render a misleading
+    // parting line for someone who didn't actually leave.
+    const lastWords = payload.lastWords || "";
+    if (lastWords && payload.removedPlayerId) {
+      // Insert as a second line. Falls back to plain string append if the
+      // wrapping element doesn't exist yet — keeps backwards-compat with
+      // the older single-textEl markup.
+      this.textEl.innerHTML = "";
+      const verdict = document.createElement("div");
+      verdict.className = "voting-result-verdict";
+      verdict.textContent = text;
+      const quote = document.createElement("div");
+      quote.className = "voting-result-lastwords";
+      quote.textContent = `„${lastWords}"`;
+      this.textEl.appendChild(verdict);
+      this.textEl.appendChild(quote);
+    } else {
+      this.textEl.textContent = text;
+    }
     this.root.classList.remove("hidden");
     if (this._timeoutId) clearTimeout(this._timeoutId);
     this._timeoutId = setTimeout(() => {

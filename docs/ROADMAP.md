@@ -12,7 +12,7 @@ Dieses Dokument ist der **eine** Plan. Es ist die Wahrheit über den Stand und d
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Repo**               | https://github.com/rausch-tech/merge-commit-mayhem                                                                                                                                                                                                                                                                                                |
 | **Live (Test-Server)** | https://prod-is-lava.dev (Apex-Domain seit 2026-04-27)                                                                                                                                                                                                                                                                                            |
-| **Backend-Tests**      | 613 grün (`uv run pytest`), Coverage-Floor 88 % auf `app/game/`                                                                                                                                                                                                                                                                                   |
+| **Backend-Tests**      | 627 grün (`uv run pytest`), Coverage-Floor 88 % auf `app/game/`                                                                                                                                                                                                                                                                                   |
 | **Frontend-Tests**     | 109 grün (`npx vitest run`)                                                                                                                                                                                                                                                                                                                       |
 | **Stack**              | Python 3.12 + FastAPI + Pydantic v2 + WebSockets, Vanilla JS + Canvas, Three.js für Editor-3D-Vorschau, Godot 4.6 für den 3D-Demo-Client, Vitest + happy-dom                                                                                                                                                                                      |
 | **CI-Gates**           | pytest (+ coverage 88 %), ruff (lint + format), mypy, prettier 3.3.3, vitest, godot-check (auto-deploy auf jedem main-Push)                                                                                                                                                                                                                       |
@@ -30,7 +30,8 @@ Dieses Dokument ist der **eine** Plan. Es ist die Wahrheit über den Stand und d
 - Among-Us-Features: Take-Down + Body-Discovery + Report, Vents (Chaos-Teleport), Lights/Comms-Sabotage mit Repair-Panels, Spectator-Mode für Geister.
 - Coffee-Energy mit Decay/Speed-Penalty/Task-Bonus, Aktive Abilities 1×/Runde.
 - Meeting-Kontext + AI-Flavor in Eventfeed + Postmortem; Endscreen mit Awards + Per-Player-Stats + AI-Postmortem.
-- Metrik-Export (JSONL pro Tag) für Balancing.
+- Metrik-Export (JSONL pro Tag) für Balancing, lesbar via `GET /api/metrics?since=YYYY-MM-DD` (win-rates, mean duration, tasks-per-role, sabotage-totals).
+- Voting-Result mit AI-flavored „last words"-Zitat des eliminated Spielers — pool nach Team unterschieden.
 - Brand: Subtitle „PROD IS LAVA", transparenter Logo-PNG, Apex-Domain.
 
 ---
@@ -165,13 +166,13 @@ Naming-Prinzip: nerdig, dev-thematisch, „kill" wird vermieden zugunsten von ha
 
 **Aufwand:** ~1.5 Wochen, ebenfalls am 2026-04-26 in derselben Rutsch-Session.
 
-| #     | Was                                                                                                                                                                                                                            | Status  |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
-| 3.6.1 | **Sabotage-Object-Binding (Tier 2.7 rework)** — dedizierte Console rausgeworfen (zu offensichtlich), stattdessen jede Sabotage an Task-Anchor mit passendem `object_type` gebunden. Same Anchor wie Release-Task → Ambiguität. | ✅ done |
-| 3.6.2 | **Meeting-Kontext** — `meeting.context = {reporterName, body? {victimName, room}, recentEvents[]}`. Snapshot zum Meeting-Start. UI zeigt Block über Voting-Liste. Hinweise, keine Beweise.                                     | ✅ done |
-| 3.6.3 | **AI-Flavor-Texte** — `app/game/ai_flavor.py` mit reichen LLM-styled Pools für Sabotage-Events („CI hatte einen Hallucinations-Anfall"), Repair, Body-Found, Vote-Kick. Vibe Coder bekommt AI-Sabotage-Themen.                 | ✅ done |
-| 3.6.4 | **Accusation-Tags / Voting-Polish** — Schritt nach hinten: Voting-UI bleibt erstmal wie sie ist, Tags sind ein eigener Slice. Voice-Chat passiert outside-of-game (TeamSpeak/Slack), kein eigener Channel.                     | ⏳ open |
-| 3.6.5 | **Voting-Result-Story** — Roll-out kann später mit „last words" Flavor-Line erweitert werden.                                                                                                                                  | ⏳ open |
+| #     | Was                                                                                                                                                                                                                                       | Status    |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| 3.6.1 | **Sabotage-Object-Binding (Tier 2.7 rework)** — dedizierte Console rausgeworfen (zu offensichtlich), stattdessen jede Sabotage an Task-Anchor mit passendem `object_type` gebunden. Same Anchor wie Release-Task → Ambiguität.            | ✅ done   |
+| 3.6.2 | **Meeting-Kontext** — `meeting.context = {reporterName, body? {victimName, room}, recentEvents[]}`. Snapshot zum Meeting-Start. UI zeigt Block über Voting-Liste. Hinweise, keine Beweise.                                                | ✅ done   |
+| 3.6.3 | **AI-Flavor-Texte** — `app/game/ai_flavor.py` mit reichen LLM-styled Pools für Sabotage-Events („CI hatte einen Hallucinations-Anfall"), Repair, Body-Found, Vote-Kick. Vibe Coder bekommt AI-Sabotage-Themen.                            | ✅ done   |
+| 3.6.4 | **Accusation-Tags / Voting-Polish** — Geschlossen (won't-fix). Original-Begründung: „bringt mit Voice-Chat den meisten Wert". Voice-Chat ist out-of-game (Teams nutzen TeamSpeak/Slack/Meet), Tags adden ohne Voice-Mehrwert nur UI-Last. | ❌ closed |
+| 3.6.5 | **Voting-Result-Story** — `voting_result.lastWords` Flavor-Line aus zwei team-spezifischen Pools (`_LAST_WORDS_CHAOS` / `_LAST_WORDS_RELEASE` in `ai_flavor.py`). Browser zeigt als gedimmtes Zitat unter dem Verdict-Toast.              | ✅ done   |
 
 **Done-Kriterium:** Meetings haben Substanz; Saboteure müssen sich physisch ans Object stellen (kein Verrats-Pattern); Eventfeed + Postmortem fühlen sich AI-generiert an.
 
@@ -318,7 +319,7 @@ Diese Tier ist absichtlich vage — was hier passiert hängt davon ab wie das Ga
 
 **Lower priority (anytime):**
 
-- **Tier 3.6.4 + 3.6.5** — Voting-Polish (Accusation-Tags, Voting-Result-Story). Voice-Chat passiert outside-of-game.
+- ~~Tier 3.6.4 + 3.6.5~~ — beide durch (3.6.5 done, 3.6.4 als won't-fix geschlossen — Voice-Chat ist out-of-game).
 - **Editor-QoL** — Keyboard-Shortcuts, Multi-Select, Duplicate. ~1–2 h.
 - **`/api/metrics`** — Aggregations-Endpoint für die JSONL-Files aus Tier 3.7.6. Hilft beim Balancing nach Live-Tests. ~45 min.
 

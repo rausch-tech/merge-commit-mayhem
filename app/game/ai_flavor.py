@@ -86,6 +86,41 @@ _FLAVOR_BODY_FOUND: Final[tuple[str, ...]] = (
     "Body discovered. Postmortem in Standup naechste Woche.",
 )
 
+# --- last-words after a vote-kick (Tier 3.6.5) -----------------------------
+#
+# Server attaches one of these to ``voting_result.lastWords`` when a player
+# is eliminated. Two pools so the line subtly shades — chaos goes out
+# trolling, release-team goes out unfairly accused. Skipped/tied votes get
+# nothing; fallback empty string keeps the wire shape stable.
+
+_LAST_WORDS_RELEASE: Final[tuple[str, ...]] = (
+    "Last commit message: 'fix: nothing wrong here'.",
+    "Geht so raus. Hat noch eine PR offen.",
+    "Out-of-Office bis zur naechsten Retro.",
+    "Tippt noch eine Slack-Nachricht: 'aber...'.",
+    "Logs sagen: war ehrlich. Niemand schaut Logs.",
+    "Letztes Wort: 'ich war im Server-Room weil...'",
+)
+
+_LAST_WORDS_CHAOS: Final[tuple[str, ...]] = (
+    "Letzter Commit: ``rm -rf .pipeline``. Nicht reverted.",
+    "Geht. Loescht den Slack-Thread auf dem Weg raus.",
+    "Vibes-only-Mode: deactivated. Niemand bemerkt's.",
+    "Zwinkert kurz Richtung console.error.",
+    "Lacht. Sagt: 'War's wert.'",
+    "Push-Force noch schnell auf main.",
+)
+
+
+def flavor_last_words(*, was_chaos: bool, rng: random.Random | None = None) -> str:
+    """One-line "last words" from an eliminated player. Pool depends on team
+    so chaos goes out trolling, release-team goes out aggrieved — but never
+    leaks role beyond what the public ``was_chaos_agent`` flag already
+    discloses in the same voting_result message."""
+    r = rng or random
+    pool = _LAST_WORDS_CHAOS if was_chaos else _LAST_WORDS_RELEASE
+    return r.choice(pool)
+
 
 def pick_event_text(category: str, *, default: str = "", rng: random.Random | None = None) -> str:
     """Return a single random flavor line for the given event category. Falls

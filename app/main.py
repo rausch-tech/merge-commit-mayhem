@@ -16,6 +16,7 @@ from app.game.game_map import (
 )
 from app.game.game_room import GameRoom, GameRoomError
 from app.game.kinds_registry import get_kinds_registry
+from app.game.metrics_aggregate import aggregate_metrics
 from app.game.models import InputState, Phase
 from app.game.sabotages import SABOTAGE_DEFINITIONS
 from app.protocol import (
@@ -809,6 +810,29 @@ async def api_list_kinds() -> dict[str, object]:
     changes.
     """
     return get_kinds_registry()
+
+
+@app.get("/api/metrics")
+async def api_metrics(since: str | None = None) -> dict[str, object]:
+    """Aggregate per-round balancing metrics (Tier 3.7.6 JSONL export).
+
+    Reads every ``<YYYY-MM-DD>.jsonl`` file under ``MCM_METRICS_DIR`` and
+    returns win-rates, mean durations, task counts per role, sabotage
+    totals etc. Pass ``?since=YYYY-MM-DD`` to limit the window.
+
+    Returns ``metricsAvailable=False`` when ``MCM_METRICS_DIR`` is unset
+    on the deploy — the endpoint stays well-shaped so the caller doesn't
+    need to special-case that.
+    """
+    since_date = None
+    if since:
+        from datetime import date
+
+        try:
+            since_date = date.fromisoformat(since)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="since must be YYYY-MM-DD") from exc
+    return aggregate_metrics(since=since_date)
 
 
 @app.get("/api/maps/{map_id}")

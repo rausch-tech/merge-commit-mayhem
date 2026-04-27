@@ -265,10 +265,17 @@ class MeetingController:
 
         was_chaos = False
         removed_name = ""
+        last_words = ""
         if eliminated_id and eliminated_id in room.players:
             room.players[eliminated_id].is_alive = False
             was_chaos = room.players[eliminated_id].team == "chaos_agents"
             removed_name = room.players[eliminated_id].name
+            # Tier 3.6.5: AI-flavored "last words" — only when someone is
+            # actually eliminated. Skipped + tied votes get an empty string
+            # so the client doesn't render a misleading parting line.
+            from app.game.ai_flavor import flavor_last_words
+
+            last_words = flavor_last_words(was_chaos=was_chaos)
 
         room.last_voting_result = {
             "removed_player_id": eliminated_id or "",
@@ -276,6 +283,7 @@ class MeetingController:
             "was_chaos_agent": was_chaos,
             "tie": named_tie,
             "skipped": skip_won,
+            "last_words": last_words,
         }
 
         # Emit a public, role-neutral event. The text MUST NOT depend on
