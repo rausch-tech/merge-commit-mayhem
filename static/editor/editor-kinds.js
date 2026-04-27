@@ -70,6 +70,7 @@ function _populateFromRegistry() {
       height: def.default_size?.[1] ?? 50,
       blocksMovement: def.blocks_movement ?? true,
       fill: def.browser_2d?.fill ?? "#888888",
+      godotAsset: def.godot_asset ?? null,
     };
     KIND_CATALOGUE.push(entry);
     KIND_BY_NAME.set(kind, entry);

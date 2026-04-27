@@ -66,6 +66,12 @@ describe("KIND_CATALOGUE", () => {
       expect(typeof entry.blocksMovement).toBe("boolean");
       expect(typeof entry.fill).toBe("string");
       expect(entry.fill).toMatch(/^#[0-9a-f]{6}$/i);
+      // godotAsset is `string` when a 3D-Mesh is staged, `null` als Fallback —
+      // editor-kind-thumbnails.js ueberspringt null-Eintraege automatisch.
+      expect(entry.godotAsset === null || typeof entry.godotAsset === "string").toBe(true);
+      if (typeof entry.godotAsset === "string") {
+        expect(entry.godotAsset.startsWith("res://")).toBe(true);
+      }
     }
   });
 

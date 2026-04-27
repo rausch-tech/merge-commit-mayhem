@@ -21,6 +21,7 @@ import {
   KIND_CATEGORIES,
   initKindsCatalogue,
 } from "/static/editor/editor-kinds.js";
+import { renderKindThumbnail } from "/static/editor/editor-kind-thumbnails.js";
 import { snap, TOOLS } from "/static/editor/editor-tools.js";
 // 3D-Preview is loaded lazily so a CDN-blocked dev environment still gets
 // a working 2D editor. Errors are shown in the preview status bar.
@@ -1561,8 +1562,17 @@ function renderKindLibrary() {
       }`;
       const swatch = document.createElement("div");
       swatch.className = "kind-tile-swatch";
-      swatch.style.background = entry.fill;
+      swatch.style.backgroundColor = entry.fill;
       btn.appendChild(swatch);
+      if (entry.godotAsset) {
+        // Color-Swatch bleibt sichtbar bis das Thumbnail fertig ist; bei
+        // Fehler (Netzwerk, GLTF-Parse) bleibt er fuer immer als Fallback.
+        renderKindThumbnail(entry.godotAsset).then((dataUrl) => {
+          if (!dataUrl) return;
+          swatch.style.backgroundImage = `url(${dataUrl})`;
+          swatch.classList.add("kind-tile-swatch--thumb");
+        });
+      }
       const name = document.createElement("div");
       name.className = "kind-tile-name";
       name.textContent = entry.kind;

@@ -486,10 +486,20 @@ h3 {
 }
 
 .kind-tile-swatch {
-  height: 18px;
+  height: 56px;
   border-radius: 2px;
   margin-bottom: 3px;
   border: 1px solid rgba(0, 0, 0, 0.4);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.kind-tile-swatch--thumb {
+  /* sobald ein Mesh-Thumbnail geladen ist, wird der Color-Fill zur dezenten
+     Background-Card hinter dem Mesh — Designer sieht trotzdem die
+     Kategorie-Farbe am Rand, das Thumbnail dominiert. */
+  background-color: rgba(20, 26, 34, 0.55) !important;
 }
 
 .kind-tile-name {
