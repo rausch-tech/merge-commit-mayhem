@@ -95,12 +95,16 @@ func _process(delta: float) -> void:
 	# In aerial demo-camera mode the rig stays parked at map center.
 	if aerial_demo_camera:
 		return
-	# Camera follow: only lerp if we actually have the local player. Otherwise
-	# the camera would drift toward (0,0,0) and miss the map entirely.
-	if not _players_by_id.has(player_id):
+	# Camera follow: prefer local player, fall back to any player so we
+	# never sit at (0,0,0) staring into the void if our id is missing.
+	var ch_anchor: Node3D = null
+	if _players_by_id.has(player_id):
+		ch_anchor = _players_by_id[player_id]
+	elif not _players_by_id.is_empty():
+		ch_anchor = _players_by_id[_players_by_id.keys()[0]]
+	if ch_anchor == null:
 		return
-	var ch_local: Node3D = _players_by_id[player_id]
-	var anchor: Vector3 = ch_local.global_position
+	var anchor: Vector3 = ch_anchor.global_position
 	var current := _camera_rig.position
 	var t = clamp(CAMERA_LERP_SPEED * delta, 0.0, 1.0)
 	_camera_rig.position = current.lerp(anchor, t)
