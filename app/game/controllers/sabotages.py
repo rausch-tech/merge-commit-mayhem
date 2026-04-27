@@ -163,14 +163,21 @@ class SabotagesController:
                 code="SABOTAGE_NOT_REPAIRABLE",
                 message=f"{sabotage_id!r} has no repair panel.",
             )
-        panel = next(
-            (p for p in room.map.sabotage_panels if p.sabotage_id == sabotage_id),
+        # Look in legacy SabotagePanel first, then Tier-4 MapObjects with
+        # ``sabotage_repair_id`` set. A map can use either.
+        panel_pos = next(
+            ((p.x, p.y) for p in room.map.sabotage_panels if p.sabotage_id == sabotage_id),
             None,
         )
-        if panel is None:
+        if panel_pos is None:
+            panel_pos = next(
+                ((o.x, o.y) for o in room.map.map_objects if o.sabotage_repair_id == sabotage_id),
+                None,
+            )
+        if panel_pos is None:
             raise GameRoomError(code="NO_PANEL", message=f"Map has no panel for {sabotage_id!r}.")
-        dx = player.x - panel.x
-        dy = player.y - panel.y
+        dx = player.x - panel_pos[0]
+        dy = player.y - panel_pos[1]
         if (
             dx * dx + dy * dy
             > SABOTAGE_PANEL_INTERACTION_RADIUS * SABOTAGE_PANEL_INTERACTION_RADIUS
@@ -207,16 +214,25 @@ class SabotagesController:
     # --- helpers used by serializer + neighbouring controllers --------------
 
     def has_typed_anchors(self) -> bool:
-        """True if the loaded map has at least one task_anchor with object_type.
-        Used as the gate for Tier 2.7's themed-object sabotage binding — maps
-        that haven't been ported yet fall back to the legacy "from anywhere"
-        path so editor maps stay playable."""
-        return any(a.object_type for a in self._room.map.task_anchors)
+        """True if the loaded map has at least one anchor with ``object_type``
+        set. Used as the gate for Tier 2.7's themed-object sabotage binding —
+        maps that haven't been ported yet fall back to the legacy "from
+        anywhere" path so editor maps stay playable.
+
+        Both legacy ``task_anchors`` and Tier-4 ``map_objects`` count.
+        """
+        room_map = self._room.map
+        return any(a.object_type for a in room_map.task_anchors) or any(
+            o.object_type for o in room_map.map_objects
+        )
 
     def object_type_for_task(self, task_id: str) -> str | None:
         for a in self._room.map.task_anchors:
             if a.task_id == task_id:
                 return a.object_type
+        for o in self._room.map.map_objects:
+            if o.task_id == task_id:
+                return o.object_type
         return None
 
     def object_anchors_for(self, sab_def: SabotageDefinition) -> list[tuple[float, float]]:
@@ -226,19 +242,26 @@ class SabotagesController:
         if not sab_def.trigger_object_types:
             return []
         allowed = set(sab_def.trigger_object_types)
-        return [
+        out: list[tuple[float, float]] = [
             (a.x, a.y)
             for a in self._room.map.task_anchors
             if a.object_type and a.object_type in allowed
         ]
+        out.extend(
+            (o.x, o.y)
+            for o in self._room.map.map_objects
+            if o.object_type and o.object_type in allowed
+        )
+        return out
 
     # --- private -------------------------------------------------------------
 
     def _near_object(self, player, sab_def: SabotageDefinition) -> bool:
-        """Tier 2.7 rework: True iff the player stands within reach of any task
-        anchor whose object_type matches one of the sabotage's allowed trigger
-        types. Same anchor as the corresponding release task — sabotage looks
-        like normal terminal work to outsiders."""
+        """Tier 2.7 rework: True iff the player stands within reach of any
+        anchor (legacy ``task_anchor`` or Tier-4 ``map_object``) whose
+        ``object_type`` matches one of the sabotage's allowed trigger types.
+        Same anchor as the corresponding release task — sabotage looks like
+        normal terminal work to outsiders."""
         if not sab_def.trigger_object_types:
             return True  # legacy sabotages without binding (defensive default)
         allowed = set(sab_def.trigger_object_types)
@@ -247,6 +270,12 @@ class SabotagesController:
             if a.object_type and a.object_type in allowed:
                 dx = player.x - a.x
                 dy = player.y - a.y
+                if dx * dx + dy * dy <= r2:
+                    return True
+        for o in self._room.map.map_objects:
+            if o.object_type and o.object_type in allowed:
+                dx = player.x - o.x
+                dy = player.y - o.y
                 if dx * dx + dy * dy <= r2:
                     return True
         return False
