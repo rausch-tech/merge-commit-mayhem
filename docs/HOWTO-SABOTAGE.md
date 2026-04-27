@@ -35,16 +35,18 @@ In `SabotagesController.trigger()`:
 Wenn die Sabotage einen **Repair-Pfad** braucht (wie `lights_out` und `comms_outage`), ergänze:
 
 - den `elif` in `SabotagesController.repair()`,
-- ein `SabotagePanel` in `maps/default.json` (siehe `docs/maps.md`),
+- entweder ein `SabotagePanel` ODER ein `MapObject` mit `sabotageRepairId` gesetzt in `maps/default.json` (siehe `docs/maps.md`),
 - den active-Flag-Block in `SabotagesController.tick()`.
 
 Wenn die Sabotage nur einmalig wirkt (wie `merge_conflict_storm`), ist nichts davon nötig.
 
-## 3. Map-Anchor
+## 3. Map-Anchor (Tier 4: MapObject mit `objectType`)
 
-Falls du einen neuen `object_type` einführst (z.B. `dev_chair`), trage in `maps/default.json` mindestens einen `taskAnchor` mit dieser `objectType`-Annotation ein. Wenn du einen bestehenden type nutzt (z.B. `git_terminal`), reicht das.
+Tier-4-Pfad (empfohlen): in `maps/default.json` einen `MapObject` mit `objectType: "<dein_neuer_type>"` ergänzen — z.B. ein `desk` mit `objectType: "dev_chair"`. Der Server iteriert sowohl `taskAnchors` als auch `mapObjects` für die Tier-2.7-Object-Binding, beides funktioniert.
 
-`docs/maps.md` listet alle aktuell genutzten `objectType`-Werte.
+Legacy-Pfad: `taskAnchor`-Eintrag mit `objectType` setzen (für Maps ohne MapObjects).
+
+`docs/maps.md` listet alle aktuell genutzten `objectType`-Werte und Asset-Mappings.
 
 ## 4. Frontend-Button
 
