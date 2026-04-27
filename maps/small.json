@@ -1,35 +1,154 @@
 {
   "name": "small-arena",
-  "size": { "width": 2400, "height": 1600 },
+  "size": {
+    "width": 2400,
+    "height": 1600
+  },
   "rooms": [
-    { "id": "open_space",  "title": "Open Space",  "x": 0,    "y": 0,   "width": 1200, "height": 800,  "color": "#3a4560" },
-    { "id": "server_room", "title": "Server Room", "x": 1200, "y": 0,   "width": 1200, "height": 800,  "color": "#2a4a70" },
-    { "id": "kitchen",     "title": "Kitchen",     "x": 0,    "y": 800, "width": 1200, "height": 800,  "color": "#7a5030" },
-    { "id": "war_room",    "title": "War Room",    "x": 1200, "y": 800, "width": 1200, "height": 800,  "color": "#2a607a" }
+    {
+      "id": "open_space",
+      "title": "Open Space",
+      "x": 0,
+      "y": 0,
+      "width": 1200,
+      "height": 800,
+      "color": "#3a4560"
+    },
+    {
+      "id": "server_room",
+      "title": "Server Room",
+      "x": 1200,
+      "y": 0,
+      "width": 1200,
+      "height": 800,
+      "color": "#2a4a70"
+    },
+    {
+      "id": "kitchen",
+      "title": "Kitchen",
+      "x": 0,
+      "y": 800,
+      "width": 1200,
+      "height": 800,
+      "color": "#7a5030"
+    },
+    {
+      "id": "war_room",
+      "title": "War Room",
+      "x": 1200,
+      "y": 800,
+      "width": 1200,
+      "height": 800,
+      "color": "#2a607a"
+    }
   ],
-  "wallLines": [
-    { "axis": "x", "position": 1200, "doors": [{ "center": 400, "width": 240 }, { "center": 1200, "width": 240 }] },
-    { "axis": "y", "position": 800,  "doors": [{ "center": 600, "width": 240 }, { "center": 1800, "width": 240 }] }
+  "doors": [
+    {
+      "id": "d1",
+      "betweenRoomA": "open_space",
+      "betweenRoomB": "server_room",
+      "position": 400,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d2",
+      "betweenRoomA": "kitchen",
+      "betweenRoomB": "war_room",
+      "position": 1200,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d3",
+      "betweenRoomA": "kitchen",
+      "betweenRoomB": "open_space",
+      "position": 600,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d4",
+      "betweenRoomA": "server_room",
+      "betweenRoomB": "war_room",
+      "position": 1800,
+      "width": 240,
+      "doorKind": "office_door"
+    }
   ],
   "spawnPoints": [
-    { "x": 300, "y": 300 },
-    { "x": 600, "y": 300 },
-    { "x": 300, "y": 600 },
-    { "x": 600, "y": 600 }
+    {
+      "x": 300,
+      "y": 300
+    },
+    {
+      "x": 600,
+      "y": 300
+    },
+    {
+      "x": 300,
+      "y": 600
+    },
+    {
+      "x": 600,
+      "y": 600
+    }
   ],
   "taskAnchors": [
-    { "taskId": "fix_unit_tests",    "x": 300,  "y": 300,  "objectType": "qa_terminal" },
-    { "taskId": "repair_deployment", "x": 1800, "y": 300,  "objectType": "ci_console" },
-    { "taskId": "refill_coffee",     "x": 300,  "y": 1200, "objectType": "coffee_machine" },
-    { "taskId": "analyze_logs",      "x": 1800, "y": 1200, "objectType": "monitoring_panel" }
+    {
+      "taskId": "fix_unit_tests",
+      "x": 300,
+      "y": 300,
+      "objectType": "qa_terminal"
+    },
+    {
+      "taskId": "repair_deployment",
+      "x": 1800,
+      "y": 300,
+      "objectType": "ci_console"
+    },
+    {
+      "taskId": "refill_coffee",
+      "x": 300,
+      "y": 1200,
+      "objectType": "coffee_machine"
+    },
+    {
+      "taskId": "analyze_logs",
+      "x": 1800,
+      "y": 1200,
+      "objectType": "monitoring_panel"
+    }
   ],
   "sabotagePanels": [
-    { "sabotageId": "lights_out",   "x": 1800, "y": 400  },
-    { "sabotageId": "comms_outage", "x": 1800, "y": 1200 }
+    {
+      "sabotageId": "lights_out",
+      "x": 1800,
+      "y": 400
+    },
+    {
+      "sabotageId": "comms_outage",
+      "x": 1800,
+      "y": 1200
+    }
   ],
   "vents": [
-    { "id": "v_open",    "x": 200,  "y": 200,  "connectedTo": ["v_kitchen"] },
-    { "id": "v_kitchen", "x": 200,  "y": 1400, "connectedTo": ["v_open"] }
+    {
+      "id": "v_open",
+      "x": 200,
+      "y": 200,
+      "connectedTo": [
+        "v_kitchen"
+      ]
+    },
+    {
+      "id": "v_kitchen",
+      "x": 200,
+      "y": 1400,
+      "connectedTo": [
+        "v_open"
+      ]
+    }
   ],
   "warRoomId": "war_room"
 }

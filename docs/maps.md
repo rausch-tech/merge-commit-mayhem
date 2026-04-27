@@ -17,7 +17,7 @@ laden.
   "name": "default-office",
   "size": { "width": 4800, "height": 3200 },
   "rooms":          [ ... ],
-  "wallLines":      [ ... ],
+  "doors":          [ ... ],   // Slice-3 (Wand-Modell C): top-level
   "spawnPoints":    [ ... ],
   "taskAnchors":    [ ... ],
   "sabotagePanels": [ ... ],
@@ -29,7 +29,9 @@ laden.
 
 ## Rooms
 
-Each room is an axis-aligned rectangle.
+Each room is an axis-aligned rectangle. Optional Tier-4 / Godot fields
+let the 3D client pick floor materials, ceiling height, ambient lighting,
+and per-room sound zones — the browser ignores them.
 
 ```jsonc
 {
@@ -40,29 +42,71 @@ Each room is an axis-aligned rectangle.
   "width": 800,
   "height": 800,
   "color": "#3a4560",
+
+  // Tier-4 / Godot extras (all optional, sensible defaults):
+  "floorMaterial": "office", // office | kitchen | server | legacy
+  "wallHeightM": 2.6,
+  "lightingProfile": "neutral", // neutral | warm | cold | dim
+  "ambientSound": null, // e.g. "kitchen_hum", "server_fans"
 }
 ```
 
-## Wall lines + doors
+## Walls and doors
 
-A wall line runs across the map on one axis with optional door cutouts.
+**Walls are not stored.** They are auto-derived at runtime from the room
+rectangles minus any doors. For each pair of adjacent rooms the shared
+edge becomes a wall (with door cutouts); for each room edge that is
+neither shared with another room nor on the map outer boundary, that
+edge becomes a perimeter wall. Map-perimeter edges are NOT walled —
+the server's MovementController clamps the player to the map bounds.
+
+This means: to "open" a passage between two adjacent rooms, you add a
+door referencing both room ids. To remove a wall section, you either
+add a door there or move/resize the rooms so the edge isn't shared and
+isn't a perimeter.
+
+### Doors
+
+A door is a gap on the shared edge between two rooms.
 
 ```jsonc
 {
-  "axis": "x",
-  "position": 800,
-  "doors": [
-    { "center": 400, "width": 120 },
-    { "center": 1200, "width": 120 },
-  ],
+  "id": "d1",
+  "betweenRoomA": "open_space",
+  "betweenRoomB": "meeting_room",
+  "position": 800, // coordinate along the shared edge (y for vertical, x for horizontal)
+  "width": 240, // optional, default 240
+  "doorKind": "office_door", // optional, default "office_door". Godot uses this as a sprite/scene key.
 }
 ```
 
-`axis: "x"` means a vertical wall line at x=position (runs the full height of the map).
-`axis: "y"` means a horizontal wall line at y=position (runs the full width).
+`betweenRoomA` and `betweenRoomB` are room ids; the order doesn't matter
+(the algorithm sorts internally for dedup). `position` is interpreted
+along the perpendicular axis of the shared edge:
 
-The engine computes concrete wall rectangles from these lines + door cutouts at
-load time. A door `width` is optional and defaults to 120.
+- For a **vertical** shared edge (rooms side-by-side, edge at some
+  `x=N`), `position` is a y-coordinate.
+- For a **horizontal** shared edge (rooms top/bottom, edge at some
+  `y=N`), `position` is an x-coordinate.
+
+`doorKind` is a free-form string used by the Godot client to pick a 3D
+door scene (`office_door`, `glass_panel`, `vault`, `none`). The browser
+client ignores it.
+
+### Pre-Slice-3 schema (deprecated)
+
+Maps written before 2026-04-27 used `wallLines: [{axis, position, doors}]`
+to define walls explicitly. That field is gone — use the one-shot
+migration script:
+
+```bash
+uv run python scripts/migrate_walls_to_doors.py
+```
+
+The script reads each `maps/*.json` file in place, drops `wallLines`,
+and emits the equivalent top-level `doors` list. Output is committed.
+Maps that still contain `wallLines` after migration will fail Pydantic
+validation at server startup with a clear `extra_forbidden` error.
 
 ## Spawn points + task anchors + war room
 

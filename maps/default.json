@@ -1,94 +1,662 @@
 {
   "name": "default-office",
-  "size": { "width": 4800, "height": 3200 },
+  "size": {
+    "width": 4800,
+    "height": 3200
+  },
   "rooms": [
-    { "id": "open_space",      "title": "Open Space",      "x": 0,    "y": 0,    "width": 1600, "height": 1600, "color": "#3a4560" },
-    { "id": "meeting_room",    "title": "Meeting Room",    "x": 1600, "y": 0,    "width": 1600, "height": 1600, "color": "#5a3a70" },
-    { "id": "kitchen",         "title": "Kitchen",         "x": 3200, "y": 0,    "width": 1600, "height": 1600, "color": "#7a5030" },
-    { "id": "server_room",     "title": "Server Room",     "x": 0,    "y": 1600, "width": 1600, "height": 1600, "color": "#2a4a70" },
-    { "id": "war_room",        "title": "War Room",        "x": 1600, "y": 1600, "width": 1600, "height": 1600, "color": "#2a607a" },
-    { "id": "legacy_basement", "title": "Legacy Basement", "x": 3200, "y": 1600, "width": 1600, "height": 1600, "color": "#3a6a3a" }
+    {
+      "id": "open_space",
+      "title": "Open Space",
+      "x": 0,
+      "y": 0,
+      "width": 1600,
+      "height": 1600,
+      "color": "#3a4560"
+    },
+    {
+      "id": "meeting_room",
+      "title": "Meeting Room",
+      "x": 1600,
+      "y": 0,
+      "width": 1600,
+      "height": 1600,
+      "color": "#5a3a70"
+    },
+    {
+      "id": "kitchen",
+      "title": "Kitchen",
+      "x": 3200,
+      "y": 0,
+      "width": 1600,
+      "height": 1600,
+      "color": "#7a5030"
+    },
+    {
+      "id": "server_room",
+      "title": "Server Room",
+      "x": 0,
+      "y": 1600,
+      "width": 1600,
+      "height": 1600,
+      "color": "#2a4a70"
+    },
+    {
+      "id": "war_room",
+      "title": "War Room",
+      "x": 1600,
+      "y": 1600,
+      "width": 1600,
+      "height": 1600,
+      "color": "#2a607a"
+    },
+    {
+      "id": "legacy_basement",
+      "title": "Legacy Basement",
+      "x": 3200,
+      "y": 1600,
+      "width": 1600,
+      "height": 1600,
+      "color": "#3a6a3a"
+    }
   ],
-  "wallLines": [
-    { "axis": "x", "position": 1600, "doors": [{ "center": 800, "width": 240 }, { "center": 2400, "width": 240 }] },
-    { "axis": "x", "position": 3200, "doors": [{ "center": 800, "width": 240 }, { "center": 2400, "width": 240 }] },
-    { "axis": "y", "position": 1600, "doors": [{ "center": 800, "width": 240 }, { "center": 2400, "width": 240 }, { "center": 4000, "width": 240 }] }
+  "doors": [
+    {
+      "id": "d1",
+      "betweenRoomA": "meeting_room",
+      "betweenRoomB": "open_space",
+      "position": 800,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d2",
+      "betweenRoomA": "server_room",
+      "betweenRoomB": "war_room",
+      "position": 2400,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d3",
+      "betweenRoomA": "kitchen",
+      "betweenRoomB": "meeting_room",
+      "position": 800,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d4",
+      "betweenRoomA": "legacy_basement",
+      "betweenRoomB": "war_room",
+      "position": 2400,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d5",
+      "betweenRoomA": "open_space",
+      "betweenRoomB": "server_room",
+      "position": 800,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d6",
+      "betweenRoomA": "meeting_room",
+      "betweenRoomB": "war_room",
+      "position": 2400,
+      "width": 240,
+      "doorKind": "office_door"
+    },
+    {
+      "id": "d7",
+      "betweenRoomA": "kitchen",
+      "betweenRoomB": "legacy_basement",
+      "position": 4000,
+      "width": 240,
+      "doorKind": "office_door"
+    }
   ],
   "spawnPoints": [
-    { "x": 400, "y": 400 }, { "x": 800, "y": 400 }, { "x": 1200, "y": 400 },
-    { "x": 400, "y": 800 }, { "x": 800, "y": 800 }, { "x": 1200, "y": 800 },
-    { "x": 400, "y": 1200 }, { "x": 800, "y": 1200 }, { "x": 1200, "y": 1200 },
-    { "x": 400, "y": 1500 }, { "x": 800, "y": 1500 }, { "x": 1200, "y": 1500 }
+    {
+      "x": 400,
+      "y": 400
+    },
+    {
+      "x": 800,
+      "y": 400
+    },
+    {
+      "x": 1200,
+      "y": 400
+    },
+    {
+      "x": 400,
+      "y": 800
+    },
+    {
+      "x": 800,
+      "y": 800
+    },
+    {
+      "x": 1200,
+      "y": 800
+    },
+    {
+      "x": 400,
+      "y": 1200
+    },
+    {
+      "x": 800,
+      "y": 1200
+    },
+    {
+      "x": 1200,
+      "y": 1200
+    },
+    {
+      "x": 400,
+      "y": 1500
+    },
+    {
+      "x": 800,
+      "y": 1500
+    },
+    {
+      "x": 1200,
+      "y": 1500
+    }
   ],
   "taskAnchors": [
-    { "taskId": "fix_unit_tests",       "x": 400,  "y": 400,  "objectType": "qa_terminal" },
-    { "taskId": "review_pr",            "x": 1100, "y": 1200, "objectType": "git_terminal" },
-    { "taskId": "repair_deployment",    "x": 800,  "y": 2400, "objectType": "ci_console" },
-    { "taskId": "refill_coffee",        "x": 4000, "y": 800,  "objectType": "coffee_machine" },
-    { "taskId": "analyze_logs",         "x": 1200, "y": 2800, "objectType": "monitoring_panel" },
-    { "taskId": "calm_legacy_service",  "x": 4000, "y": 2400, "objectType": "legacy_terminal" },
-    { "taskId": "reduce_scope",         "x": 2000, "y": 400,  "objectType": "meeting_screen" },
-    { "taskId": "write_release_notes",  "x": 2800, "y": 1200, "objectType": "release_console" }
+    {
+      "taskId": "fix_unit_tests",
+      "x": 400,
+      "y": 400,
+      "objectType": "qa_terminal"
+    },
+    {
+      "taskId": "review_pr",
+      "x": 1100,
+      "y": 1200,
+      "objectType": "git_terminal"
+    },
+    {
+      "taskId": "repair_deployment",
+      "x": 800,
+      "y": 2400,
+      "objectType": "ci_console"
+    },
+    {
+      "taskId": "refill_coffee",
+      "x": 4000,
+      "y": 800,
+      "objectType": "coffee_machine"
+    },
+    {
+      "taskId": "analyze_logs",
+      "x": 1200,
+      "y": 2800,
+      "objectType": "monitoring_panel"
+    },
+    {
+      "taskId": "calm_legacy_service",
+      "x": 4000,
+      "y": 2400,
+      "objectType": "legacy_terminal"
+    },
+    {
+      "taskId": "reduce_scope",
+      "x": 2000,
+      "y": 400,
+      "objectType": "meeting_screen"
+    },
+    {
+      "taskId": "write_release_notes",
+      "x": 2800,
+      "y": 1200,
+      "objectType": "release_console"
+    }
   ],
   "sabotagePanels": [
-    { "sabotageId": "lights_out",   "x": 800,  "y": 2400 },
-    { "sabotageId": "comms_outage", "x": 4000, "y": 2400 }
+    {
+      "sabotageId": "lights_out",
+      "x": 800,
+      "y": 2400
+    },
+    {
+      "sabotageId": "comms_outage",
+      "x": 4000,
+      "y": 2400
+    }
   ],
   "vents": [
-    { "id": "v_open",    "x": 600,  "y": 600,  "connectedTo": ["v_server", "v_legacy"] },
-    { "id": "v_server",  "x": 800,  "y": 2000, "connectedTo": ["v_open", "v_legacy"] },
-    { "id": "v_legacy",  "x": 4200, "y": 2800, "connectedTo": ["v_open", "v_server"] }
+    {
+      "id": "v_open",
+      "x": 600,
+      "y": 600,
+      "connectedTo": [
+        "v_server",
+        "v_legacy"
+      ]
+    },
+    {
+      "id": "v_server",
+      "x": 800,
+      "y": 2000,
+      "connectedTo": [
+        "v_open",
+        "v_legacy"
+      ]
+    },
+    {
+      "id": "v_legacy",
+      "x": 4200,
+      "y": 2800,
+      "connectedTo": [
+        "v_open",
+        "v_server"
+      ]
+    }
   ],
   "mapObjects": [
-    { "id": "os-desk-qa",       "x": 400,  "y": 400,  "width": 110, "height": 60,  "kind": "desk",            "blocksMovement": false, "taskId": "fix_unit_tests", "objectType": "qa_terminal" },
-    { "id": "os-monitor-qa",    "x": 400,  "y": 380,  "width": 60,  "height": 30,  "kind": "monitor",         "blocksMovement": false },
-    { "id": "os-chair-qa",      "x": 400,  "y": 470,  "width": 50,  "height": 50,  "kind": "chair_desk",      "blocksMovement": false },
-    { "id": "os-desk-git",      "x": 1100, "y": 1200, "width": 110, "height": 60,  "kind": "desk",            "blocksMovement": false, "taskId": "review_pr",      "objectType": "git_terminal" },
-    { "id": "os-monitor-git",   "x": 1100, "y": 1180, "width": 60,  "height": 30,  "kind": "monitor",         "blocksMovement": false },
-    { "id": "os-chair-git",     "x": 1100, "y": 1270, "width": 50,  "height": 50,  "kind": "chair_desk",      "blocksMovement": false },
-    { "id": "os-desk-decoy-1",  "x": 750,  "y": 400,  "width": 110, "height": 60,  "kind": "desk" },
-    { "id": "os-desk-decoy-2",  "x": 1100, "y": 700,  "width": 110, "height": 60,  "kind": "desk" },
-    { "id": "os-desk-decoy-3",  "x": 400,  "y": 1200, "width": 110, "height": 60,  "kind": "desk" },
-    { "id": "os-plant",         "x": 1450, "y": 200,  "width": 60,  "height": 60,  "kind": "plant_cactus",    "blocksMovement": false },
-
-    { "id": "mr-table",         "x": 2400, "y": 700,  "width": 480, "height": 140, "kind": "meeting_table" },
-    { "id": "mr-chair-1",       "x": 2200, "y": 580,  "width": 50,  "height": 50,  "kind": "chair_meeting",   "blocksMovement": false },
-    { "id": "mr-chair-2",       "x": 2400, "y": 580,  "width": 50,  "height": 50,  "kind": "chair_meeting",   "blocksMovement": false },
-    { "id": "mr-chair-3",       "x": 2600, "y": 580,  "width": 50,  "height": 50,  "kind": "chair_meeting",   "blocksMovement": false },
-    { "id": "mr-chair-4",       "x": 2200, "y": 820,  "width": 50,  "height": 50,  "kind": "chair_meeting",   "blocksMovement": false },
-    { "id": "mr-chair-5",       "x": 2400, "y": 820,  "width": 50,  "height": 50,  "kind": "chair_meeting",   "blocksMovement": false },
-    { "id": "mr-chair-6",       "x": 2600, "y": 820,  "width": 50,  "height": 50,  "kind": "chair_meeting",   "blocksMovement": false },
-    { "id": "mr-screen-scope",  "x": 2000, "y": 200,  "width": 200, "height": 30,  "kind": "presentation_screen", "blocksMovement": false, "taskId": "reduce_scope", "objectType": "meeting_screen" },
-    { "id": "mr-screen-scope-anchor", "x": 2000, "y": 400, "width": 80, "height": 40, "kind": "monitor",     "blocksMovement": false },
-    { "id": "mr-release-desk",  "x": 2800, "y": 1200, "width": 110, "height": 60,  "kind": "desk",            "blocksMovement": false, "taskId": "write_release_notes", "objectType": "release_console" },
-
-    { "id": "kt-counter-1",     "x": 3700, "y": 600,  "width": 320, "height": 80,  "kind": "kitchen_counter" },
-    { "id": "kt-counter-2",     "x": 4100, "y": 600,  "width": 280, "height": 80,  "kind": "kitchen_counter" },
-    { "id": "kt-coffee",        "x": 4000, "y": 800,  "width": 90,  "height": 90,  "kind": "coffee_machine",  "blocksMovement": false, "taskId": "refill_coffee", "objectType": "coffee_machine" },
-    { "id": "kt-fridge",        "x": 3500, "y": 250,  "width": 100, "height": 130, "kind": "fridge" },
-    { "id": "kt-stool-1",       "x": 3700, "y": 750,  "width": 50,  "height": 50,  "kind": "chair_stool",     "blocksMovement": false },
-    { "id": "kt-stool-2",       "x": 3850, "y": 750,  "width": 50,  "height": 50,  "kind": "chair_stool",     "blocksMovement": false },
-    { "id": "kt-plant",         "x": 4500, "y": 1300, "width": 60,  "height": 60,  "kind": "plant_cactus",    "blocksMovement": false },
-
-    { "id": "sr-rack-1",        "x": 300,  "y": 2000, "width": 80,  "height": 100, "kind": "server_rack" },
-    { "id": "sr-rack-2",        "x": 300,  "y": 2150, "width": 80,  "height": 100, "kind": "server_rack" },
-    { "id": "sr-rack-3",        "x": 1300, "y": 2000, "width": 80,  "height": 100, "kind": "server_rack" },
-    { "id": "sr-rack-4",        "x": 1300, "y": 2150, "width": 80,  "height": 100, "kind": "server_rack" },
-    { "id": "sr-ci-desk",       "x": 800,  "y": 2400, "width": 110, "height": 60,  "kind": "desk",            "blocksMovement": false, "taskId": "repair_deployment", "objectType": "ci_console", "sabotageRepairId": "lights_out" },
-    { "id": "sr-monitoring",    "x": 1200, "y": 2800, "width": 200, "height": 60,  "kind": "monitoring_panel", "blocksMovement": false, "taskId": "analyze_logs", "objectType": "monitoring_panel" },
-    { "id": "sr-cabinet",       "x": 200,  "y": 2700, "width": 80,  "height": 80,  "kind": "cabinet" },
-
-    { "id": "wr-screen-wall",   "x": 2400, "y": 1700, "width": 480, "height": 30,  "kind": "presentation_screen", "blocksMovement": false },
-    { "id": "wr-conference",    "x": 2400, "y": 2400, "width": 360, "height": 120, "kind": "meeting_table" },
-    { "id": "wr-chair-1",       "x": 2250, "y": 2300, "width": 50,  "height": 50,  "kind": "chair_meeting",   "blocksMovement": false },
-    { "id": "wr-chair-2",       "x": 2550, "y": 2300, "width": 50,  "height": 50,  "kind": "chair_meeting",   "blocksMovement": false },
-    { "id": "wr-plant",         "x": 3050, "y": 1750, "width": 60,  "height": 60,  "kind": "plant_cactus",    "blocksMovement": false },
-
-    { "id": "lb-old-desk",      "x": 4000, "y": 2400, "width": 110, "height": 60,  "kind": "old_workstation", "blocksMovement": false, "taskId": "calm_legacy_service", "objectType": "legacy_terminal", "sabotageRepairId": "comms_outage" },
-    { "id": "lb-crate-1",       "x": 3500, "y": 2000, "width": 70,  "height": 70,  "kind": "crate" },
-    { "id": "lb-crate-2",       "x": 3600, "y": 2000, "width": 70,  "height": 70,  "kind": "crate" },
-    { "id": "lb-crate-3",       "x": 4500, "y": 1900, "width": 70,  "height": 70,  "kind": "crate" },
-    { "id": "lb-cabinet",       "x": 3400, "y": 2900, "width": 80,  "height": 80,  "kind": "cabinet" }
+    {
+      "id": "os-desk-qa",
+      "x": 400,
+      "y": 400,
+      "width": 110,
+      "height": 60,
+      "kind": "desk",
+      "blocksMovement": false,
+      "taskId": "fix_unit_tests",
+      "objectType": "qa_terminal"
+    },
+    {
+      "id": "os-monitor-qa",
+      "x": 400,
+      "y": 380,
+      "width": 60,
+      "height": 30,
+      "kind": "monitor",
+      "blocksMovement": false
+    },
+    {
+      "id": "os-chair-qa",
+      "x": 400,
+      "y": 470,
+      "width": 50,
+      "height": 50,
+      "kind": "chair_desk",
+      "blocksMovement": false
+    },
+    {
+      "id": "os-desk-git",
+      "x": 1100,
+      "y": 1200,
+      "width": 110,
+      "height": 60,
+      "kind": "desk",
+      "blocksMovement": false,
+      "taskId": "review_pr",
+      "objectType": "git_terminal"
+    },
+    {
+      "id": "os-monitor-git",
+      "x": 1100,
+      "y": 1180,
+      "width": 60,
+      "height": 30,
+      "kind": "monitor",
+      "blocksMovement": false
+    },
+    {
+      "id": "os-chair-git",
+      "x": 1100,
+      "y": 1270,
+      "width": 50,
+      "height": 50,
+      "kind": "chair_desk",
+      "blocksMovement": false
+    },
+    {
+      "id": "os-desk-decoy-1",
+      "x": 750,
+      "y": 400,
+      "width": 110,
+      "height": 60,
+      "kind": "desk"
+    },
+    {
+      "id": "os-desk-decoy-2",
+      "x": 1100,
+      "y": 700,
+      "width": 110,
+      "height": 60,
+      "kind": "desk"
+    },
+    {
+      "id": "os-desk-decoy-3",
+      "x": 400,
+      "y": 1200,
+      "width": 110,
+      "height": 60,
+      "kind": "desk"
+    },
+    {
+      "id": "os-plant",
+      "x": 1450,
+      "y": 200,
+      "width": 60,
+      "height": 60,
+      "kind": "plant_cactus",
+      "blocksMovement": false
+    },
+    {
+      "id": "mr-table",
+      "x": 2400,
+      "y": 700,
+      "width": 480,
+      "height": 140,
+      "kind": "meeting_table"
+    },
+    {
+      "id": "mr-chair-1",
+      "x": 2200,
+      "y": 580,
+      "width": 50,
+      "height": 50,
+      "kind": "chair_meeting",
+      "blocksMovement": false
+    },
+    {
+      "id": "mr-chair-2",
+      "x": 2400,
+      "y": 580,
+      "width": 50,
+      "height": 50,
+      "kind": "chair_meeting",
+      "blocksMovement": false
+    },
+    {
+      "id": "mr-chair-3",
+      "x": 2600,
+      "y": 580,
+      "width": 50,
+      "height": 50,
+      "kind": "chair_meeting",
+      "blocksMovement": false
+    },
+    {
+      "id": "mr-chair-4",
+      "x": 2200,
+      "y": 820,
+      "width": 50,
+      "height": 50,
+      "kind": "chair_meeting",
+      "blocksMovement": false
+    },
+    {
+      "id": "mr-chair-5",
+      "x": 2400,
+      "y": 820,
+      "width": 50,
+      "height": 50,
+      "kind": "chair_meeting",
+      "blocksMovement": false
+    },
+    {
+      "id": "mr-chair-6",
+      "x": 2600,
+      "y": 820,
+      "width": 50,
+      "height": 50,
+      "kind": "chair_meeting",
+      "blocksMovement": false
+    },
+    {
+      "id": "mr-screen-scope",
+      "x": 2000,
+      "y": 200,
+      "width": 200,
+      "height": 30,
+      "kind": "presentation_screen",
+      "blocksMovement": false,
+      "taskId": "reduce_scope",
+      "objectType": "meeting_screen"
+    },
+    {
+      "id": "mr-screen-scope-anchor",
+      "x": 2000,
+      "y": 400,
+      "width": 80,
+      "height": 40,
+      "kind": "monitor",
+      "blocksMovement": false
+    },
+    {
+      "id": "mr-release-desk",
+      "x": 2800,
+      "y": 1200,
+      "width": 110,
+      "height": 60,
+      "kind": "desk",
+      "blocksMovement": false,
+      "taskId": "write_release_notes",
+      "objectType": "release_console"
+    },
+    {
+      "id": "kt-counter-1",
+      "x": 3700,
+      "y": 600,
+      "width": 320,
+      "height": 80,
+      "kind": "kitchen_counter"
+    },
+    {
+      "id": "kt-counter-2",
+      "x": 4100,
+      "y": 600,
+      "width": 280,
+      "height": 80,
+      "kind": "kitchen_counter"
+    },
+    {
+      "id": "kt-coffee",
+      "x": 4000,
+      "y": 800,
+      "width": 90,
+      "height": 90,
+      "kind": "coffee_machine",
+      "blocksMovement": false,
+      "taskId": "refill_coffee",
+      "objectType": "coffee_machine"
+    },
+    {
+      "id": "kt-fridge",
+      "x": 3500,
+      "y": 250,
+      "width": 100,
+      "height": 130,
+      "kind": "fridge"
+    },
+    {
+      "id": "kt-stool-1",
+      "x": 3700,
+      "y": 750,
+      "width": 50,
+      "height": 50,
+      "kind": "chair_stool",
+      "blocksMovement": false
+    },
+    {
+      "id": "kt-stool-2",
+      "x": 3850,
+      "y": 750,
+      "width": 50,
+      "height": 50,
+      "kind": "chair_stool",
+      "blocksMovement": false
+    },
+    {
+      "id": "kt-plant",
+      "x": 4500,
+      "y": 1300,
+      "width": 60,
+      "height": 60,
+      "kind": "plant_cactus",
+      "blocksMovement": false
+    },
+    {
+      "id": "sr-rack-1",
+      "x": 300,
+      "y": 2000,
+      "width": 80,
+      "height": 100,
+      "kind": "server_rack"
+    },
+    {
+      "id": "sr-rack-2",
+      "x": 300,
+      "y": 2150,
+      "width": 80,
+      "height": 100,
+      "kind": "server_rack"
+    },
+    {
+      "id": "sr-rack-3",
+      "x": 1300,
+      "y": 2000,
+      "width": 80,
+      "height": 100,
+      "kind": "server_rack"
+    },
+    {
+      "id": "sr-rack-4",
+      "x": 1300,
+      "y": 2150,
+      "width": 80,
+      "height": 100,
+      "kind": "server_rack"
+    },
+    {
+      "id": "sr-ci-desk",
+      "x": 800,
+      "y": 2400,
+      "width": 110,
+      "height": 60,
+      "kind": "desk",
+      "blocksMovement": false,
+      "taskId": "repair_deployment",
+      "objectType": "ci_console",
+      "sabotageRepairId": "lights_out"
+    },
+    {
+      "id": "sr-monitoring",
+      "x": 1200,
+      "y": 2800,
+      "width": 200,
+      "height": 60,
+      "kind": "monitoring_panel",
+      "blocksMovement": false,
+      "taskId": "analyze_logs",
+      "objectType": "monitoring_panel"
+    },
+    {
+      "id": "sr-cabinet",
+      "x": 200,
+      "y": 2700,
+      "width": 80,
+      "height": 80,
+      "kind": "cabinet"
+    },
+    {
+      "id": "wr-screen-wall",
+      "x": 2400,
+      "y": 1700,
+      "width": 480,
+      "height": 30,
+      "kind": "presentation_screen",
+      "blocksMovement": false
+    },
+    {
+      "id": "wr-conference",
+      "x": 2400,
+      "y": 2400,
+      "width": 360,
+      "height": 120,
+      "kind": "meeting_table"
+    },
+    {
+      "id": "wr-chair-1",
+      "x": 2250,
+      "y": 2300,
+      "width": 50,
+      "height": 50,
+      "kind": "chair_meeting",
+      "blocksMovement": false
+    },
+    {
+      "id": "wr-chair-2",
+      "x": 2550,
+      "y": 2300,
+      "width": 50,
+      "height": 50,
+      "kind": "chair_meeting",
+      "blocksMovement": false
+    },
+    {
+      "id": "wr-plant",
+      "x": 3050,
+      "y": 1750,
+      "width": 60,
+      "height": 60,
+      "kind": "plant_cactus",
+      "blocksMovement": false
+    },
+    {
+      "id": "lb-old-desk",
+      "x": 4000,
+      "y": 2400,
+      "width": 110,
+      "height": 60,
+      "kind": "old_workstation",
+      "blocksMovement": false,
+      "taskId": "calm_legacy_service",
+      "objectType": "legacy_terminal",
+      "sabotageRepairId": "comms_outage"
+    },
+    {
+      "id": "lb-crate-1",
+      "x": 3500,
+      "y": 2000,
+      "width": 70,
+      "height": 70,
+      "kind": "crate"
+    },
+    {
+      "id": "lb-crate-2",
+      "x": 3600,
+      "y": 2000,
+      "width": 70,
+      "height": 70,
+      "kind": "crate"
+    },
+    {
+      "id": "lb-crate-3",
+      "x": 4500,
+      "y": 1900,
+      "width": 70,
+      "height": 70,
+      "kind": "crate"
+    },
+    {
+      "id": "lb-cabinet",
+      "x": 3400,
+      "y": 2900,
+      "width": 80,
+      "height": 80,
+      "kind": "cabinet"
+    }
   ],
   "warRoomId": "war_room"
 }

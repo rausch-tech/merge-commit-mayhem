@@ -160,10 +160,11 @@ function render() {
     ctx2d.fillText(r.title || r.id, r.x + 8, r.y + 22 / state.view.scale);
   }
 
-  // Wall lines: solid black where wall, gray where door cutout.
-  for (const wl of state.map.wallLines) {
-    drawWallLine(wl);
-  }
+  // Walls (Slice-3): auto-derived from room edges minus doors.
+  // Editor mirrors what the server computes so the user sees the live
+  // result of moving rooms or adding/removing doors.
+  drawAutoWalls();
+  drawDoors();
 
   // Spawn points.
   for (let i = 0; i < state.map.spawnPoints.length; i++) {
@@ -322,62 +323,140 @@ function drawGrid() {
   }
 }
 
-function drawWallLine(wl) {
-  const w = state.map.size.width;
-  const h = state.map.size.height;
-  const thickness = 8;
-  ctx2d.lineWidth = thickness / state.view.scale;
-  if (wl.axis === "x") {
-    // Vertical line at x=position.
-    const segments = computeSegments(0, h, wl.doors || []);
-    for (const [a, b] of segments.solid) {
-      ctx2d.strokeStyle = "#0a0a0a";
-      ctx2d.beginPath();
-      ctx2d.moveTo(wl.position, a);
-      ctx2d.lineTo(wl.position, b);
-      ctx2d.stroke();
-    }
-    for (const [a, b] of segments.gaps) {
-      ctx2d.strokeStyle = "#555a64";
-      ctx2d.beginPath();
-      ctx2d.moveTo(wl.position, a);
-      ctx2d.lineTo(wl.position, b);
-      ctx2d.stroke();
-    }
-  } else {
-    const segments = computeSegments(0, w, wl.doors || []);
-    for (const [a, b] of segments.solid) {
-      ctx2d.strokeStyle = "#0a0a0a";
-      ctx2d.beginPath();
-      ctx2d.moveTo(a, wl.position);
-      ctx2d.lineTo(b, wl.position);
-      ctx2d.stroke();
-    }
-    for (const [a, b] of segments.gaps) {
-      ctx2d.strokeStyle = "#555a64";
-      ctx2d.beginPath();
-      ctx2d.moveTo(a, wl.position);
-      ctx2d.lineTo(b, wl.position);
-      ctx2d.stroke();
+// Slice-3: walls auto-derived from room edges (no more wallLines).
+// Mirrors render.js:computeWallsClient — keep in sync with the server's
+// app/game/game_map.compute_walls.
+
+function _intervalSubtract(start, end, cutouts) {
+  if (start >= end) return [];
+  if (!cutouts.length) return [[start, end]];
+  const clipped = cutouts
+    .map(([a, b]) => [Math.max(a, start), Math.min(b, end)])
+    .filter(([a, b]) => a < b)
+    .sort((p, q) => p[0] - q[0]);
+  const out = [];
+  let cursor = start;
+  for (const [a, b] of clipped) {
+    if (a > cursor) out.push([cursor, a]);
+    cursor = Math.max(cursor, b);
+  }
+  if (cursor < end) out.push([cursor, end]);
+  return out;
+}
+
+function _edgeOverlap(other, axis, edgePos, start, end) {
+  if (axis === "x") {
+    if (other.x !== edgePos && other.x + other.width !== edgePos) return null;
+    const a = Math.max(start, other.y);
+    const b = Math.min(end, other.y + other.height);
+    return a < b ? [a, b] : null;
+  }
+  if (other.y !== edgePos && other.y + other.height !== edgePos) return null;
+  const a = Math.max(start, other.x);
+  const b = Math.min(end, other.x + other.width);
+  return a < b ? [a, b] : null;
+}
+
+function drawAutoWalls() {
+  const rooms = state.map.rooms || [];
+  const doors = state.map.doors || [];
+  const mapW = state.map.size.width;
+  const mapH = state.map.size.height;
+  const isMapEdge = (axis, edgePos) =>
+    axis === "x" ? edgePos === 0 || edgePos === mapW : edgePos === 0 || edgePos === mapH;
+  const processed = new Set();
+  ctx2d.fillStyle = "#0a0a0a";
+  for (const room of rooms) {
+    const edges = [
+      ["y", room.y, room.x, room.x + room.width],
+      ["y", room.y + room.height, room.x, room.x + room.width],
+      ["x", room.x, room.y, room.y + room.height],
+      ["x", room.x + room.width, room.y, room.y + room.height],
+    ];
+    for (const [axis, edgePos, start, end] of edges) {
+      const sharedList = [];
+      for (const other of rooms) {
+        if (other.id === room.id) continue;
+        const ovl = _edgeOverlap(other, axis, edgePos, start, end);
+        if (ovl) sharedList.push([other.id, ovl]);
+      }
+      for (const [otherId, ovl] of sharedList) {
+        const pairKey = [room.id, otherId].sort();
+        const key = `${axis}|${edgePos}|${pairKey[0]}|${pairKey[1]}|${ovl[0]}|${ovl[1]}`;
+        if (processed.has(key)) continue;
+        processed.add(key);
+        const cutouts = [];
+        for (const door of doors) {
+          const dPair = [door.betweenRoomA, door.betweenRoomB].sort();
+          if (dPair[0] !== pairKey[0] || dPair[1] !== pairKey[1]) continue;
+          if (door.position < ovl[0] || door.position > ovl[1]) continue;
+          const half = Math.floor((door.width || 240) / 2);
+          cutouts.push([door.position - half, door.position + half]);
+        }
+        for (const [a, b] of _intervalSubtract(ovl[0], ovl[1], cutouts)) {
+          if (axis === "x") ctx2d.fillRect(edgePos - 8, a, 16, b - a);
+          else ctx2d.fillRect(a, edgePos - 8, b - a, 16);
+        }
+      }
+      if (!isMapEdge(axis, edgePos)) {
+        const sharedCuts = sharedList.map(([, ovl]) => ovl);
+        for (const [a, b] of _intervalSubtract(start, end, sharedCuts)) {
+          if (axis === "x") ctx2d.fillRect(edgePos - 8, a, 16, b - a);
+          else ctx2d.fillRect(a, edgePos - 8, b - a, 16);
+        }
+      }
     }
   }
 }
 
-function computeSegments(start, end, doors) {
-  // Returns { solid: [[a,b], ...], gaps: [[a,b], ...] } over [start, end].
-  const sorted = [...doors].sort((x, y) => x.center - y.center);
-  const solid = [];
-  const gaps = [];
-  let cursor = start;
-  for (const d of sorted) {
-    const a = d.center - d.width / 2;
-    const b = d.center + d.width / 2;
-    if (a > cursor) solid.push([cursor, a]);
-    gaps.push([Math.max(start, a), Math.min(end, b)]);
-    cursor = Math.max(cursor, b);
+function drawDoors() {
+  const rooms = state.map.rooms || [];
+  const doors = state.map.doors || [];
+  const roomById = new Map(rooms.map((r) => [r.id, r]));
+  ctx2d.save();
+  ctx2d.lineWidth = 2 / state.view.scale;
+  for (const d of doors) {
+    const a = roomById.get(d.betweenRoomA);
+    const b = roomById.get(d.betweenRoomB);
+    if (!a || !b) continue;
+    // Determine the shared edge between rooms a and b (axis + position).
+    const edge = _findSharedEdge(a, b);
+    if (!edge) continue;
+    const half = Math.floor((d.width || 240) / 2);
+    if (edge.axis === "x") {
+      // Vertical edge — door is a horizontal gap on x=edge.position.
+      ctx2d.fillStyle = "#facc15";
+      ctx2d.fillRect(edge.position - 8, d.position - half, 16, half * 2);
+      ctx2d.strokeStyle = "#a16207";
+      ctx2d.strokeRect(edge.position - 8, d.position - half, 16, half * 2);
+      ctx2d.fillStyle = "#1a1a1a";
+      ctx2d.font = `${Math.max(9, 11 / state.view.scale)}px monospace`;
+      ctx2d.textAlign = "left";
+      ctx2d.textBaseline = "middle";
+      ctx2d.fillText(d.id, edge.position + 14, d.position);
+    } else {
+      ctx2d.fillStyle = "#facc15";
+      ctx2d.fillRect(d.position - half, edge.position - 8, half * 2, 16);
+      ctx2d.strokeStyle = "#a16207";
+      ctx2d.strokeRect(d.position - half, edge.position - 8, half * 2, 16);
+      ctx2d.fillStyle = "#1a1a1a";
+      ctx2d.font = `${Math.max(9, 11 / state.view.scale)}px monospace`;
+      ctx2d.textAlign = "center";
+      ctx2d.textBaseline = "top";
+      ctx2d.fillText(d.id, d.position, edge.position + 12);
+    }
   }
-  if (cursor < end) solid.push([cursor, end]);
-  return { solid, gaps };
+  ctx2d.restore();
+}
+
+function _findSharedEdge(a, b) {
+  // Vertical shared edge: a.right == b.left or a.left == b.right.
+  if (a.x + a.width === b.x) return { axis: "x", position: b.x };
+  if (b.x + b.width === a.x) return { axis: "x", position: a.x };
+  // Horizontal shared edge.
+  if (a.y + a.height === b.y) return { axis: "y", position: b.y };
+  if (b.y + b.height === a.y) return { axis: "y", position: a.y };
+  return null;
 }
 
 function drawSelectionHighlight() {
@@ -390,19 +469,6 @@ function drawSelectionHighlight() {
   if (sel.kind === "room") {
     const r = state.map.rooms[sel.index];
     if (r) ctx2d.strokeRect(r.x - 2, r.y - 2, r.width + 4, r.height + 4);
-  } else if (sel.kind === "wall") {
-    const wl = state.map.wallLines[sel.index];
-    if (wl) {
-      ctx2d.beginPath();
-      if (wl.axis === "x") {
-        ctx2d.moveTo(wl.position, 0);
-        ctx2d.lineTo(wl.position, state.map.size.height);
-      } else {
-        ctx2d.moveTo(0, wl.position);
-        ctx2d.lineTo(state.map.size.width, wl.position);
-      }
-      ctx2d.stroke();
-    }
   } else if (sel.kind === "spawn") {
     const s = state.map.spawnPoints[sel.index];
     if (s) {
@@ -496,8 +562,14 @@ function deleteSelection() {
   if (sel.kind === "room") {
     const removed = state.map.rooms.splice(sel.index, 1)[0];
     if (removed && state.map.warRoomId === removed.id) state.map.warRoomId = "";
-  } else if (sel.kind === "wall") {
-    state.map.wallLines.splice(sel.index, 1);
+    // Drop any doors that referenced the removed room — they have nowhere
+    // to live anymore. Slice-4 will offer a UI to keep them attached when
+    // the user drags an adjacent edge instead.
+    if (removed) {
+      state.map.doors = (state.map.doors || []).filter(
+        (d) => d.betweenRoomA !== removed.id && d.betweenRoomB !== removed.id
+      );
+    }
   } else if (sel.kind === "spawn") {
     state.map.spawnPoints.splice(sel.index, 1);
   } else if (sel.kind === "task") {
@@ -577,7 +649,6 @@ function renderPropsSidebar() {
   dom.propsContent.classList.remove("hidden");
   dom.propsContent.innerHTML = "";
   if (sel.kind === "room") return renderRoomProps(sel.index);
-  if (sel.kind === "wall") return renderWallProps(sel.index);
   if (sel.kind === "spawn") return renderSpawnProps(sel.index);
   if (sel.kind === "task") return renderTaskProps(sel.index);
   if (sel.kind === "object") return renderObjectProps(sel.index);
@@ -688,94 +759,6 @@ function renderRoomProps(i) {
       "color"
     )
   );
-  appendDeleteButton(root);
-}
-
-function renderWallProps(i) {
-  const wl = state.map.wallLines[i];
-  if (!wl) return;
-  const root = dom.propsContent;
-  root.appendChild(
-    makeField("Achse (x|y)", wl.axis, (v) => {
-      if (v === "x" || v === "y") {
-        wl.axis = v;
-        toolContext.markDirty();
-        requestRender();
-      }
-    })
-  );
-  root.appendChild(
-    makeField(
-      "Position",
-      wl.position,
-      (v) => {
-        const n = parseInt(v, 10);
-        if (Number.isFinite(n)) {
-          wl.position = n;
-          toolContext.markDirty();
-          requestRender();
-        }
-      },
-      "number"
-    )
-  );
-  const doorsSection = document.createElement("div");
-  doorsSection.className = "doors-section";
-  const heading = document.createElement("strong");
-  heading.textContent = "Türen";
-  doorsSection.appendChild(heading);
-  for (let di = 0; di < (wl.doors || []).length; di++) {
-    const d = wl.doors[di];
-    const row = document.createElement("div");
-    row.className = "door-row";
-    const cInput = document.createElement("input");
-    cInput.type = "number";
-    cInput.value = d.center;
-    cInput.title = "Mittelpunkt";
-    cInput.addEventListener("input", () => {
-      const n = parseInt(cInput.value, 10);
-      if (Number.isFinite(n)) {
-        d.center = n;
-        toolContext.markDirty();
-        requestRender();
-      }
-    });
-    const wInput = document.createElement("input");
-    wInput.type = "number";
-    wInput.value = d.width;
-    wInput.title = "Breite";
-    wInput.addEventListener("input", () => {
-      const n = parseInt(wInput.value, 10);
-      if (Number.isFinite(n) && n > 0) {
-        d.width = n;
-        toolContext.markDirty();
-        requestRender();
-      }
-    });
-    const removeBtn = document.createElement("button");
-    removeBtn.textContent = "x";
-    removeBtn.className = "danger";
-    removeBtn.addEventListener("click", () => {
-      wl.doors.splice(di, 1);
-      toolContext.markDirty();
-      renderPropsSidebar();
-      requestRender();
-    });
-    row.append("c=", cInput, "w=", wInput, removeBtn);
-    doorsSection.appendChild(row);
-  }
-  const addBtn = document.createElement("button");
-  addBtn.textContent = "+ Tür";
-  addBtn.addEventListener("click", () => {
-    const max = wl.axis === "x" ? state.map.size.height : state.map.size.width;
-    wl.doors = wl.doors || [];
-    wl.doors.push({ center: Math.round(max / 2), width: 240 });
-    toolContext.markDirty();
-    renderPropsSidebar();
-    requestRender();
-  });
-  doorsSection.appendChild(addBtn);
-  root.appendChild(doorsSection);
   appendDeleteButton(root);
 }
 

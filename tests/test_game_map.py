@@ -38,8 +38,11 @@ def test_default_map_room_ids_are_unique():
     assert len(ids) == len(set(ids))
 
 
-def test_default_map_has_three_wall_lines():
-    assert len(DEFAULT_MAP.wall_lines) == 3
+def test_default_map_has_seven_doors():
+    """Slice-3 schema: walls are auto-derived from rooms; doors are the only
+    explicit wall-related field. Default map: 7 doors connecting the six
+    rooms (one between each adjacent pair)."""
+    assert len(DEFAULT_MAP.doors) == 7
 
 
 def test_default_map_has_spawn_points():
@@ -97,14 +100,14 @@ def test_load_map_raises_on_extra_field_in_room():
 # --- compute_walls -----------------------------------------------------------
 
 
-def test_compute_walls_includes_wall_lines_plus_blocking_objects():
-    """Default map: 10 segments from wall_lines (3+3+4) + N AABBs from
-    map_objects with blocks_movement=True. The exact number of blocking
-    objects depends on the default-map content; we assert the lower
-    bound (the wall lines) and that the total > 10."""
+def test_compute_walls_includes_room_edges_plus_blocking_objects():
+    """Default map: 14 wall segments derived from adjacent room edges
+    (7 shared edges, each split into 2 segments by one door) plus one AABB
+    per blocking MapObject. The 14 number is verified by the per-edge
+    tests below; this is the aggregate sanity check."""
     walls = compute_walls(DEFAULT_MAP)
     blocking = sum(1 for o in DEFAULT_MAP.map_objects if o.blocks_movement)
-    assert len(walls) == 10 + blocking
+    assert len(walls) == 14 + blocking
 
 
 def test_compute_walls_are_tuples_of_four_ints():
@@ -116,20 +119,24 @@ def test_compute_walls_are_tuples_of_four_ints():
 
 def test_compute_walls_vertical_wall_at_1600():
     walls = compute_walls(DEFAULT_MAP)
-    # All vertical-wall segments for line x=1600 should have x1 < 1600 < x2.
+    # x=1600 is shared between two room PAIRS now (open_space|meeting_room
+    # and server_room|war_room). Each pair has one door, so each pair
+    # produces 2 wall segments → 4 total along x=1600.
     vert_1600 = [
         w for w in walls if w[0] == 1600 - WALL_THICKNESS and w[2] == 1600 + WALL_THICKNESS
     ]
-    assert len(vert_1600) == 3  # 3 segments (2 doors cut it into 3)
+    assert len(vert_1600) == 4
 
 
 def test_compute_walls_horizontal_wall_at_1600():
     walls = compute_walls(DEFAULT_MAP)
-    # Horizontal wall segments for line y=1600.
+    # y=1600 is shared between three room pairs (open_space|server_room,
+    # meeting_room|war_room, kitchen|legacy_basement). Each has one door
+    # → 2 segments each → 6 total along y=1600.
     horiz_1600 = [
         w for w in walls if w[1] == 1600 - WALL_THICKNESS and w[3] == 1600 + WALL_THICKNESS
     ]
-    assert len(horiz_1600) == 4  # 3 doors cut it into 4
+    assert len(horiz_1600) == 6
 
 
 # --- war_room_bounds_for -----------------------------------------------------

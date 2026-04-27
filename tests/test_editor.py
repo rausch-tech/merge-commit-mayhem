@@ -56,7 +56,7 @@ def _blank_map_payload() -> dict:
         "name": "untitled",
         "size": {"width": 4800, "height": 3200},
         "rooms": [],
-        "wallLines": [],
+        "doors": [],
         "spawnPoints": [],
         "taskAnchors": [],
         "warRoomId": "",
