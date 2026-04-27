@@ -81,9 +81,13 @@ def test_aabb_rotation_90_or_270_swaps_dimensions(rot):
 
 
 def test_legacy_map_without_map_objects_still_loads():
-    """maps/default.json + maps/small.json don't have mapObjects yet —
-    they must continue to validate cleanly."""
-    assert DEFAULT_MAP.map_objects == []
+    """A map without ``mapObjects`` (small.json) keeps validating cleanly
+    — backward-compat invariant. ``default.json`` opts in (the Tier-4
+    redesign added ~40 props); use small.json as the no-objects fixture."""
+    from app.game.game_map import discover_maps
+
+    registry = discover_maps()
+    assert registry["small"].map_objects == []
 
 
 def test_map_object_json_roundtrip_keeps_camel_case_on_wire():
