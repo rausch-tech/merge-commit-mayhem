@@ -758,3 +758,10 @@ async def editor_page() -> FileResponse:
     files conforming to ``docs/maps.md``. No editor-specific server state.
     """
     return FileResponse(_static_dir / "editor" / "editor.html")
+
+
+@app.get("/spielprinzip")
+async def spielprinzip_page() -> FileResponse:
+    """Serve the long-form game-overview subpage with screenshots, role
+    matrix, sabotage-object map and design philosophy."""
+    return FileResponse(_static_dir / "spielprinzip.html")

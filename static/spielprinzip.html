@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <title>Spielprinzip — Merge Conflict Mayhem</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Wie Merge Conflict Mayhem funktioniert: Rollen, persönliche Tasks, Coffee-Energy, Sabotagen, Meetings. Vollständige Doku mit Screenshots."
+    />
+    <link rel="stylesheet" href="/static/landing.css" />
+    <link rel="stylesheet" href="/static/spielprinzip.css" />
+    <link rel="preload" as="image" href="/images/logo.png" />
+  </head>
+  <body class="page-spielprinzip">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="/">
+          <span class="brand-prompt">$</span>
+          <span class="brand-name">merge-conflict-mayhem</span>
+        </a>
+        <nav class="topbar-nav">
+          <a href="/#was-ist-das">Was ist das?</a>
+          <a href="/spielprinzip" class="active">Spielprinzip</a>
+          <a href="/#how-to-play">How to Play</a>
+          <a href="/#rollen">Rollen</a>
+          <a href="/#roadmap">Roadmap</a>
+          <a class="topbar-cta" href="/play">Spielen &rarr;</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="sub-main">
+      <!-- Sub-Hero -->
+      <section class="sub-hero">
+        <div class="sub-hero-inner">
+          <p class="kicker">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+            <span class="kicker-text">// docs / spielprinzip</span>
+          </p>
+          <h1 class="sub-hero-title">Spielprinzip & Hintergrund</h1>
+          <p class="sub-hero-sub">
+            Eine vollständige Tour: Rollen mit echten Stärken, persönliche Aufgaben pro Spieler,
+            Coffee als Team-Ressource, Sabotagen die wie normale Arbeit aussehen, und ein
+            Meeting-Screen, der euch Diskussionsstoff liefert &mdash; aber niemals Beweise.
+          </p>
+          <div class="sub-hero-meta">
+            <span class="sub-meta-pill">Stand 2026-04-27</span>
+            <span class="sub-meta-pill">Tier 0&ndash;3.7 live</span>
+            <span class="sub-meta-pill">~10&nbsp;min&nbsp;/&nbsp;Runde</span>
+            <span class="sub-meta-pill">4&ndash;12 Spieler</span>
+          </div>
+          <nav class="sub-toc" aria-label="Inhalt">
+            <a href="#vision">// vision</a>
+            <a href="#runde">// rundenablauf</a>
+            <a href="#rollen-detail">// rollen</a>
+            <a href="#tasks">// tasks &amp; coffee</a>
+            <a href="#sabotagen">// sabotagen</a>
+            <a href="#meetings">// meetings</a>
+            <a href="#endscreen">// endscreen</a>
+            <a href="#ai">// ai-flavor</a>
+            <a href="#tech">// tech</a>
+          </nav>
+        </div>
+      </section>
+
+      <!-- Vision -->
+      <section id="vision" class="section">
+        <div class="section-head">
+          <span class="section-tag">// section_01</span>
+          <h2>Vision &mdash; warum das Spiel existiert</h2>
+        </div>
+        <div class="prose">
+          <p>
+            Wir wollten ein Spiel haben, das man in der Mittagspause mit dem ganzen Team starten
+            kann &mdash; ohne Download, ohne Account, ohne 20 Minuten Tutorial. Among Us hat das
+            Format perfektioniert; uns hat aber gefehlt, dass die Tasks und Sabotagen sich nach
+            <strong>unserem Alltag</strong> anfühlen.
+          </p>
+          <p class="prose-quote">
+            <span class="prose-quote-mark">&gt;</span>
+            Stell dir Among Us vor &mdash; aber statt Raumstation ein Software-Büro mitten im
+            Release. Statt &bdquo;Schalter umlegen&ldquo; reviewst du Pull Requests, fixst CI/CD und
+            holst Kaffee. Statt &bdquo;Lichter aus&ldquo; setzt jemand heimlich die Pipeline rot.
+          </p>
+          <p>
+            Die Spannungsquelle ist dieselbe:
+            <strong>du weißt nicht, wer auf deiner Seite ist</strong>. Aber die Witze sind unsere
+            &mdash; PRs, Standups, Slack-Outages, Hotfixes auf main. Und weil wir eine KI-Firma
+            sind, zieht sich AI-Theming durch das ganze Spiel: der prominenteste Chaos-Agent heißt
+            <strong>Vibe Coder</strong>, der Eventfeed klingt wie ein müder Senior-Engineer im
+            Incident-Channel, und der Endscreen- Postmortem ist LLM-styled.
+          </p>
+        </div>
+      </section>
+
+      <!-- Rundenablauf -->
+      <section id="runde" class="section section-alt">
+        <div class="section-head">
+          <span class="section-tag">// section_02</span>
+          <h2>Wie eine Runde abläuft</h2>
+        </div>
+        <ol class="round-steps">
+          <li>
+            <strong>Lobby.</strong> 4&ndash;12 Spieler joinen mit einem 4-stelligen Raumcode. Jeder
+            kann optional eine <em>Wunschrolle</em> wählen &mdash; der Server respektiert
+            best-effort. Chaos-Wünsche werden silently ignoriert (Geheimhaltung).
+          </li>
+          <li>
+            <strong>Role-Intro.</strong> Beim Rundenstart bekommt jeder ein Modal mit Rolle,
+            Stärken, aktiver Fähigkeit und drei persönlichen Aufgaben. Release-Spieler sehen echte
+            Tasks, Chaos-Spieler bekommen plausible Tarn-Aufgaben.
+          </li>
+          <li>
+            <strong>Spielen (15 min Default).</strong> Bewegung mit WASD, Tasks mit E, Vents mit V
+            (nur Chaos), Sabotage-Buttons rechts unten (nur Chaos), Ability-Button für aktive
+            Rollen. Eigene Coffee-Energy tickt runter und beeinflusst Geschwindigkeit.
+          </li>
+          <li>
+            <strong>Body &amp; Meeting.</strong> Force-Reboots hinterlassen Bodies. Wer einen Body
+            findet, kann reporten &rarr; Meeting. Im War Room kann jeder einmal pro Runde ein
+            Emergency-Meeting auslösen, auch ohne Body. Der Scrum Master kann zusätzlich via
+            Standup-Ability ein Meeting auch außerhalb triggern.
+          </li>
+          <li>
+            <strong>Win-Conditions</strong> (first-to-fire): Pipeline kollabiert &rarr; Chaos
+            gewinnt. Alle Chaos ausgevoted &rarr; Release gewinnt. Release-Progress 100&nbsp;%
+            &rarr; Release gewinnt. 15&nbsp;min abgelaufen &rarr; Chaos gewinnt.
+          </li>
+          <li>
+            <strong>Endscreen.</strong> Rollen-Reveal, Per-Player-Stats, Awards (Pipeline Whisperer,
+            Vibe of the Round, Held der Kaffeemaschine, …) und ein AI-styled Postmortem-Text als
+            Diskussionsfutter.
+          </li>
+        </ol>
+        <figure class="screenshot">
+          <img
+            src="/static/images/screenshots/02-lobby-with-role.png"
+            alt="Lobby mit Wunschrolle-Picker"
+            loading="lazy"
+          />
+          <figcaption>Lobby mit Wunschrolle &mdash; "will: DevOps" als Tag am Spieler.</figcaption>
+        </figure>
+      </section>
+
+      <!-- Rollen Detail -->
+      <section id="rollen-detail" class="section">
+        <div class="section-head">
+          <span class="section-tag">// section_03</span>
+          <h2>Rollen &mdash; 5 Release + 3 Chaos</h2>
+        </div>
+        <div class="prose">
+          <p>
+            Jede Rolle hat <strong>Stärken</strong> (× 1.35 Task-Speed in passenden Kategorien),
+            <strong>Schwächen</strong> (× 0.75), ein <strong>Coffee-Profil</strong> (Decay-Rate +
+            Max-Energy) und meist eine <strong>aktive Fähigkeit</strong> (1× pro Runde).
+          </p>
+        </div>
+
+        <h3 class="rolle-team-title rolle-team-release">Release-Team</h3>
+        <div class="rolle-grid">
+          <article class="rolle-card rolle-release">
+            <h4>Developer</h4>
+            <p class="rolle-blurb">Code-Spezialist • PRs &amp; Tests</p>
+            <ul class="rolle-traits">
+              <li><strong>Stark:</strong> Code (PRs, Tests, Release-Notes)</li>
+              <li><strong>Schwach:</strong> Support-Tasks</li>
+              <li><strong>Coffee:</strong> normaler Decay</li>
+              <li><strong>Fähigkeit:</strong> &mdash;</li>
+            </ul>
+          </article>
+
+          <article class="rolle-card rolle-release rolle-highlight">
+            <h4>DevOps Engineer</h4>
+            <p class="rolle-blurb">Infra-Spezialist • Pipeline &amp; Deploys</p>
+            <ul class="rolle-traits">
+              <li><strong>Stark:</strong> Infra (CI/CD, Logs, Deploy)</li>
+              <li><strong>Schwach:</strong> Code, Scope</li>
+              <li><strong>Coffee:</strong> hohe Abhängigkeit (1.5× Decay)</li>
+              <li><strong>Fähigkeit:</strong> Rollback &mdash; +18 Pipeline</li>
+              <li><span class="singleton-tag">max 1× pro Runde</span></li>
+            </ul>
+          </article>
+
+          <article class="rolle-card rolle-release">
+            <h4>QA Lead</h4>
+            <p class="rolle-blurb">Test-Spezialistin • Logs &amp; Repro</p>
+            <ul class="rolle-traits">
+              <li><strong>Stark:</strong> Code, Legacy</li>
+              <li><strong>Schwach:</strong> Infra</li>
+              <li><strong>Coffee:</strong> stabil (0.6× Decay)</li>
+              <li><strong>Fähigkeit:</strong> Reproduce Bug &mdash; flagged letzte Aktion</li>
+              <li><span class="singleton-tag">max 1× pro Runde</span></li>
+            </ul>
+          </article>
+
+          <article class="rolle-card rolle-release">
+            <h4>Scrum Master</h4>
+            <p class="rolle-blurb">Process-Lead • Scope &amp; Standup</p>
+            <ul class="rolle-traits">
+              <li><strong>Stark:</strong> Scope</li>
+              <li><strong>Schwach:</strong> Infra</li>
+              <li><strong>Coffee:</strong> leicht reduziert (0.8×)</li>
+              <li>
+                <strong>Fähigkeit:</strong> Standup &mdash; ruft Meeting (auch außerhalb War Room)
+              </li>
+              <li><span class="singleton-tag">max 1× pro Runde</span></li>
+            </ul>
+          </article>
+
+          <article class="rolle-card rolle-release rolle-highlight">
+            <h4>Caffeine Collector</h4>
+            <p class="rolle-blurb">Support • Coffee Run</p>
+            <ul class="rolle-traits">
+              <li><strong>Stark:</strong> Support (Kaffee)</li>
+              <li><strong>Schwach:</strong> Code, Infra</li>
+              <li><strong>Coffee:</strong> sehr stabil (0.5×), max <strong>130</strong></li>
+              <li>
+                <strong>Fähigkeit:</strong> Coffee Run &mdash; +35 Coffee an alle in 220&nbsp;px
+              </li>
+              <li><span class="singleton-tag">max 1× pro Runde</span></li>
+            </ul>
+          </article>
+        </div>
+
+        <h3 class="rolle-team-title rolle-team-chaos">Chaos-Agenten</h3>
+        <p class="prose-note">
+          Alle drei Chaos-Varianten sehen für Außenstehende identisch aus &mdash; "Chaos-Agent"
+          steht nur im eigenen Role-Intro. Sie unterscheiden sich nur in den verfügbaren Sabotagen.
+        </p>
+        <div class="rolle-grid">
+          <article class="rolle-card rolle-chaos">
+            <h4>Vibe Coder</h4>
+            <p class="rolle-blurb">AI-Chaos • Code, CI, Vibe</p>
+            <p class="rolle-desc">
+              Committet direkt auf main, schmückt Tests mit Hallucinations, lässt die Pipeline
+              "atmen" &mdash; auf seine Art.
+            </p>
+            <ul class="rolle-traits">
+              <li>
+                <strong>Sabotagen:</strong> ci_cd_red, flaky_tests, merge_conflict_storm,
+                fake_customer_request
+              </li>
+            </ul>
+          </article>
+
+          <article class="rolle-card rolle-chaos">
+            <h4>Rogue Consultant</h4>
+            <p class="rolle-blurb">Process-Chaos • Meetings, Scope</p>
+            <p class="rolle-desc">
+              Erfindet Customer Requests, zieht Leute in unnötige Meetings, wird dafür bezahlt,
+              alles zu blockieren.
+            </p>
+            <ul class="rolle-traits">
+              <li>
+                <strong>Sabotagen:</strong> mandatory_meeting, fake_customer_request, coffee_outage,
+                merge_conflict_storm
+              </li>
+            </ul>
+          </article>
+
+          <article class="rolle-card rolle-chaos">
+            <h4>Shadow Admin</h4>
+            <p class="rolle-blurb">Infra-Chaos • Outages</p>
+            <p class="rolle-desc">
+              Hat root, kappt Slack, killt die Beleuchtung, lässt das Pager-System brennen.
+            </p>
+            <ul class="rolle-traits">
+              <li>
+                <strong>Sabotagen:</strong> lights_out, comms_outage, ci_cd_red, mandatory_meeting
+              </li>
+            </ul>
+          </article>
+        </div>
+
+        <figure class="screenshot screenshot-narrow">
+          <img
+            src="/static/images/screenshots/03-role-intro-modal.png"
+            alt="Role-Intro-Modal für Vibe Coder"
+            loading="lazy"
+          />
+          <figcaption>
+            Das Role-Intro-Modal zeigt deine Rolle, Theme und drei persönliche Aufgaben &mdash; für
+            Chaos sind das plausible Tarn-Tasks.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- Tasks + Coffee -->
+      <section id="tasks" class="section section-alt">
+        <div class="section-head">
+          <span class="section-tag">// section_04</span>
+          <h2>Persönliche Tasks &amp; Coffee-Energy</h2>
+        </div>
+        <div class="prose">
+          <p>
+            Nicht jeder Spieler kann alle Tasks gleich gut. Beim Rundenstart bekommt jeder
+            <strong>3 persönliche Aufgaben</strong>:
+          </p>
+          <ul class="prose-list">
+            <li>
+              <strong>Release-Team:</strong> 2 Tasks aus den Stärke-Kategorien der Rolle + 1 freie.
+              Im HUD mit ★ markiert. Andere Tasks dürfen auch erledigt werden, aber langsamer.
+            </li>
+            <li>
+              <strong>Chaos-Agenten:</strong> 3 Fake-Tasks passend zur Tarn-Persona. Beobachter
+              sehen denselben Busy-State wie bei echter Arbeit.
+            </li>
+          </ul>
+          <p class="prose-quote">
+            <span class="prose-quote-mark">&gt;</span>
+            Das ist der eigentliche Trick: Persönliche Tasks erzeugen Alibis ("Ich war im Server
+            Room, weil ich Deployment fixen musste") und Verdacht ("Warum war der Scrum Master beim
+            CI-Terminal?") &mdash; ohne dass das Spiel jemandem sagt, wer wirklich Chaos ist.
+          </p>
+        </div>
+
+        <figure class="screenshot">
+          <img
+            src="/static/images/screenshots/04-game-hud.png"
+            alt="In-Game HUD mit persönlichen Tasks und Coffee-Pille"
+            loading="lazy"
+          />
+          <figcaption>
+            HUD im Spiel: links die persönliche Task-Liste mit ★, oben Stats inkl.
+            <strong>"DU 44"</strong>-Pille (eigene Coffee-Energy), rechts die Sabotage-Buttons mit
+            Object-Type-Hints für Chaos.
+          </figcaption>
+        </figure>
+
+        <h3 class="sub-h3">Coffee-Energy &mdash; warum die Kitchen plötzlich wichtig ist</h3>
+        <div class="prose">
+          <p>
+            Jeder Spieler hat eigene Coffee-Energy (0..max). Decay 1.4/s &times; Rolle-Modifier.
+            Effekt:
+          </p>
+        </div>
+        <table class="coffee-table">
+          <thead>
+            <tr>
+              <th>Coffee-Level</th>
+              <th>Effekt</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>≥ 80</td>
+              <td>Task-Bonus (schneller arbeiten)</td>
+            </tr>
+            <tr>
+              <td>15..79</td>
+              <td>normal</td>
+            </tr>
+            <tr>
+              <td>&lt; 15</td>
+              <td>Speed-Penalty + Movement-Slowdown (Pille pulsiert rot)</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="prose">
+          <p>Refill-Optionen:</p>
+          <ul class="prose-list">
+            <li>
+              <strong>refill_coffee-Task</strong> in der Kitchen &rarr; eigene Energy auf max + +15
+              für Nachbarn in 180&nbsp;px (kleiner Splash am Tisch).
+            </li>
+            <li>
+              <strong>Coffee Run</strong> (Caffeine-Collector-Ability) &rarr; +35 Coffee an alle in
+              220&nbsp;px.
+            </li>
+            <li>
+              <strong>coffee_outage-Sabotage</strong> setzt globalen Team-Coffee auf 0 und halbiert
+              alle Spieler auf 40&nbsp;% ihrer Max-Energy.
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Sabotagen -->
+      <section id="sabotagen" class="section">
+        <div class="section-head">
+          <span class="section-tag">// section_05</span>
+          <h2>Sabotagen &mdash; an Themen-Objekte gebunden</h2>
+        </div>
+        <div class="prose">
+          <p>
+            Acht Sabotagen, jede mit eigenem Cooldown. Aber wichtig:
+            <strong>Chaos kann sie nicht von überall triggern</strong>. Jede Sabotage hat einen
+            <em>Object-Type-Anchor</em> &mdash; und der ist <strong>derselbe Anchor</strong>, den
+            auch das Release-Team für die zugehörige Task nutzt.
+          </p>
+          <p class="prose-quote">
+            <span class="prose-quote-mark">&gt;</span>
+            Wäre der Trigger-Spot ein eigenes "Sabotage-Terminal", wäre jeder, der dort steht,
+            sofort verdächtig. Same Anchor &rarr; Beobachter sehen "X arbeitet am CI-Terminal" und
+            müssen raten, ob das eine Repair, eine echte Task oder eine Sabotage ist. Genau diese
+            Ambiguität trägt die Diskussion.
+          </p>
+        </div>
+
+        <table class="sabotage-table">
+          <thead>
+            <tr>
+              <th>Sabotage</th>
+              <th>Effekt</th>
+              <th>Object-Type</th>
+              <th>Trigger-Ort (Default-Map)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>CI/CD Rot</td>
+              <td>Pipeline -20</td>
+              <td><code>ci_console</code></td>
+              <td>Server Room (an <code>repair_deployment</code>)</td>
+            </tr>
+            <tr>
+              <td>Flaky Tests</td>
+              <td>Incidents +30</td>
+              <td><code>qa_terminal</code></td>
+              <td>Open Space (an <code>fix_unit_tests</code>)</td>
+            </tr>
+            <tr>
+              <td>Merge Conflict Storm</td>
+              <td>Pipeline -10, Incidents +25</td>
+              <td><code>git_terminal</code></td>
+              <td>Open Space (an <code>review_pr</code>)</td>
+            </tr>
+            <tr>
+              <td>Coffee Outage</td>
+              <td>Team-Coffee = 0; alle auf 40 % Max-Energy</td>
+              <td><code>coffee_machine</code></td>
+              <td>Kitchen (an <code>refill_coffee</code>)</td>
+            </tr>
+            <tr>
+              <td>Mandatory Meeting</td>
+              <td>5 s alle langsam</td>
+              <td><code>meeting_screen</code></td>
+              <td>Meeting Room (an <code>reduce_scope</code>)</td>
+            </tr>
+            <tr>
+              <td>Fake Customer Request</td>
+              <td>Release -15</td>
+              <td><code>release_console</code> / <code>meeting_screen</code></td>
+              <td>Meeting Room</td>
+            </tr>
+            <tr>
+              <td>PagerDuty-Storm</td>
+              <td>Sicht reduziert auf 150 px Radius</td>
+              <td><code>monitoring_panel</code></td>
+              <td>Server Room (an <code>analyze_logs</code>)</td>
+            </tr>
+            <tr>
+              <td>Slack-Down</td>
+              <td>Tasks + andere Sabotagen blockiert</td>
+              <td><code>monitoring_panel</code> / <code>ci_console</code></td>
+              <td>Server Room</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="prose">
+          <p>
+            <strong>PagerDuty-Storm</strong> und <strong>Slack-Down</strong> haben zusätzlich
+            <em>Repair-Panels</em> mit 50&nbsp;px Reichweite, an denen jeder Lebende sie reparieren
+            kann.
+          </p>
+          <p>
+            <strong>Vents</strong> (chaos-only) bieten Tunnel zwischen Open Space, Server Room und
+            Legacy Basement. <strong>Force-Reboot</strong> ist der Take-Down, mit 25&nbsp;s Cooldown
+            und im War-Room gesperrt.
+          </p>
+        </div>
+      </section>
+
+      <!-- Meetings -->
+      <section id="meetings" class="section section-alt">
+        <div class="section-head">
+          <span class="section-tag">// section_06</span>
+          <h2>Meetings &mdash; Hinweise statt Beweise</h2>
+        </div>
+        <div class="prose">
+          <p>
+            Wenn ein Body reportet wird oder jemand ein Emergency ausruft, friert die Runde ein und
+            der Meeting-Screen kommt hoch. Er zeigt <strong>Kontext</strong>, aber keine Beweise:
+          </p>
+          <ul class="prose-list">
+            <li><strong>Reporter</strong> &mdash; wer hat Body gefunden / Meeting ausgelöst</li>
+            <li><strong>Body-Ort</strong> &mdash; z.&nbsp;B. "Body von Anna im Server Room"</li>
+            <li>
+              <strong>Letzte 6 Events</strong> &mdash; Sabotagen, Repairs, Reports der letzten
+              Sekunden
+            </li>
+            <li><strong>Voting-Liste</strong> der Lebenden + Skip-Option</li>
+          </ul>
+          <p>
+            Jeder Lebende hat eine Stimme (Re-Vote überschreibt). Nach 60&nbsp;s oder wenn alle
+            voted haben &rarr; höchste Anzahl wird eliminiert (Skip oder Tie &rarr; niemand).
+            Geister dürfen nicht voten oder reporten &mdash; sie können aber weiter Tasks erledigen
+            und damit dem Release-Team auch nach dem Tod helfen.
+          </p>
+        </div>
+      </section>
+
+      <!-- Endscreen -->
+      <section id="endscreen" class="section">
+        <div class="section-head">
+          <span class="section-tag">// section_07</span>
+          <h2>Endscreen &mdash; Awards &amp; AI-Postmortem</h2>
+        </div>
+        <div class="prose">
+          <p>
+            Nach Spielende werden Rollen aufgedeckt und der Server liefert ein
+            <code>final_summary</code>:
+          </p>
+          <ul class="prose-list">
+            <li>
+              <strong>Per-Player-Stats</strong>: Tasks erledigt, Sabotagen ausgelöst, Coffee am
+              Ende, Ability genutzt, lebt/tot.
+            </li>
+            <li>
+              <strong>Awards</strong> kuratiert aus Stats: <em>Pipeline Whisperer</em> (meiste
+              Tasks), <em>Vibe of the Round</em> (meiste Sabotagen),
+              <em>Held der Kaffeemaschine</em> (höchste End-Coffee-Energy),
+              <em>Most Suspicious Innocent</em> (Release-Spieler, der ausgevoted wurde).
+            </li>
+            <li>
+              <strong>AI-Postmortem</strong>: mehrzeiliger LLM-styled Text. Liest sich wie
+              <em
+                >"Generated by Claude (vibes-only mode). Das Release-Team hat es über die Linie
+                gebracht. Knapp, mit viel Kaffee und weniger Würde als erhofft."</em
+              >
+            </li>
+          </ul>
+          <p>Das ist der Moment, in dem Leute lachen und "noch eine Runde" sagen.</p>
+        </div>
+      </section>
+
+      <!-- AI-Flavor -->
+      <section id="ai" class="section section-alt">
+        <div class="section-head">
+          <span class="section-tag">// section_08</span>
+          <h2>AI-Flavor durchgehend</h2>
+        </div>
+        <div class="prose">
+          <p>
+            Wir sind eine KI-Firma &mdash; entsprechend zieht sich AI-Theming durch das ganze Spiel:
+          </p>
+          <ul class="prose-list">
+            <li>
+              <strong>Vibe Coder</strong> als prominente Chaos-Rolle &mdash; Karikatur des "AI Pair
+              Programmer", der direkt auf main pusht.
+            </li>
+            <li>
+              <strong>Sabotage-Eventfeed-Texte</strong> mit LLM-Vibes:
+              <ul class="prose-list">
+                <li><em>"CI hatte einen Hallucinations-Anfall."</em></li>
+                <li><em>"main ist rot. Vermutlich ein 'kleiner Refactor'."</em></li>
+                <li><em>"Kaffeemaschine meldet 418: I'm a teapot."</em></li>
+                <li><em>"Slack ist down. Productivity steigt kurz."</em></li>
+              </ul>
+            </li>
+            <li>
+              <strong>Postmortem-Generator</strong> spuckt Incident-Reports im AI-Stil aus
+              (procedural mit reichen Templates, später optional via echter LLM-Call).
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Tech-Stack -->
+      <section id="tech" class="section">
+        <div class="section-head">
+          <span class="section-tag">// section_09</span>
+          <h2>Tech &amp; Architektur</h2>
+        </div>
+        <div class="prose">
+          <p class="prose-quote">
+            <span class="prose-quote-mark">&gt;</span>
+            Architektur-Nordstern: <strong>Python entscheidet, der Client zeigt nur an.</strong>
+            Nichts an Spiellogik im Frontend.
+          </p>
+        </div>
+        <ul class="tech-list">
+          <li>
+            <strong>Backend</strong>: Python 3.12 + FastAPI + Pydantic v2 + asyncio.
+            20-Hz-Tick-Loop. WebSocket-Endpoint <code>/ws</code>. Authoritativ für
+            <em>allen</em> State.
+          </li>
+          <li>
+            <strong>Frontend</strong> (Web-Client): Vanilla HTML/CSS/JS +
+            <code>&lt;canvas&gt;</code>. Keine Build-Pipeline. Nächste Stufe: Godot 4 als polished
+            Primary-Client (Tier 4) &mdash; Browser-Client bleibt als Web-Fallback.
+          </li>
+          <li>
+            <strong>Hosting</strong>: AWS EC2 t4g.nano in eu-central-1, Caddy als HTTPS-
+            Reverse-Proxy, GitHub-Actions-Auto-Deploy auf jedem <code>main</code>-Push.
+          </li>
+          <li>
+            <strong>Tests</strong>: 471 Backend (pytest), 37 Frontend (vitest). Tick-Compute p99 =
+            0.6&nbsp;ms bei 12 Spielern (~84× Headroom auf das 50-ms-Tick-Budget).
+          </li>
+          <li>
+            <strong>Map-System</strong>: Räume, Wände, Türen, Spawn-Punkte, Task-Anker (mit
+            <code>objectType</code>) und Vents als JSON. Map-Editor unter
+            <a href="/editor"><code>/editor</code></a
+            >.
+          </li>
+        </ul>
+        <figure class="screenshot screenshot-narrow">
+          <img src="/static/images/screenshots/05-map-editor.png" alt="Map-Editor" loading="lazy" />
+          <figcaption>
+            Der Map-Editor unter <code>/editor</code> &mdash; reines Client-Tool, exportiert JSON
+            nach <code>docs/maps.md</code>-Schema.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- CTA + Links -->
+      <section class="cta-final">
+        <div class="cta-window">
+          <div class="window-bar">
+            <span class="dot dot-red"></span>
+            <span class="dot dot-yellow"></span>
+            <span class="dot dot-green"></span>
+            <span class="window-title">ready &mdash; press enter</span>
+          </div>
+          <div class="window-body">
+            <p class="cmd"><span class="prompt">$</span> ./join_lunch_break_round</p>
+            <p class="output">
+              &rarr; Sweet-Spot 6&ndash;10 Spieler, mindestens 4.<br />
+              &rarr; ~10&nbsp;min pro Runde.<br />
+              &rarr; <span class="caret">_</span>
+            </p>
+            <a class="btn btn-primary btn-cta" href="/play">Spielen jetzt &rarr;</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="docs-links">
+        <h2 class="docs-links-title">Weiterlesen</h2>
+        <ul>
+          <li>
+            <a
+              href="https://github.com/rausch-tech/merge-commit-mayhem/blob/main/docs/GAME_OVERVIEW.md"
+              target="_blank"
+              rel="noopener"
+              ><code>docs/GAME_OVERVIEW.md</code> &mdash; teilbare Markdown-Version dieser Seite</a
+            >
+          </li>
+          <li>
+            <a
+              href="https://github.com/rausch-tech/merge-commit-mayhem/blob/main/docs/ROADMAP.md"
+              target="_blank"
+              rel="noopener"
+              ><code>docs/ROADMAP.md</code> &mdash; Tier 0&ndash;7 mit Status</a
+            >
+          </li>
+          <li>
+            <a
+              href="https://github.com/rausch-tech/merge-commit-mayhem/blob/main/docs/PROTOCOL.md"
+              target="_blank"
+              rel="noopener"
+              ><code>docs/PROTOCOL.md</code> &mdash; vollständiger WebSocket-Vertrag</a
+            >
+          </li>
+          <li>
+            <a
+              href="https://github.com/rausch-tech/merge-commit-mayhem/blob/main/docs/ARCHITECTURE.md"
+              target="_blank"
+              rel="noopener"
+              ><code>docs/ARCHITECTURE.md</code> &mdash; High-Level Backend-Overview</a
+            >
+          </li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <p>
+            <span class="brand-prompt">$</span>
+            merge-conflict-mayhem &mdash; built for tech-team lunch breaks
+          </p>
+          <a
+            class="footer-rausch"
+            href="https://rausch.se/"
+            target="_blank"
+            rel="noopener"
+            aria-label="RAUSCH technology"
+          >
+            <img
+              src="https://www.rausch.se/wp-content/uploads/RAUSCH-technology_Logo-white.svg"
+              alt="RAUSCH technology"
+            />
+          </a>
+        </div>
+        <p class="footer-links">
+          <a href="/">Home</a>
+          <span class="footer-sep">/</span>
+          <a href="/spielprinzip">Spielprinzip</a>
+          <span class="footer-sep">/</span>
+          <a
+            href="https://github.com/rausch-tech/merge-commit-mayhem"
+            target="_blank"
+            rel="noopener"
+            >GitHub</a
+          >
+          <span class="footer-sep">/</span>
+          <a href="/editor">Map-Editor</a>
+          <span class="footer-sep">/</span>
+          <a href="/play">Spielen</a>
+          <span class="footer-sep">/</span>
+          <a href="https://rausch.se/impressum" target="_blank" rel="noopener">Impressum</a>
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

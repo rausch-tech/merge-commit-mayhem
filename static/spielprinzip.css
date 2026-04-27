@@ -1,0 +1,483 @@
+/* Spielprinzip-Subpage — extra styles on top of landing.css.
+   Reuse landing-Tokens (bg, panel, accent, mono, …); add page-specific
+   layouts: sub-hero, role grids, sabotage table, screenshots. */
+
+.page-spielprinzip .topbar-nav a.active {
+  color: var(--accent);
+  border-bottom: 1px solid var(--accent);
+}
+
+/* Sub-Hero ---------------------------------------------------------------- */
+
+.sub-main {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 24px 96px;
+}
+
+.sub-hero {
+  padding: 64px 0 32px;
+}
+
+.sub-hero-inner {
+  max-width: 820px;
+}
+
+.sub-hero-title {
+  font-family: var(--mono);
+  font-size: clamp(2rem, 4vw, 3rem);
+  margin: 16px 0 8px;
+  color: var(--text);
+}
+
+.sub-hero-sub {
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.55;
+  margin: 0 0 20px;
+  max-width: 720px;
+}
+
+.sub-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 24px;
+}
+
+.sub-meta-pill {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.sub-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  padding: 12px 16px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 0 8px 8px 0;
+}
+
+.sub-toc a {
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.sub-toc a:hover {
+  color: var(--accent);
+}
+
+/* Sections (lighter than landing) ----------------------------------------- */
+
+.sub-main .section {
+  padding: 48px 0;
+  border-top: 1px solid var(--border);
+}
+
+.sub-main .section:first-of-type {
+  border-top: none;
+}
+
+.sub-main .section-alt {
+  background: linear-gradient(
+    180deg,
+    rgba(20, 24, 42, 0) 0%,
+    rgba(20, 24, 42, 0.7) 50%,
+    rgba(20, 24, 42, 0) 100%
+  );
+}
+
+.sub-main .section-head h2 {
+  font-family: var(--mono);
+  font-size: 1.6rem;
+  margin: 4px 0 24px;
+  color: var(--text);
+}
+
+.sub-main .section-tag {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+.sub-main .prose {
+  max-width: 760px;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--text);
+}
+
+.sub-main .prose p {
+  margin: 0 0 14px;
+}
+
+.sub-main .prose-list {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  line-height: 1.65;
+  color: var(--text);
+}
+
+.sub-main .prose-list li {
+  margin: 6px 0;
+}
+
+.sub-main .prose-quote {
+  margin: 18px 0;
+  padding: 14px 18px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  font-family: var(--mono);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.sub-main .prose-quote-mark {
+  color: var(--accent);
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.sub-main .prose-note {
+  color: var(--muted);
+  font-style: italic;
+  font-size: 0.92rem;
+  margin: 0 0 16px;
+  max-width: 760px;
+}
+
+.sub-h3 {
+  font-family: var(--mono);
+  font-size: 1.15rem;
+  color: var(--info);
+  margin: 28px 0 12px;
+}
+
+/* Round Steps ------------------------------------------------------------- */
+
+.round-steps {
+  list-style: none;
+  counter-reset: step;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 14px;
+  max-width: 820px;
+}
+
+.round-steps li {
+  counter-increment: step;
+  position: relative;
+  padding: 14px 18px 14px 56px;
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.round-steps li::before {
+  content: counter(step, decimal-leading-zero);
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* Rolle Grids ------------------------------------------------------------- */
+
+.rolle-team-title {
+  font-family: var(--mono);
+  font-size: 1.05rem;
+  margin: 28px 0 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rolle-team-release {
+  color: var(--accent);
+}
+
+.rolle-team-chaos {
+  color: var(--danger);
+}
+
+.rolle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.rolle-card {
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  position: relative;
+}
+
+.rolle-card.rolle-release {
+  border-left: 3px solid var(--accent);
+}
+
+.rolle-card.rolle-chaos {
+  border-left: 3px solid var(--danger);
+}
+
+.rolle-card.rolle-highlight {
+  background: linear-gradient(135deg, rgba(74, 222, 128, 0.08) 0%, rgba(31, 37, 61, 0) 100%);
+}
+
+.rolle-card h4 {
+  font-family: var(--mono);
+  font-size: 1.08rem;
+  margin: 0 0 4px;
+  color: var(--text);
+}
+
+.rolle-card .rolle-blurb {
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-style: italic;
+  margin: 0 0 12px;
+}
+
+.rolle-card .rolle-desc {
+  font-size: 0.9rem;
+  color: var(--text);
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.rolle-traits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.rolle-traits li {
+  padding: 2px 0;
+  color: var(--muted);
+}
+
+.rolle-traits li strong {
+  color: var(--text);
+}
+
+.singleton-tag {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 10px;
+  letter-spacing: 0.04em;
+}
+
+/* Coffee + Sabotage Tables ----------------------------------------------- */
+
+.coffee-table,
+.sabotage-table {
+  width: 100%;
+  max-width: 920px;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+  margin: 8px 0 18px;
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.coffee-table th,
+.sabotage-table th {
+  background: var(--panel);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.coffee-table td,
+.sabotage-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: top;
+}
+
+.coffee-table tr:last-child td,
+.sabotage-table tr:last-child td {
+  border-bottom: none;
+}
+
+.coffee-table tr:hover td,
+.sabotage-table tr:hover td {
+  background: rgba(74, 222, 128, 0.04);
+}
+
+.sabotage-table code {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--warn);
+  background: rgba(251, 191, 36, 0.08);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* Screenshots ------------------------------------------------------------ */
+
+.screenshot {
+  margin: 24px 0 8px;
+  max-width: 920px;
+}
+
+.screenshot-narrow {
+  max-width: 640px;
+}
+
+.screenshot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-soft);
+}
+
+.screenshot figcaption {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Tech list -------------------------------------------------------------- */
+
+.tech-list {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+  display: grid;
+  gap: 10px;
+  max-width: 820px;
+}
+
+.tech-list li {
+  padding: 12px 16px;
+  background: var(--panel-soft);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--info);
+  border-radius: 6px;
+  font-size: 0.94rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.tech-list code {
+  font-family: var(--mono);
+  font-size: 0.86rem;
+  color: var(--warn);
+  background: rgba(251, 191, 36, 0.08);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* Docs links footer-block ------------------------------------------------ */
+
+.docs-links {
+  margin: 48px auto 0;
+  padding: 28px 0 0;
+  border-top: 1px solid var(--border);
+  max-width: 820px;
+}
+
+.docs-links-title {
+  font-family: var(--mono);
+  font-size: 1.05rem;
+  color: var(--muted);
+  margin: 0 0 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.docs-links ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.docs-links li {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+}
+
+.docs-links a {
+  color: var(--info);
+  text-decoration: none;
+}
+
+.docs-links a:hover {
+  text-decoration: underline;
+}
+
+.docs-links code {
+  font-family: var(--mono);
+  font-size: 0.86rem;
+  color: var(--warn);
+}
+
+/* Mobile ----------------------------------------------------------------- */
+
+@media (max-width: 700px) {
+  .sub-main {
+    padding: 0 16px 64px;
+  }
+  .sub-hero {
+    padding: 32px 0 16px;
+  }
+  .sub-toc {
+    font-size: 0.78rem;
+  }
+  .rolle-grid {
+    grid-template-columns: 1fr;
+  }
+  .coffee-table,
+  .sabotage-table {
+    font-size: 0.82rem;
+  }
+  .coffee-table th,
+  .sabotage-table th,
+  .coffee-table td,
+  .sabotage-table td {
+    padding: 8px 10px;
+  }
+}
