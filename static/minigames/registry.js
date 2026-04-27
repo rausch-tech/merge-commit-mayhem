@@ -8,6 +8,7 @@ import { CablePairingRenderer } from "./cable_pairing.js";
 import { CoffeePourRenderer } from "./coffee_pour.js";
 import { DiffReviewRenderer } from "./diff_review.js";
 import { LogFilterRenderer } from "./log_filter.js";
+import { ReleaseNotesRenderer } from "./release_notes.js";
 import { SprintTrimRenderer } from "./sprint_trim.js";
 import { StabilityBalanceRenderer } from "./stability_balance.js";
 import { TestSuiteRepairRenderer } from "./test_suite_repair.js";
@@ -20,4 +21,5 @@ export const MINI_GAME_RENDERERS = {
   sprint_trim: SprintTrimRenderer,
   diff_review: DiffReviewRenderer,
   stability_balance: StabilityBalanceRenderer,
+  release_notes: ReleaseNotesRenderer,
 };

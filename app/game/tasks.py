@@ -102,6 +102,7 @@ TASK_DEFINITIONS: Final[list[TaskDefinition]] = [
         room="meeting_room",
         required_seconds=4.0,
         release_progress_reward=6,
+        mini_game="release_notes",
         category="code",
     ),
 ]
