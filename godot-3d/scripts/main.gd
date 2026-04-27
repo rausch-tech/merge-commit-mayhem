@@ -29,6 +29,9 @@ var _player_id: String = ""
 var _is_host: bool = false
 var _map: Dictionary = {}
 var _role_info: Dictionary = {}
+# Guard so the 20 Hz game_state stream doesn't trigger world.tscn instantiation
+# repeatedly between the first transition and Main's queue_free taking effect.
+var _transitioning: bool = false
 
 # UI Nodes (built in _ready)
 var _connect_card: PanelContainer
@@ -409,8 +412,11 @@ func _on_message(type_: String, payload: Dictionary) -> void:
 				payload.get("role", "?"), payload.get("team", "?")
 			])
 		Protocol.TYPE_GAME_STATE:
+			if _transitioning:
+				return  # already on the way to world.tscn; ignore further ticks
 			var phase := str(payload.get("phase", ""))
 			if phase == Protocol.PHASE_PLAYING or phase == Protocol.PHASE_MEETING:
+				_transitioning = true
 				_transition_to_world(payload)
 		Protocol.TYPE_ERROR:
 			var code := str(payload.get("code", "?"))
@@ -477,9 +483,14 @@ func _set_lobby_status(text: String, is_error: bool) -> void:
 
 func _transition_to_world(initial_state: Dictionary) -> void:
 	_append_log("[main] phase=playing — switching to 3D world")
+	# Disconnect the message stream so further ticks queueing during the
+	# call_deferred-then-await window don't reach _on_message again.
+	if _ws != null and _ws.message_received.is_connected(_on_message):
+		_ws.message_received.disconnect(_on_message)
 	var world_packed := load(WORLD_SCENE) as PackedScene
 	if world_packed == null:
 		_set_lobby_status("world.tscn nicht gefunden", true)
+		_transitioning = false
 		return
 	var world := world_packed.instantiate()
 	world.set("ws_client", _ws)
