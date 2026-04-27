@@ -1,3 +1,4 @@
+import { ensureKindsLoaded } from "./kinds.js";
 import { WsClient } from "./ws.js";
 import {
   attachInput,
@@ -19,6 +20,15 @@ import { InGameMenu } from "./menu.js";
 import { MiniGameModal } from "./minigames/base.js";
 import { TouchControls } from "./touch-controls.js";
 import { RoleIntroModal } from "./role_intro.js";
+
+// Fire-and-forget: kick off /api/kinds at boot so the renderer has the
+// kind→style mapping ready before the first map frame paints. A network
+// blip leaves drawMapObjects in fallback mode (neutral grey), graceful
+// degradation rather than a crash.
+ensureKindsLoaded().catch((err) => {
+  // eslint-disable-next-line no-console
+  console.warn("[mcm] /api/kinds not available — neutral fills as fallback:", err);
+});
 
 const SESSION_KEY = "mcm.session";
 

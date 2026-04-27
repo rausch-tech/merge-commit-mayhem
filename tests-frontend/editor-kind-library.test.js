@@ -2,9 +2,28 @@
 // MapObject kinds the editor offers. The catalogue must include every kind
 // the placeholder palette in render.js handles so the editor and the
 // browser game agree on what placement options exist.
+//
+// Post-2026-04-27: kinds come from maps/kinds.json via /api/kinds. Tests
+// load the on-disk file and seed the editor facade synchronously so they
+// don't need a real /api/kinds endpoint.
 
-import { describe, expect, it } from "vitest";
-import { KIND_BY_NAME, KIND_CATALOGUE, KIND_CATEGORIES } from "../static/editor/editor-kinds.js";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { beforeAll, describe, expect, it } from "vitest";
+import {
+  KIND_BY_NAME,
+  KIND_CATALOGUE,
+  KIND_CATEGORIES,
+  _seedFromRegistryForTests,
+} from "../static/editor/editor-kinds.js";
+
+beforeAll(() => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const path = resolve(here, "../maps/kinds.json");
+  const registry = JSON.parse(readFileSync(path, "utf-8"));
+  _seedFromRegistryForTests(registry);
+});
 
 describe("KIND_CATALOGUE", () => {
   it("has at least the documented vocabulary entries", () => {

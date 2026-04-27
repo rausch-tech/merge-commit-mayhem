@@ -1,6 +1,7 @@
 // Pure rendering. Holds no game state -- just takes snapshots.
 // Map data is received from the server via setMap() on room_joined.
 
+import { kindBrowser2d } from "./kinds.js";
 import { drawSprite, loadSheet } from "./sprites.js";
 
 // Preload task spritesheet so it's cached before the first frame needs it.
@@ -130,51 +131,15 @@ function clamp(v, lo, hi) {
 // The server sends ``map.mapObjects`` as an array of axis-aligned props with
 // a logical ``kind`` string. The browser draws each as a coloured rectangle
 // with a short label — this is intentionally placeholder-grade. Godot's
-// 3D client (separate branch) maps the same ``kind`` to a real .gltf scene.
+// 3D client maps the same ``kind`` to a real .gltf scene.
+//
+// Style metadata (fill + label) comes from /api/kinds via ``kindBrowser2d``
+// — single source of truth lives in maps/kinds.json so editor + browser +
+// Godot all agree on the visual identity per kind. If the registry hasn't
+// loaded yet (or the kind is unknown), we fall back to neutral grey + the
+// kind string as label so the silhouette still reads on screen.
 
-// kind → {fill, label}. New kinds added to the server should also land here
-// so the placeholder stays meaningful. Unknown kinds fall back to a neutral
-// grey + the kind string itself as label.
-const MAP_OBJECT_STYLE = {
-  // Workstation cluster
-  desk: { fill: "#7c5a3a", label: "DESK" },
-  desk_large: { fill: "#7c5a3a", label: "DESK" },
-  desk_decorated: { fill: "#7c5a3a", label: "DESK" },
-  chair_desk: { fill: "#3f3128", label: "" },
-  monitor: { fill: "#1f2937", label: "MON" },
-  keyboard: { fill: "#1f2937", label: "" },
-  mouse_pad: { fill: "#1f2937", label: "" },
-  mug: { fill: "#a16207", label: "" },
-  lamp_desk: { fill: "#fbbf24", label: "" },
-
-  // Server room
-  server_rack: { fill: "#1e293b", label: "RACK" },
-  monitoring_panel: { fill: "#0ea5e9", label: "PANEL" },
-  cabinet: { fill: "#3f3f46", label: "" },
-
-  // Meeting / War Room
-  meeting_table: { fill: "#52525b", label: "TABLE" },
-  presentation_screen: { fill: "#1e1b4b", label: "SCRN" },
-  chair_meeting: { fill: "#3f3128", label: "" },
-
-  // Kitchen
-  kitchen_counter: { fill: "#9ca3af", label: "CNTR" },
-  kitchen_corner: { fill: "#9ca3af", label: "CNTR" },
-  kitchen_sink: { fill: "#94a3b8", label: "SINK" },
-  coffee_machine: { fill: "#854d0e", label: "COFFEE" },
-  fridge: { fill: "#cbd5e1", label: "FRIDGE" },
-  chair_stool: { fill: "#3f3128", label: "" },
-
-  // Decor (blocks_movement usually false)
-  plant_cactus: { fill: "#15803d", label: "" },
-  picture_frame: { fill: "#a78bfa", label: "" },
-  rug: { fill: "#7e22ce", label: "" },
-  cup_pencils: { fill: "#a16207", label: "" },
-
-  // Legacy basement
-  crate: { fill: "#78350f", label: "CRATE" },
-  old_workstation: { fill: "#44403c", label: "OLD" },
-};
+const FALLBACK_STYLE = { fill: "#475569", label: null };
 
 function drawMapObjects(ctx, mapObjects) {
   if (!Array.isArray(mapObjects)) return;
@@ -188,7 +153,14 @@ function drawMapObjects(ctx, mapObjects) {
     // map_object_aabb() so collision and render line up exactly.
     const dw = rotation === 90 || rotation === 270 ? h : w;
     const dh = rotation === 90 || rotation === 270 ? w : h;
-    const style = MAP_OBJECT_STYLE[obj.kind] || { fill: "#475569", label: obj.kind || "?" };
+    const styleHint = kindBrowser2d(obj.kind);
+    const style = {
+      fill: styleHint?.fill ?? FALLBACK_STYLE.fill,
+      // Empty-string labels in kinds.json are intentional ("don't show a
+      // label for this kind") so we coerce them to null below; a missing
+      // hint falls back to the kind name.
+      label: styleHint ? styleHint.label || null : obj.kind || null,
+    };
 
     ctx.fillStyle = style.fill;
     ctx.globalAlpha = obj.blocksMovement === false ? 0.5 : 1;

@@ -23,6 +23,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { kindBrowser2d, kindGodotAsset } from "/static/kinds.js";
 
 const WORLD_SCALE = 0.01;
 const WALL_HEIGHT = 2.6;
@@ -37,45 +38,24 @@ const PLAYER_RADIUS = 0.35;
 // self-contained without exporting from render.js.
 const WALL_THICKNESS_SERVER_PX = 8;
 
-// Map kind -> .glb file under /assets/3d/. Only staged kinds are listed;
-// missing kinds fall through to a coloured box. As Tier 4.0.x stages
-// more meshes, add them here.
-const KIND_TO_GLB = {
-  desk: "/assets/3d/furniture/desk.gltf",
-  desk_large: "/assets/3d/furniture/desk.gltf",
-  desk_decorated: "/assets/3d/furniture/desk.gltf",
-  chair_desk: "/assets/3d/furniture/chair_desk_A.gltf",
-  chair_meeting: "/assets/3d/furniture/chair_desk_A.gltf",
-  chair_stool: "/assets/3d/furniture/chair_desk_A.gltf",
-  monitor: "/assets/3d/furniture/monitor.gltf",
-};
+// Godot publishes GLTF paths as ``res://assets/...``. The browser preview
+// serves them under ``/assets/3d/...`` (FastAPI mount on godot-3d/assets).
+// One small string swap, kept inline so the kinds.json schema stays
+// uniform across all consumers.
+const GODOT_RES_PREFIX = "res://";
+const BROWSER_ASSET_PREFIX = "/assets/3d/";
 
-// Fallback colours for kinds without a staged mesh — mirrors the editor's
-// MAP_OBJECT_STYLE so the 3D preview reads the same as the 2D library tile.
-const KIND_FALLBACK_COLOR = {
-  server_rack: 0x1e293b,
-  monitoring_panel: 0x0ea5e9,
-  cabinet: 0x3f3f46,
-  meeting_table: 0x52525b,
-  presentation_screen: 0x1e1b4b,
-  kitchen_counter: 0x9ca3af,
-  kitchen_corner: 0x9ca3af,
-  kitchen_sink: 0x94a3b8,
-  coffee_machine: 0x854d0e,
-  fridge: 0xcbd5e1,
-  plant_cactus: 0x15803d,
-  picture_frame: 0xa78bfa,
-  rug: 0x7e22ce,
-  crate: 0x78350f,
-  old_workstation: 0x44403c,
-  keyboard: 0x1f2937,
-  mug: 0xa16207,
-  lamp_desk: 0xfbbf24,
-};
+function godotAssetToBrowserUrl(godotAsset) {
+  if (!godotAsset || !godotAsset.startsWith(GODOT_RES_PREFIX)) return null;
+  return BROWSER_ASSET_PREFIX + godotAsset.slice(GODOT_RES_PREFIX.length);
+}
 
 // Approximate height (Godot units) per kind for the fallback box. Decor
 // stays low; furniture is desk-height; racks tall. Picked by eye —
 // designers care about silhouette, not exact dimensions.
+//
+// 3D-only metadata; lives here because kinds.json is a 2D-flavour schema.
+// If a future Godot kind ships a real .gltf this height is unused.
 const KIND_FALLBACK_HEIGHT = {
   server_rack: 1.8,
   monitoring_panel: 1.4,
@@ -403,7 +383,7 @@ export class MapPreview3D {
   }
 
   _placeMapObject(obj, epoch) {
-    const url = KIND_TO_GLB[obj.kind];
+    const url = godotAssetToBrowserUrl(kindGodotAsset(obj.kind));
     if (url) {
       this._loadGltfInstance(url).then(
         (root) => {
@@ -435,7 +415,11 @@ export class MapPreview3D {
       ((obj.rotation === 90 || obj.rotation === 270 ? obj.width : obj.height) || 0) * WORLD_SCALE;
     const h = KIND_FALLBACK_HEIGHT[obj.kind] ?? 0.4;
     if (w <= 0 || d <= 0) return "skipped";
-    const colour = KIND_FALLBACK_COLOR[obj.kind] ?? 0x556070;
+    // Tint comes from the kinds.json browser_2d.fill — keeps the 3D box
+    // colour-coded the same as the 2D editor library tile. Falls back to
+    // neutral steel-blue when the kind isn't in the registry yet.
+    const fillHex = kindBrowser2d(obj.kind)?.fill;
+    const colour = fillHex ? this._parseHex(fillHex, 0x556070) : 0x556070;
     const mat = new THREE.MeshStandardMaterial({
       color: colour,
       roughness: 0.75,

@@ -15,7 +15,12 @@ import {
   validateMap,
 } from "/static/editor/editor-state.js";
 import { History } from "/static/editor/editor-history.js";
-import { KIND_BY_NAME, KIND_CATALOGUE, KIND_CATEGORIES } from "/static/editor/editor-kinds.js";
+import {
+  KIND_BY_NAME,
+  KIND_CATALOGUE,
+  KIND_CATEGORIES,
+  initKindsCatalogue,
+} from "/static/editor/editor-kinds.js";
 import { snap, TOOLS } from "/static/editor/editor-tools.js";
 // 3D-Preview is loaded lazily so a CDN-blocked dev environment still gets
 // a working 2D editor. Errors are shown in the preview status bar.
@@ -1718,17 +1723,30 @@ window.addEventListener("keydown", (e) => {
 });
 
 // --- Boot ------------------------------------------------------------------
+//
+// Kinds catalogue is fetched async from /api/kinds. Everything that
+// reads KIND_CATALOGUE / KIND_BY_NAME / KIND_CATEGORIES (palette,
+// validation, props sidebar) runs AFTER the init resolves so the
+// catalogue is populated. On fetch failure we still bring the editor
+// up — palette will be empty, designer sees the toast, fixes deploy.
 
-renderKindLibrary();
-renderLayerToggles();
-setTool("select");
-syncTopbarFields();
-renderPropsSidebar();
-refreshValidationStrip();
-refreshUndoButtons();
-fitCanvas();
-// 3D preview is on by default (toggle is checked in HTML). Lazy-load + first
-// render fires once the module resolves.
-if (dom.toggle3DPreview?.checked) {
-  setPreview3DEnabled(true);
-}
+(async () => {
+  try {
+    await initKindsCatalogue();
+  } catch (err) {
+    flashStatus(`Kind-Catalogue nicht geladen: ${err.message}`, true);
+  }
+  renderKindLibrary();
+  renderLayerToggles();
+  setTool("select");
+  syncTopbarFields();
+  renderPropsSidebar();
+  refreshValidationStrip();
+  refreshUndoButtons();
+  fitCanvas();
+  // 3D preview is on by default (toggle is checked in HTML). Lazy-load + first
+  // render fires once the module resolves.
+  if (dom.toggle3DPreview?.checked) {
+    setPreview3DEnabled(true);
+  }
+})();
