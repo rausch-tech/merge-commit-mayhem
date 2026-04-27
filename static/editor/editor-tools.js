@@ -5,14 +5,107 @@
 // trigger a re-render. Coordinates passed in are already mapped from screen
 // space to map space (and snapped, unless Shift is held).
 
+import { KIND_BY_NAME } from "/static/editor/editor-kinds.js";
+
 const SNAP = 50;
+const DRAG_THRESHOLD_PX = 4; // movement below this is treated as a click, not a drag
+const DOOR_HIT_BAND_PX = 14; // half-width of the band around a door rectangle
+const DOOR_PLACEMENT_BAND_PX = 28; // distance from a shared edge that still counts as "on it"
+const DOOR_DEFAULT_WIDTH = 240;
+const DOOR_DEFAULT_KIND = "office_door";
 
 export function snap(value, enabled) {
   if (!enabled) return Math.round(value);
   return Math.round(value / SNAP) * SNAP;
 }
 
-// Hit-test helpers. Returned object describes a selection: { kind, index }.
+// --- Shared-edge geometry --------------------------------------------------
+//
+// A door lives on the shared edge between two adjacent rooms. Several places
+// in the editor need the same geometry: hit-testing, drawing, drag-clamping,
+// and door creation. Put it here once.
+
+/** Find the shared edge between rooms a and b, if any. */
+export function findSharedEdge(a, b) {
+  if (a.x + a.width === b.x || b.x + b.width === a.x) {
+    const position = a.x + a.width === b.x ? b.x : a.x;
+    const start = Math.max(a.y, b.y);
+    const end = Math.min(a.y + a.height, b.y + b.height);
+    if (start < end) return { axis: "x", position, start, end };
+  }
+  if (a.y + a.height === b.y || b.y + b.height === a.y) {
+    const position = a.y + a.height === b.y ? b.y : a.y;
+    const start = Math.max(a.x, b.x);
+    const end = Math.min(a.x + a.width, b.x + b.width);
+    if (start < end) return { axis: "y", position, start, end };
+  }
+  return null;
+}
+
+/**
+ * Find the shared edge nearest to (mx, my) within `threshold`. Returns
+ * `{ axis, position, start, end, roomA, roomB, projection }` or null.
+ * `projection` is the cursor projected onto the edge (the door position).
+ */
+export function findNearestSharedEdge(map, mx, my, threshold = DOOR_PLACEMENT_BAND_PX) {
+  const rooms = map.rooms || [];
+  let best = null;
+  let bestDist = threshold + 1;
+  for (let i = 0; i < rooms.length; i++) {
+    for (let j = i + 1; j < rooms.length; j++) {
+      const edge = findSharedEdge(rooms[i], rooms[j]);
+      if (!edge) continue;
+      let dist;
+      let projection;
+      if (edge.axis === "x") {
+        // Vertical edge: cursor must be near edge.position in x and inside [start,end] in y.
+        dist = Math.abs(mx - edge.position);
+        projection = Math.max(edge.start, Math.min(edge.end, my));
+        if (my < edge.start - threshold || my > edge.end + threshold) continue;
+      } else {
+        dist = Math.abs(my - edge.position);
+        projection = Math.max(edge.start, Math.min(edge.end, mx));
+        if (mx < edge.start - threshold || mx > edge.end + threshold) continue;
+      }
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = { ...edge, roomA: rooms[i].id, roomB: rooms[j].id, projection };
+      }
+    }
+  }
+  return best;
+}
+
+/** Recompute the shared edge for an existing door (rooms may have moved). */
+export function doorEdge(map, door) {
+  const rooms = map.rooms || [];
+  const a = rooms.find((r) => r.id === door.betweenRoomA);
+  const b = rooms.find((r) => r.id === door.betweenRoomB);
+  if (!a || !b) return null;
+  return findSharedEdge(a, b);
+}
+
+// --- Hit-test --------------------------------------------------------------
+
+/** Point-in-rectangle helper for axis-aligned door bands. */
+function _hitDoor(door, edge, mx, my) {
+  if (!edge) return false;
+  const half = Math.floor((door.width || DOOR_DEFAULT_WIDTH) / 2);
+  if (edge.axis === "x") {
+    return (
+      Math.abs(mx - edge.position) <= DOOR_HIT_BAND_PX &&
+      my >= door.position - half &&
+      my <= door.position + half
+    );
+  }
+  return (
+    Math.abs(my - edge.position) <= DOOR_HIT_BAND_PX &&
+    mx >= door.position - half &&
+    mx <= door.position + half
+  );
+}
+
+// Returned object describes a selection: { kind, index }.
 export function hitTest(map, mx, my) {
   // Spawns + task anchors first (they're small).
   const radius = 18;
@@ -28,6 +121,12 @@ export function hitTest(map, mx, my) {
       return { kind: "task", index: i };
     }
   }
+  // Doors: test before objects so they're easier to grab on busy maps.
+  for (let i = (map.doors || []).length - 1; i >= 0; i--) {
+    const door = map.doors[i];
+    const edge = doorEdge(map, door);
+    if (_hitDoor(door, edge, mx, my)) return { kind: "door", index: i };
+  }
   // Map objects: hit-test against their bounding box (after rotation swap).
   for (let i = (map.mapObjects || []).length - 1; i >= 0; i--) {
     const o = map.mapObjects[i];
@@ -35,20 +134,6 @@ export function hitTest(map, mx, my) {
     const dh = o.rotation === 90 || o.rotation === 270 ? o.width : o.height;
     if (mx >= o.x - dw / 2 && mx <= o.x + dw / 2 && my >= o.y - dh / 2 && my <= o.y + dh / 2) {
       return { kind: "object", index: i };
-    }
-  }
-  // Wall lines: hit a thin band around the line.
-  const bandHalf = 12;
-  for (let i = (map.wallLines || []).length - 1; i >= 0; i--) {
-    const wl = map.wallLines[i];
-    if (wl.axis === "x") {
-      if (Math.abs(mx - wl.position) <= bandHalf && my >= 0 && my <= map.size.height) {
-        return { kind: "wall", index: i };
-      }
-    } else {
-      if (Math.abs(my - wl.position) <= bandHalf && mx >= 0 && mx <= map.size.width) {
-        return { kind: "wall", index: i };
-      }
     }
   }
   // Rooms last (largest).
@@ -61,15 +146,111 @@ export function hitTest(map, mx, my) {
   return null;
 }
 
-// --- Select tool ------------------------------------------------------------
+// --- Select tool: click to select, drag to move ----------------------------
+//
+// Drag works for rooms, spawns, task anchors, map objects, and doors. The
+// handle records the click point relative to the entity's reference point
+// so the drag motion stays consistent. Doors are constrained to slide
+// along their shared edge (clamped to the edge range minus half door
+// width), so the user can't drag a door off the wall.
 
 export class SelectTool {
+  constructor() {
+    this.drag = null;
+  }
   onDown(ctx, mx, my) {
     const hit = hitTest(ctx.map, mx, my);
+    if (!hit) {
+      ctx.setSelection(null);
+      this.drag = null;
+      return;
+    }
     ctx.setSelection(hit);
+    this.drag = {
+      kind: hit.kind,
+      index: hit.index,
+      offsetX: 0,
+      offsetY: 0,
+      offsetPos: 0,
+      downX: mx,
+      downY: my,
+      moved: false,
+    };
+    if (hit.kind === "room") {
+      const r = ctx.map.rooms[hit.index];
+      this.drag.offsetX = mx - r.x;
+      this.drag.offsetY = my - r.y;
+    } else if (hit.kind === "spawn") {
+      const s = ctx.map.spawnPoints[hit.index];
+      this.drag.offsetX = mx - s.x;
+      this.drag.offsetY = my - s.y;
+    } else if (hit.kind === "task") {
+      const t = ctx.map.taskAnchors[hit.index];
+      this.drag.offsetX = mx - t.x;
+      this.drag.offsetY = my - t.y;
+    } else if (hit.kind === "object") {
+      const o = ctx.map.mapObjects[hit.index];
+      this.drag.offsetX = mx - o.x;
+      this.drag.offsetY = my - o.y;
+    } else if (hit.kind === "door") {
+      const door = ctx.map.doors[hit.index];
+      const edge = doorEdge(ctx.map, door);
+      if (edge) {
+        const cursorAlong = edge.axis === "x" ? my : mx;
+        this.drag.offsetPos = cursorAlong - door.position;
+      }
+    }
   }
-  onMove() {}
-  onUp() {}
+  onMove(ctx, mx, my) {
+    if (!this.drag) return;
+    if (
+      !this.drag.moved &&
+      Math.hypot(mx - this.drag.downX, my - this.drag.downY) < DRAG_THRESHOLD_PX
+    ) {
+      return;
+    }
+    this.drag.moved = true;
+    if (this.drag.kind === "room") {
+      const r = ctx.map.rooms[this.drag.index];
+      if (!r) return;
+      r.x = mx - this.drag.offsetX;
+      r.y = my - this.drag.offsetY;
+    } else if (this.drag.kind === "spawn") {
+      const s = ctx.map.spawnPoints[this.drag.index];
+      if (!s) return;
+      s.x = mx - this.drag.offsetX;
+      s.y = my - this.drag.offsetY;
+    } else if (this.drag.kind === "task") {
+      const t = ctx.map.taskAnchors[this.drag.index];
+      if (!t) return;
+      t.x = mx - this.drag.offsetX;
+      t.y = my - this.drag.offsetY;
+    } else if (this.drag.kind === "object") {
+      const o = ctx.map.mapObjects[this.drag.index];
+      if (!o) return;
+      o.x = mx - this.drag.offsetX;
+      o.y = my - this.drag.offsetY;
+    } else if (this.drag.kind === "door") {
+      const door = ctx.map.doors[this.drag.index];
+      if (!door) return;
+      const edge = doorEdge(ctx.map, door);
+      if (!edge) return;
+      const cursorAlong = edge.axis === "x" ? my : mx;
+      const half = Math.floor((door.width || DOOR_DEFAULT_WIDTH) / 2);
+      const minPos = edge.start + half;
+      const maxPos = edge.end - half;
+      let target = cursorAlong - this.drag.offsetPos;
+      if (maxPos >= minPos) {
+        target = Math.max(minPos, Math.min(maxPos, target));
+      }
+      door.position = target;
+    }
+    ctx.markDirty();
+    ctx.refreshPropsSidebar();
+  }
+  onUp() {
+    this.drag = null;
+  }
   drawPreview() {}
 }
 
@@ -156,73 +337,6 @@ function defaultRoomColor(index) {
   return palette[index % palette.length];
 }
 
-// --- Wall tool: click two points (snaps to nearest axis) -------------------
-
-export class WallTool {
-  constructor() {
-    this.firstX = null;
-    this.firstY = null;
-    this.curX = null;
-    this.curY = null;
-  }
-  onDown(ctx, mx, my) {
-    if (this.firstX === null) {
-      this.firstX = mx;
-      this.firstY = my;
-      this.curX = mx;
-      this.curY = my;
-      ctx.requestRender();
-    } else {
-      // Decide axis from dominant delta.
-      const dx = Math.abs(mx - this.firstX);
-      const dy = Math.abs(my - this.firstY);
-      let axis;
-      let position;
-      if (dy > dx) {
-        // Vertical wall — runs along Y, fixed X position.
-        axis = "x";
-        position = this.firstX;
-      } else {
-        axis = "y";
-        position = this.firstY;
-      }
-      this.firstX = null;
-      this.firstY = null;
-      this.curX = null;
-      this.curY = null;
-      ctx.map.wallLines.push({ axis, position, doors: [] });
-      ctx.markDirty();
-      ctx.setSelection({ kind: "wall", index: ctx.map.wallLines.length - 1 });
-    }
-  }
-  onMove(ctx, mx, my) {
-    if (this.firstX === null) return;
-    this.curX = mx;
-    this.curY = my;
-    ctx.requestRender();
-  }
-  onUp() {}
-  drawPreview(ctx2d, ctx) {
-    if (this.firstX === null) return;
-    const dx = Math.abs((this.curX || 0) - this.firstX);
-    const dy = Math.abs((this.curY || 0) - this.firstY);
-    ctx2d.save();
-    ctx2d.strokeStyle = "#88ccff";
-    ctx2d.lineWidth = 2;
-    ctx2d.setLineDash([6, 4]);
-    ctx2d.beginPath();
-    if (dy > dx) {
-      ctx2d.moveTo(this.firstX, 0);
-      ctx2d.lineTo(this.firstX, ctx.map.size.height);
-    } else {
-      ctx2d.moveTo(0, this.firstY);
-      ctx2d.lineTo(ctx.map.size.width, this.firstY);
-    }
-    ctx2d.stroke();
-    ctx2d.restore();
-  }
-}
-
 // --- Spawn tool: click to add a point --------------------------------------
 
 export class SpawnTool {
@@ -251,30 +365,37 @@ export class TaskAnchorTool {
   drawPreview() {}
 }
 
-// --- Object tool: click + prompt for kind (Tier 4 props) -------------------
+// --- Object tool: click to place a MapObject from the kind library ---------
 //
-// Default size: 80x40 (desk-sized). Adjust via JSON afterward — the editor
-// MVP keeps placement-only; rotation is settable in JSON, future polish
-// adds resize handles + rotate-shortcut to the editor.
-
-const DEFAULT_OBJECT_KIND = "desk";
-const DEFAULT_OBJECT_SIZE = { width: 80, height: 40 };
+// `ctx.pendingKind` is set when the user clicks an entry in the library
+// sidebar. The catalogue entry provides default size and blocks-movement so
+// new objects match the in-game look without needing JSON tweaks.
 
 export class ObjectTool {
   onDown(ctx, mx, my) {
-    const kind = (window.prompt("Object-Kind", DEFAULT_OBJECT_KIND) || "").trim();
-    if (!kind) return;
+    const kind = ctx.pendingKind;
+    if (!kind) {
+      window.alert(
+        "Wähle zuerst einen Objekt-Typ in der Bibliothek (linke Sidebar) und klicke dann auf die Karte."
+      );
+      return;
+    }
+    const entry = KIND_BY_NAME.get(kind) || {
+      width: 80,
+      height: 40,
+      blocksMovement: true,
+    };
     if (!Array.isArray(ctx.map.mapObjects)) ctx.map.mapObjects = [];
     const id = `obj-${ctx.map.mapObjects.length + 1}`;
     ctx.map.mapObjects.push({
       id,
       x: mx,
       y: my,
-      width: DEFAULT_OBJECT_SIZE.width,
-      height: DEFAULT_OBJECT_SIZE.height,
+      width: entry.width,
+      height: entry.height,
       kind,
       rotation: 0,
-      blocksMovement: true,
+      blocksMovement: entry.blocksMovement !== false,
     });
     ctx.markDirty();
     ctx.setSelection({ kind: "object", index: ctx.map.mapObjects.length - 1 });
@@ -284,11 +405,54 @@ export class ObjectTool {
   drawPreview() {}
 }
 
+// --- Door tool: click on a shared edge to add a door -----------------------
+//
+// Doors are gaps in the shared edge between two rooms. The user picks the
+// Door tool, clicks anywhere near a shared edge, and a door is placed at
+// the projected cursor position. If the click isn't near any shared edge
+// the user gets a hint.
+
+export class DoorTool {
+  onDown(ctx, mx, my) {
+    const edge = findNearestSharedEdge(ctx.map, mx, my);
+    if (!edge) {
+      window.alert(
+        "Türen können nur auf gemeinsamen Wänden zwischen zwei Räumen platziert werden. Klicke näher an eine geteilte Wand."
+      );
+      return;
+    }
+    if (!Array.isArray(ctx.map.doors)) ctx.map.doors = [];
+    // Clamp position so a default-width door fits on the edge — otherwise
+    // the door visualizer would draw outside the wall.
+    const half = Math.floor(DOOR_DEFAULT_WIDTH / 2);
+    const minPos = edge.start + half;
+    const maxPos = edge.end - half;
+    let position = edge.projection;
+    if (maxPos >= minPos) {
+      position = Math.max(minPos, Math.min(maxPos, position));
+    }
+    const id = `d${ctx.map.doors.length + 1}`;
+    ctx.map.doors.push({
+      id,
+      betweenRoomA: edge.roomA,
+      betweenRoomB: edge.roomB,
+      position,
+      width: DOOR_DEFAULT_WIDTH,
+      doorKind: DOOR_DEFAULT_KIND,
+    });
+    ctx.markDirty();
+    ctx.setSelection({ kind: "door", index: ctx.map.doors.length - 1 });
+  }
+  onMove() {}
+  onUp() {}
+  drawPreview() {}
+}
+
 export const TOOLS = {
   select: SelectTool,
   room: RoomTool,
-  wall: WallTool,
   spawn: SpawnTool,
   task: TaskAnchorTool,
   object: ObjectTool,
+  door: DoorTool,
 };

@@ -1,13 +1,20 @@
 """
 Map-Loader und Pydantic-Modelle fuer die Spielkarte.
 
-Die Karte definiert: Raeume, Wand-Linien (mit Tuer-Cutouts), Spawn-Punkte,
-Task-Anker und welcher Raum der War Room ist. Wand-Rechtecke werden zur
-Lade-Zeit aus den Wand-Linien + Tuerenberechnet (siehe walls.py).
+Die Karte definiert: Raeume (Rechtecke), Tueren (zwischen adjacenten Raum-
+Paaren), Spawn-Punkte, Task-Anker, Vents, Sabotage-Panels, MapObjects, und
+welcher Raum der War Room ist. Waende werden NICHT explizit gespeichert —
+sie ergeben sich automatisch aus den Raum-Kanten: jede gemeinsame Kante
+zweier Raeume ist eine Wand, abzueglich aller Tueren auf dieser Kante.
+Map-Aussenkanten werden nicht gewallt (Player-Clamp im MovementController).
+
+Slice-3-Schema-Bruch (2026-04-27): das alte ``wallLines`` ist entfernt.
+Maps mit dem alten Feld werfen Pydantic-Validation-Errors; Migration via
+``scripts/migrate_walls_to_doors.py`` ist die einmalige Konversion.
 
 Mehrere Karten liegen unter /maps/*.json. ``discover_maps`` scannt das
-Verzeichnis; ``MAP_REGISTRY`` ist die lazy gefuellte module-globale Map-Map.
-Der Editor (spaeter) erzeugt das gleiche Format.
+Verzeichnis; ``MAP_REGISTRY`` ist die lazy gefuellte module-globale
+Map-Map. Der Editor erzeugt das gleiche Format.
 """
 
 import json
@@ -18,11 +25,7 @@ from typing import Final, Literal
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
-from app.game.walls import (
-    DOOR_WIDTH_DEFAULT,
-    horizontal_wall_segments,
-    vertical_wall_segments,
-)
+from app.game.walls import DOOR_WIDTH_DEFAULT, WALL_THICKNESS
 
 
 def _camel() -> ConfigDict:
@@ -33,20 +36,40 @@ def _camel() -> ConfigDict:
     )
 
 
-class WallDoor(BaseModel):
-    model_config = _camel()
-    center: int
-    width: int = DOOR_WIDTH_DEFAULT
+class Door(BaseModel):
+    """A door is a gap in the auto-derived wall between two adjacent rooms.
 
+    ``position`` is a coordinate along the shared edge: y for vertical
+    shared edges (rooms side-by-side), x for horizontal shared edges
+    (rooms top/bottom). ``width`` is the gap size, defaults to 240.
+    ``door_kind`` is a client-side asset hint (browser ignores it; Godot
+    maps it to a PackedScene like ``office_door`` or ``glass_panel``).
+    """
 
-class WallLine(BaseModel):
     model_config = _camel()
-    axis: Literal["x", "y"]
+    id: str
+    between_room_a: str
+    between_room_b: str
     position: int
-    doors: list[WallDoor] = Field(default_factory=list)
+    width: int = DOOR_WIDTH_DEFAULT
+    door_kind: str = "office_door"
+
+
+# Allowed values for the optional Godot-flavour fields on ``Room``.
+_FLOOR_MATERIALS: Final[tuple[str, ...]] = ("office", "kitchen", "server", "legacy")
+_LIGHTING_PROFILES: Final[tuple[str, ...]] = ("neutral", "warm", "cold", "dim")
 
 
 class Room(BaseModel):
+    """Axis-aligned rectangle. Room boundaries become walls automatically
+    where they aren't shared with another room (and aren't on the map edge)
+    or carved by a Door.
+
+    Tier-4 / Godot-flavour fields are all optional with sensible defaults
+    so the browser-only flow is unaffected; the Godot client uses them to
+    pick floor materials, ceiling height, ambient lighting, and per-room
+    sound zones."""
+
     model_config = _camel()
     id: str
     title: str
@@ -54,7 +77,12 @@ class Room(BaseModel):
     y: int
     width: int
     height: int
-    color: str  # hex
+    color: str  # hex — used by 2D browser render
+    # Godot-flavour (optional, ignored by browser):
+    floor_material: str = "office"
+    wall_height_m: float = 2.6
+    lighting_profile: str = "neutral"
+    ambient_sound: str | None = None
 
 
 class MapSize(BaseModel):
@@ -147,15 +175,17 @@ class GameMap(BaseModel):
     name: str
     size: MapSize
     rooms: list[Room]
-    wall_lines: list[WallLine] = Field(default_factory=list)
+    # Slice-3 (Tier 4 prep): doors live as a top-level list, each door
+    # references two adjacent rooms by id. Walls are auto-derived from
+    # adjacent room edges (see ``compute_walls``); no separate
+    # ``wallLines`` storage anymore. Migration via
+    # scripts/migrate_walls_to_doors.py.
+    doors: list[Door] = Field(default_factory=list)
     spawn_points: list[SpawnPoint] = Field(default_factory=list)
     task_anchors: list[TaskAnchor] = Field(default_factory=list)
     sabotage_panels: list[SabotagePanel] = Field(default_factory=list)
     vents: list[Vent] = Field(default_factory=list)
     # Tier 4: optional list of props (furniture, server racks, decor).
-    # Legacy maps without this field default to an empty list and keep
-    # working — open floors plus standalone TaskAnchor / SabotagePanel
-    # remain valid until a map opts in by populating ``map_objects``.
     map_objects: list[MapObject] = Field(default_factory=list)
     war_room_id: str
 
@@ -181,19 +211,135 @@ def map_object_aabb(obj: "MapObject") -> tuple[int, int, int, int]:
     )
 
 
+def _interval_subtract(
+    start: int, end: int, cutouts: list[tuple[int, int]]
+) -> list[tuple[int, int]]:
+    """Return ``[start, end]`` minus the union of ``cutouts``. Each cutout
+    is ``(a, b)`` with ``a < b``. The result is a sorted list of intervals
+    that together cover ``[start, end] \\ cutouts``. Cutouts outside the
+    range are clipped; overlapping cutouts merge naturally."""
+    if not cutouts:
+        return [(start, end)] if start < end else []
+    clipped: list[tuple[int, int]] = []
+    for a, b in cutouts:
+        sa = max(a, start)
+        sb = min(b, end)
+        if sa < sb:
+            clipped.append((sa, sb))
+    clipped.sort()
+    out: list[tuple[int, int]] = []
+    cursor = start
+    for a, b in clipped:
+        if a > cursor:
+            out.append((cursor, a))
+        cursor = max(cursor, b)
+    if cursor < end:
+        out.append((cursor, end))
+    return out
+
+
+def _edge_overlap(
+    other: Room, axis: str, edge_pos: int, start: int, end: int
+) -> tuple[int, int] | None:
+    """If ``other`` has a room edge at ``(axis, edge_pos)`` overlapping the
+    perpendicular range ``[start, end]``, return the overlap interval.
+    Otherwise return None.
+
+    ``axis="x"`` means a vertical edge at x=edge_pos; the perpendicular
+    coordinate is y. ``axis="y"`` means a horizontal edge at y=edge_pos
+    with perpendicular x.
+    """
+    if axis == "x":
+        if other.x != edge_pos and other.x + other.width != edge_pos:
+            return None
+        a = max(start, other.y)
+        b = min(end, other.y + other.height)
+    else:
+        if other.y != edge_pos and other.y + other.height != edge_pos:
+            return None
+        a = max(start, other.x)
+        b = min(end, other.x + other.width)
+    return (a, b) if a < b else None
+
+
+def _wall_rect(axis: str, edge_pos: int, seg_start: int, seg_end: int) -> tuple[int, int, int, int]:
+    """Wall rectangle ``(x1, y1, x2, y2)`` centered on the given edge."""
+    if axis == "x":
+        return (edge_pos - WALL_THICKNESS, seg_start, edge_pos + WALL_THICKNESS, seg_end)
+    return (seg_start, edge_pos - WALL_THICKNESS, seg_end, edge_pos + WALL_THICKNESS)
+
+
+def _is_map_edge(axis: str, edge_pos: int, map_size: MapSize) -> bool:
+    """True if the given edge sits exactly on the outer map boundary —
+    those are NOT walled (the MovementController clamps perimeter)."""
+    if axis == "x":
+        return edge_pos == 0 or edge_pos == map_size.width
+    return edge_pos == 0 or edge_pos == map_size.height
+
+
 def compute_walls(game_map: GameMap) -> list[tuple[int, int, int, int]]:
     """Concrete wall rectangles for the map. Computed once per map; pure.
 
-    Includes both ``wall_lines`` (axis-aligned segments with door cutouts)
-    and ``map_objects`` with ``blocks_movement=True`` (Tier 4 props).
+    Slice-3 algorithm: walls are derived from adjacent room edges, with
+    door cutouts. For each room edge:
+      - Shared portions with another room → wall minus matching doors.
+        Processed once per room pair (dedup via ``processed`` set).
+      - Non-shared (perimeter-of-room) portions → wall, unless the edge
+        sits on the map outer boundary.
+    Plus blocking ``map_objects`` (Tier 4 props) get their AABBs added.
     """
     out: list[tuple[int, int, int, int]] = []
-    for line in game_map.wall_lines:
-        doors_pairs = [(d.center, d.width) for d in line.doors]
-        if line.axis == "x":
-            out.extend(vertical_wall_segments(line.position, doors_pairs, game_map.size.height))
-        else:
-            out.extend(horizontal_wall_segments(line.position, doors_pairs, game_map.size.width))
+    rooms = list(game_map.rooms)
+
+    # Each (axis, edge_pos, room_a_id, room_b_id, ovl_start, ovl_end) is
+    # processed once; the second time we hit the same pair from the other
+    # room's edge iteration, we skip it.
+    processed: set[tuple[str, int, str, str, int, int]] = set()
+
+    for room in rooms:
+        edges = (
+            ("y", room.y, room.x, room.x + room.width),  # top
+            ("y", room.y + room.height, room.x, room.x + room.width),  # bottom
+            ("x", room.x, room.y, room.y + room.height),  # left
+            ("x", room.x + room.width, room.y, room.y + room.height),  # right
+        )
+        for axis, edge_pos, start, end in edges:
+            shared: list[tuple[str, tuple[int, int]]] = []
+            for other in rooms:
+                if other.id == room.id:
+                    continue
+                ovl = _edge_overlap(other, axis, edge_pos, start, end)
+                if ovl is not None:
+                    shared.append((other.id, ovl))
+
+            # Shared portions — emit walls (with door cutouts), one per pair.
+            for other_id, (ovl_start, ovl_end) in shared:
+                pair_key = tuple(sorted([room.id, other_id]))
+                key = (axis, edge_pos, pair_key[0], pair_key[1], ovl_start, ovl_end)
+                if key in processed:
+                    continue
+                processed.add(key)
+
+                cutouts: list[tuple[int, int]] = []
+                for door in game_map.doors:
+                    door_pair = tuple(sorted([door.between_room_a, door.between_room_b]))
+                    if door_pair != pair_key:
+                        continue
+                    if not (ovl_start <= door.position <= ovl_end):
+                        continue
+                    half = door.width // 2
+                    cutouts.append((door.position - half, door.position + half))
+
+                for seg_start, seg_end in _interval_subtract(ovl_start, ovl_end, cutouts):
+                    out.append(_wall_rect(axis, edge_pos, seg_start, seg_end))
+
+            # Perimeter portions — only if this edge isn't on the map boundary.
+            if not _is_map_edge(axis, edge_pos, game_map.size):
+                shared_cuts = [ovl for _, ovl in shared]
+                for seg_start, seg_end in _interval_subtract(start, end, shared_cuts):
+                    out.append(_wall_rect(axis, edge_pos, seg_start, seg_end))
+
+    # Tier 4: blocking MapObjects.
     for obj in game_map.map_objects:
         if obj.blocks_movement:
             out.append(map_object_aabb(obj))

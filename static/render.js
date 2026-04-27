@@ -26,41 +26,95 @@ const WALL_THICKNESS = 8;
 
 /**
  * Mirror of the server-side compute_walls() in app/game/game_map.py.
- * Accepts the map JSON received in room_joined and returns wall rectangles
- * as [x1, y1, x2, y2] arrays.
+ * Slice-3 schema: walls are auto-derived from adjacent room edges minus
+ * door cutouts. Map-perimeter edges are NOT walled (player-clamp handles
+ * map boundaries on the server). Returns rectangles as [x1, y1, x2, y2].
  */
 function computeWallsClient(map) {
-  if (!map || !map.wallLines) return [];
-  const out = [];
+  if (!map || !Array.isArray(map.rooms)) return [];
+  const rooms = map.rooms;
+  const doors = Array.isArray(map.doors) ? map.doors : [];
   const mapW = map.size?.width ?? 0;
   const mapH = map.size?.height ?? 0;
-  for (const line of map.wallLines) {
-    const doors = [...(line.doors || [])].sort((a, b) => a.center - b.center);
-    if (line.axis === "x") {
-      // Vertical wall line at x=line.position
-      let lastY = 0;
-      for (const d of doors) {
-        const top = d.center - Math.floor(d.width / 2);
-        if (top > lastY) {
-          out.push([line.position - WALL_THICKNESS, lastY, line.position + WALL_THICKNESS, top]);
+  const out = [];
+  const processed = new Set();
+
+  const wallRect = (axis, edgePos, segStart, segEnd) =>
+    axis === "x"
+      ? [edgePos - WALL_THICKNESS, segStart, edgePos + WALL_THICKNESS, segEnd]
+      : [segStart, edgePos - WALL_THICKNESS, segEnd, edgePos + WALL_THICKNESS];
+
+  const isMapEdge = (axis, edgePos) =>
+    axis === "x" ? edgePos === 0 || edgePos === mapW : edgePos === 0 || edgePos === mapH;
+
+  const intervalSubtract = (start, end, cutouts) => {
+    if (start >= end) return [];
+    if (!cutouts.length) return [[start, end]];
+    const clipped = cutouts
+      .map(([a, b]) => [Math.max(a, start), Math.min(b, end)])
+      .filter(([a, b]) => a < b)
+      .sort((p, q) => p[0] - q[0]);
+    const result = [];
+    let cursor = start;
+    for (const [a, b] of clipped) {
+      if (a > cursor) result.push([cursor, a]);
+      cursor = Math.max(cursor, b);
+    }
+    if (cursor < end) result.push([cursor, end]);
+    return result;
+  };
+
+  const edgeOverlap = (other, axis, edgePos, start, end) => {
+    if (axis === "x") {
+      if (other.x !== edgePos && other.x + other.width !== edgePos) return null;
+      const a = Math.max(start, other.y);
+      const b = Math.min(end, other.y + other.height);
+      return a < b ? [a, b] : null;
+    }
+    if (other.y !== edgePos && other.y + other.height !== edgePos) return null;
+    const a = Math.max(start, other.x);
+    const b = Math.min(end, other.x + other.width);
+    return a < b ? [a, b] : null;
+  };
+
+  for (const room of rooms) {
+    const edges = [
+      ["y", room.y, room.x, room.x + room.width],
+      ["y", room.y + room.height, room.x, room.x + room.width],
+      ["x", room.x, room.y, room.y + room.height],
+      ["x", room.x + room.width, room.y, room.y + room.height],
+    ];
+    for (const [axis, edgePos, start, end] of edges) {
+      const sharedList = [];
+      for (const other of rooms) {
+        if (other.id === room.id) continue;
+        const ovl = edgeOverlap(other, axis, edgePos, start, end);
+        if (ovl) sharedList.push([other.id, ovl]);
+      }
+      // Shared portions, dedup per pair.
+      for (const [otherId, ovl] of sharedList) {
+        const pairKey = [room.id, otherId].sort();
+        const key = `${axis}|${edgePos}|${pairKey[0]}|${pairKey[1]}|${ovl[0]}|${ovl[1]}`;
+        if (processed.has(key)) continue;
+        processed.add(key);
+        const cutouts = [];
+        for (const door of doors) {
+          const dPair = [door.betweenRoomA, door.betweenRoomB].sort();
+          if (dPair[0] !== pairKey[0] || dPair[1] !== pairKey[1]) continue;
+          if (door.position < ovl[0] || door.position > ovl[1]) continue;
+          const half = Math.floor((door.width ?? 240) / 2);
+          cutouts.push([door.position - half, door.position + half]);
         }
-        lastY = d.center + Math.floor(d.width / 2);
-      }
-      if (lastY < mapH) {
-        out.push([line.position - WALL_THICKNESS, lastY, line.position + WALL_THICKNESS, mapH]);
-      }
-    } else {
-      // Horizontal wall line at y=line.position
-      let lastX = 0;
-      for (const d of doors) {
-        const left = d.center - Math.floor(d.width / 2);
-        if (left > lastX) {
-          out.push([lastX, line.position - WALL_THICKNESS, left, line.position + WALL_THICKNESS]);
+        for (const [segStart, segEnd] of intervalSubtract(ovl[0], ovl[1], cutouts)) {
+          out.push(wallRect(axis, edgePos, segStart, segEnd));
         }
-        lastX = d.center + Math.floor(d.width / 2);
       }
-      if (lastX < mapW) {
-        out.push([lastX, line.position - WALL_THICKNESS, mapW, line.position + WALL_THICKNESS]);
+      // Perimeter portions — skip if the edge is on the map outer boundary.
+      if (!isMapEdge(axis, edgePos)) {
+        const sharedCuts = sharedList.map(([, ovl]) => ovl);
+        for (const [segStart, segEnd] of intervalSubtract(start, end, sharedCuts)) {
+          out.push(wallRect(axis, edgePos, segStart, segEnd));
+        }
       }
     }
   }
@@ -417,25 +471,36 @@ export class Renderer {
     this.localPlayerNearPanel = nearPanel;
 
     // Vents (Tier 2.3). Drawn for everyone — they are part of the world's
-    // architecture. Only chaos can interact with them.
+    // architecture. Only chaos can interact with them. Visibility was a
+    // playtest pain point: dark-on-dark backgrounds made them invisible.
+    // Editor-slice-1: lighter steel finish + outer halo so they pop
+    // against any room tint, and slightly bigger footprint.
     const VENT_INTERACT_RADIUS = 50;
+    const VENT_HALF_W = 16;
+    const VENT_HALF_H = 14;
     let nearVent = null;
     for (const vent of this.vents) {
       ctx.save();
-      // Dark steel grille icon — small rectangle with parallel lines.
-      ctx.fillStyle = "#1f2937";
-      ctx.fillRect(vent.x - 14, vent.y - 12, 28, 24);
-      ctx.strokeStyle = "#475569";
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(vent.x - 14, vent.y - 12, 28, 24);
+      // Outer halo so the vent is findable on a dark room background.
+      ctx.fillStyle = "rgba(148, 163, 184, 0.22)";
+      ctx.beginPath();
+      ctx.arc(vent.x, vent.y, VENT_HALF_W + 8, 0, Math.PI * 2);
+      ctx.fill();
+      // Steel grille body — lighter slate so it contrasts the dark floor.
+      ctx.fillStyle = "#64748b";
+      ctx.fillRect(vent.x - VENT_HALF_W, vent.y - VENT_HALF_H, VENT_HALF_W * 2, VENT_HALF_H * 2);
+      ctx.strokeStyle = "#0b0f1f";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(vent.x - VENT_HALF_W, vent.y - VENT_HALF_H, VENT_HALF_W * 2, VENT_HALF_H * 2);
+      // Grates: brighter horizontal slats for legibility.
       ctx.beginPath();
       for (let i = 0; i < 4; i++) {
-        const yy = vent.y - 9 + i * 6;
-        ctx.moveTo(vent.x - 11, yy);
-        ctx.lineTo(vent.x + 11, yy);
+        const yy = vent.y - VENT_HALF_H + 4 + i * ((VENT_HALF_H * 2 - 8) / 3);
+        ctx.moveTo(vent.x - VENT_HALF_W + 3, yy);
+        ctx.lineTo(vent.x + VENT_HALF_W - 3, yy);
       }
-      ctx.strokeStyle = "#94a3b8";
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.restore();
 

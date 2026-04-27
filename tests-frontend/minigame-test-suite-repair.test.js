@@ -45,9 +45,7 @@ describe("TestSuiteRepairRenderer", () => {
     const partial = {
       ...VIEW,
       nextOrder: 2,
-      tests: VIEW.tests.map((t) =>
-        t.order === 1 ? { ...t, status: "fixed" } : t
-      ),
+      tests: VIEW.tests.map((t) => (t.order === 1 ? { ...t, status: "fixed" } : t)),
     };
     renderer.onStart(partial);
     const fixed = container.querySelector(".mini-game-test.fixed");

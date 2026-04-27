@@ -858,13 +858,18 @@ def test_leave_room_during_playing_removes_player_and_broadcasts_game_state():
 
 
 def test_leave_room_when_last_player_drops_room():
-    """A solo player leaving cleans the room out of the registry."""
+    """A solo player leaving cleans the room out of the registry.
+
+    Flaky-fix (2026-04-27): the assertion has to run AFTER the WebSocket +
+    TestClient context exit so the disconnect handler has flushed. Inside
+    the ``with`` block, ``leave_room`` is dispatched but the room cleanup
+    can race with the registry read; intermittent failures observed in CI.
+    """
     with TestClient(app) as client, client.websocket_connect("/ws") as ws:
         _join(ws, "SOLOX", "Alice")
         ws.receive_json()
         ws.send_json({"type": "leave_room", "payload": {}})
-        # No more frames are guaranteed; the room should be gone.
-        assert registry.get("SOLOX") is None
+    assert registry.get("SOLOX") is None
 
 
 def test_abort_round_requires_host_and_running_round():

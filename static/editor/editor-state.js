@@ -8,9 +8,11 @@ export const blankMap = () => ({
   name: "untitled",
   size: { width: 4800, height: 3200 },
   rooms: [],
-  wallLines: [],
+  doors: [],
   spawnPoints: [],
   taskAnchors: [],
+  sabotagePanels: [],
+  vents: [],
   mapObjects: [],
   warRoomId: "",
 });
@@ -29,17 +31,44 @@ export function serializeMap(map) {
       width: r.width,
       height: r.height,
       color: r.color,
+      // Tier-4 / Godot fields — only emit when non-default so legacy maps
+      // stay terse in the JSON.
+      ...(r.floorMaterial && r.floorMaterial !== "office"
+        ? { floorMaterial: r.floorMaterial }
+        : {}),
+      ...(typeof r.wallHeightM === "number" && r.wallHeightM !== 2.6
+        ? { wallHeightM: r.wallHeightM }
+        : {}),
+      ...(r.lightingProfile && r.lightingProfile !== "neutral"
+        ? { lightingProfile: r.lightingProfile }
+        : {}),
+      ...(r.ambientSound ? { ambientSound: r.ambientSound } : {}),
     })),
-    wallLines: (map.wallLines || []).map((w) => ({
-      axis: w.axis,
-      position: w.position,
-      doors: (w.doors || []).map((d) => ({ center: d.center, width: d.width })),
+    doors: (map.doors || []).map((d) => ({
+      id: d.id,
+      betweenRoomA: d.betweenRoomA,
+      betweenRoomB: d.betweenRoomB,
+      position: d.position,
+      width: d.width,
+      doorKind: d.doorKind || "office_door",
     })),
     spawnPoints: (map.spawnPoints || []).map((s) => ({ x: s.x, y: s.y })),
     taskAnchors: (map.taskAnchors || []).map((t) => ({
       taskId: t.taskId,
       x: t.x,
       y: t.y,
+      ...(t.objectType ? { objectType: t.objectType } : {}),
+    })),
+    sabotagePanels: (map.sabotagePanels || []).map((p) => ({
+      sabotageId: p.sabotageId,
+      x: p.x,
+      y: p.y,
+    })),
+    vents: (map.vents || []).map((v) => ({
+      id: v.id,
+      x: v.x,
+      y: v.y,
+      connectedTo: Array.isArray(v.connectedTo) ? [...v.connectedTo] : [],
     })),
     mapObjects: (map.mapObjects || []).map((o) => ({
       id: o.id,
@@ -95,17 +124,19 @@ export function deserializeMap(jsonText) {
       width: Number(r.width),
       height: Number(r.height),
       color: String(r.color || "#3a4560"),
+      floorMaterial: r.floorMaterial ? String(r.floorMaterial) : "office",
+      wallHeightM: typeof r.wallHeightM === "number" ? r.wallHeightM : 2.6,
+      lightingProfile: r.lightingProfile ? String(r.lightingProfile) : "neutral",
+      ambientSound: r.ambientSound ? String(r.ambientSound) : null,
     })),
-    wallLines: Array.isArray(raw.wallLines)
-      ? raw.wallLines.map((w) => ({
-          axis: w.axis === "y" ? "y" : "x",
-          position: Number(w.position),
-          doors: Array.isArray(w.doors)
-            ? w.doors.map((d) => ({
-                center: Number(d.center),
-                width: Number(d.width),
-              }))
-            : [],
+    doors: Array.isArray(raw.doors)
+      ? raw.doors.map((d) => ({
+          id: String(d.id),
+          betweenRoomA: String(d.betweenRoomA),
+          betweenRoomB: String(d.betweenRoomB),
+          position: Number(d.position),
+          width: Number(d.width),
+          doorKind: d.doorKind ? String(d.doorKind) : "office_door",
         }))
       : [],
     spawnPoints: Array.isArray(raw.spawnPoints)
@@ -116,6 +147,22 @@ export function deserializeMap(jsonText) {
           taskId: String(t.taskId),
           x: Number(t.x),
           y: Number(t.y),
+          objectType: t.objectType ? String(t.objectType) : null,
+        }))
+      : [],
+    sabotagePanels: Array.isArray(raw.sabotagePanels)
+      ? raw.sabotagePanels.map((p) => ({
+          sabotageId: String(p.sabotageId),
+          x: Number(p.x),
+          y: Number(p.y),
+        }))
+      : [],
+    vents: Array.isArray(raw.vents)
+      ? raw.vents.map((v) => ({
+          id: String(v.id),
+          x: Number(v.x),
+          y: Number(v.y),
+          connectedTo: Array.isArray(v.connectedTo) ? v.connectedTo.map(String) : [],
         }))
       : [],
     mapObjects: Array.isArray(raw.mapObjects)
@@ -157,10 +204,20 @@ export function validateMap(map) {
   }
   const w = map.size.width;
   const h = map.size.height;
-  for (const wl of map.wallLines || []) {
-    const max = wl.axis === "x" ? w : h;
-    if (wl.position < 0 || wl.position > max) {
-      warnings.push(`Wand bei ${wl.axis}=${wl.position} liegt ausserhalb der Map.`);
+  // Doors: each must reference two existing rooms (and not the same one).
+  for (const d of map.doors || []) {
+    if (d.betweenRoomA === d.betweenRoomB) {
+      warnings.push(`Tür "${d.id}" verbindet einen Raum mit sich selbst.`);
+      continue;
+    }
+    if (!roomIds.has(d.betweenRoomA)) {
+      warnings.push(`Tür "${d.id}" referenziert unbekannten Raum "${d.betweenRoomA}".`);
+    }
+    if (!roomIds.has(d.betweenRoomB)) {
+      warnings.push(`Tür "${d.id}" referenziert unbekannten Raum "${d.betweenRoomB}".`);
+    }
+    if (d.width <= 0) {
+      warnings.push(`Tür "${d.id}" hat Breite <= 0.`);
     }
   }
   for (const sp of map.spawnPoints || []) {
@@ -179,6 +236,23 @@ export function validateMap(map) {
     }
     if (o.width <= 0 || o.height <= 0) {
       warnings.push(`Object "${o.id}" hat Breite oder Hoehe <= 0.`);
+    }
+  }
+  for (const p of map.sabotagePanels || []) {
+    if (p.x < 0 || p.x > w || p.y < 0 || p.y > h) {
+      warnings.push(`Sabotage-Panel "${p.sabotageId}" (${p.x}, ${p.y}) ausserhalb der Map.`);
+    }
+  }
+  // Vents: each connectedTo target must reference an existing vent id.
+  const ventIds = new Set((map.vents || []).map((v) => v.id));
+  for (const v of map.vents || []) {
+    if (v.x < 0 || v.x > w || v.y < 0 || v.y > h) {
+      warnings.push(`Vent "${v.id}" (${v.x}, ${v.y}) ausserhalb der Map.`);
+    }
+    for (const target of v.connectedTo || []) {
+      if (!ventIds.has(target)) {
+        warnings.push(`Vent "${v.id}" verweist auf unbekannten Vent "${target}".`);
+      }
     }
   }
   return warnings;

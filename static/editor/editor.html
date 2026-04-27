@@ -15,7 +15,9 @@
         <button id="btn-new" type="button">Neu</button>
         <button id="btn-load" type="button">JSON laden</button>
         <input id="file-input" type="file" accept=".json,application/json" hidden />
-        <button id="btn-download" type="button">JSON herunterladen</button>
+        <button id="btn-download" type="button" title="Strg+S">JSON herunterladen</button>
+        <button id="btn-undo" type="button" title="Strg+Z" disabled>Undo</button>
+        <button id="btn-redo" type="button" title="Strg+Y / Strg+Shift+Z" disabled>Redo</button>
       </div>
       <div class="topbar-group">
         <label>
@@ -57,12 +59,6 @@
           </li>
           <li>
             <label>
-              <input type="radio" name="tool" value="wall" />
-              Wand
-            </label>
-          </li>
-          <li>
-            <label>
               <input type="radio" name="tool" value="spawn" />
               Spawn
             </label>
@@ -79,11 +75,27 @@
               Objekt
             </label>
           </li>
+          <li>
+            <label>
+              <input type="radio" name="tool" value="door" />
+              Tür
+            </label>
+          </li>
         </ul>
         <p class="hint">
           Shift halten = Snapping aus.<br />
+          Auswählen + ziehen = verschieben.<br />
+          Tür-Werkzeug + Klick auf geteilte Wand = Tür.<br />
           Entf-Taste = Auswahl löschen.
         </p>
+        <h3>Layer</h3>
+        <div id="layer-toggles" class="layer-toggles"></div>
+        <h3>Bibliothek</h3>
+        <div id="kind-library-pending" class="kind-pending hidden">
+          Aktiv: <strong id="kind-library-pending-name"></strong>
+          <button id="kind-library-clear" type="button" title="Auswahl aufheben">×</button>
+        </div>
+        <div id="kind-library"></div>
       </aside>
       <aside id="props-sidebar">
         <h3>Eigenschaften</h3>
@@ -92,7 +104,10 @@
       </aside>
       <section id="canvas-area">
         <canvas id="editor-canvas" width="1200" height="800"></canvas>
-        <div id="status-bar"><span id="cursor-coords">--, --</span></div>
+        <div id="status-bar">
+          <span id="cursor-coords">--, --</span>
+          <span id="validation-strip" class="validation-strip"></span>
+        </div>
       </section>
     </main>
     <script type="module" src="/static/editor/editor.js"></script>
