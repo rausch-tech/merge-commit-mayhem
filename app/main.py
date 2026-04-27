@@ -813,13 +813,35 @@ _sounds_dir = Path(__file__).parent.parent / "sounds"
 # consumes the same .glb/.gltf files the Godot client uses, so editor and
 # game stay visually in lock-step. Mount as /assets/3d/.
 _godot_3d_assets_dir = Path(__file__).parent.parent / "godot-3d" / "assets"
+# Godot Web-Export landet unter godot-3d/exports/ (gitignored, ~37 MB WASM).
+# Wenn ein Build vorliegt, mounten wir ihn unter /godot/. Build via
+# scripts/godot-web-export.sh.
+_godot_export_dir = Path(__file__).parent.parent / "godot-3d" / "exports"
 if _images_dir.exists():
     app.mount("/images", StaticFiles(directory=_images_dir), name="images")
 if _sounds_dir.exists():
     app.mount("/sounds", StaticFiles(directory=_sounds_dir), name="sounds")
 if _godot_3d_assets_dir.exists():
     app.mount("/assets/3d", StaticFiles(directory=_godot_3d_assets_dir), name="godot_3d_assets")
+if (_godot_export_dir / "index.html").exists():
+    # html=True liefert index.html bei Anfragen auf "/godot/".
+    app.mount("/godot", StaticFiles(directory=_godot_export_dir, html=True), name="godot_web")
 app.mount("/static", StaticFiles(directory=_static_dir), name="static")
+
+
+# Godot 4.x Web-Export braucht SharedArrayBuffer (Threading). Browser
+# erlauben SharedArrayBuffer nur in cross-origin-isolated Kontexten — d.h.
+# Response muss COOP=same-origin und COEP=require-corp setzen. StaticFiles
+# setzt das nicht von alleine. Middleware schaltet die Headers nur fuer
+# /godot/-Pfade an, sonst wuerden andere Mounts (CDN-Three.js fuer den
+# Editor!) blockiert.
+@app.middleware("http")
+async def godot_web_cross_origin_isolation(request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/godot"):
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+        response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
+    return response
 
 
 @app.get("/")

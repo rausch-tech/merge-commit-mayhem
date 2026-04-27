@@ -122,21 +122,21 @@ für die finalen Slices ggf. ersetzt wird; siehe §6.6 + `ASSET_LICENSE.md`.
 
 ### 2.2 Godot-Sprint (~4–6 Wochen)
 
-| #    | Slice                                                                                 | Effort | Demo-Stand                    |
-| ---- | ------------------------------------------------------------------------------------- | ------ | ----------------------------- |
-| 4.1  | Godot-4-Setup, Web-Export-Config, WebSocketPeer-Binding                               | 1 Tag  | OK in `godot-3d/`             |
-| 4.2  | Lobby-Scene (UI, Room-Code-Input, Player-Liste, Map-Selection, Start)                 | 1–2 Tg | OK `main.gd`                  |
-| 4.3  | Map-Loader: JSON → 3D-Geometrie (Floors, Walls, Doors, Spawns, TaskAnchors)           | 2 Tage | TEILWEISE — §3.6 Schema-Drift |
-| 4.4  | Character-Scene: Mesh + Idle/Walk-Anim + Movement-Interpolation                       | 2–3 Tg | OK `character.gd`             |
-| 4.5  | HUD + Stat-Pills + Role + Timer (Tween-Animationen)                                   | 1 Tag  | OK `hud.gd`                   |
-| 4.6  | Task-Interaction (Mini-Game-Modals via Tier-3-API + Progress-Ring + Completion-VFX)   | 2 Tage | TODO                          |
-| 4.7  | Sabotage-Buttons mit Cooldown-Display                                                 | 1 Tag  | TODO                          |
-| 4.8  | Voting-Overlay + Result-Toast (Slide-Animationen)                                     | 1 Tag  | TODO                          |
-| 4.9  | Endscreen mit Role-Reveal + Stats + Confetti-Particles                                | 1 Tag  | TODO                          |
-| 4.10 | Among-Us-Features: Vents (anim+sfx), Body+Report, Take-Down, Lights/Comms-VFX, Ghosts | 5–8 Tg | nur Ghost-Alpha vorhanden     |
-| 4.11 | Sound-Integration (Footsteps, UI-SFX, BGM)                                            | 1 Tag  | TEILWEISE (siehe §3)          |
-| 4.12 | Polish + Bugfixes                                                                     | 3–5 Tg | TODO                          |
-| 4.13 | Web-Export-Deploy zur selben EC2                                                      | 0.5 Tg | TODO — noch nicht getestet    |
+| #    | Slice                                                                                 | Effort | Demo-Stand                                                                                                 |
+| ---- | ------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------- |
+| 4.1  | Godot-4-Setup, Web-Export-Config, WebSocketPeer-Binding                               | 1 Tag  | OK in `godot-3d/`                                                                                          |
+| 4.2  | Lobby-Scene (UI, Room-Code-Input, Player-Liste, Map-Selection, Start)                 | 1–2 Tg | OK `main.gd`                                                                                               |
+| 4.3  | Map-Loader: JSON → 3D-Geometrie (Floors, Walls, Doors, Spawns, TaskAnchors)           | 2 Tage | TEILWEISE — §3.6 Schema-Drift                                                                              |
+| 4.4  | Character-Scene: Mesh + Idle/Walk-Anim + Movement-Interpolation                       | 2–3 Tg | OK `character.gd`                                                                                          |
+| 4.5  | HUD + Stat-Pills + Role + Timer (Tween-Animationen)                                   | 1 Tag  | OK `hud.gd`                                                                                                |
+| 4.6  | Task-Interaction (Mini-Game-Modals via Tier-3-API + Progress-Ring + Completion-VFX)   | 2 Tage | TODO                                                                                                       |
+| 4.7  | Sabotage-Buttons mit Cooldown-Display                                                 | 1 Tag  | TODO                                                                                                       |
+| 4.8  | Voting-Overlay + Result-Toast (Slide-Animationen)                                     | 1 Tag  | TODO                                                                                                       |
+| 4.9  | Endscreen mit Role-Reveal + Stats + Confetti-Particles                                | 1 Tag  | TODO                                                                                                       |
+| 4.10 | Among-Us-Features: Vents (anim+sfx), Body+Report, Take-Down, Lights/Comms-VFX, Ghosts | 5–8 Tg | nur Ghost-Alpha vorhanden                                                                                  |
+| 4.11 | Sound-Integration (Footsteps, UI-SFX, BGM)                                            | 1 Tag  | TEILWEISE (siehe §3)                                                                                       |
+| 4.12 | Polish + Bugfixes                                                                     | 3–5 Tg | TODO                                                                                                       |
+| 4.13 | Web-Export-Deploy zur selben EC2                                                      | 0.5 Tg | 🟡 lokal builbar via `scripts/godot-web-export.sh`, FastAPI mountet `/godot/`, EC2-Tarball-Inclusion offen |
 
 Die Demo-Stand-Spalte ist **als Architektur-Referenz** gemeint, nicht als
 "Slice-merged-DoD". Die Demo kompiliert und läuft lokal gegen Backend, ist
@@ -160,7 +160,7 @@ inkrementell weiterbauen kannst.
 ```
 godot-3d/
 ├── project.godot                          # Godot 4.6, mobile renderer, 1280×720
-├── export_presets.cfg                     # (skeleton — Web-Export noch nicht konfiguriert)
+├── export_presets.cfg                     # Web-Export-Preset konfiguriert (threading + cross-origin-isolation)
 ├── maps/
 │   ├── default.json                       # 6-room office (4800×3200) — LEGACY wallLines schema!
 │   └── office_complex.json                # 9-room (5600×3200) mit Korridor — LEGACY wallLines
@@ -193,8 +193,14 @@ godot-3d/
     └── test_world.gd                      #  85 LoC — alter Spike, lädt fehlendes Dummy.glb
 ```
 
-`project.godot` hat noch **keinen** Web-Export konfiguriert (Tier 4.13). Ein
-`export_presets.cfg` Skelett liegt vor.
+`project.godot` hat seit 2026-04-27 ein konfiguriertes Web-Export-Preset
+(Tier 4.13). Build via `scripts/godot-web-export.sh` (release oder
+`-d` fuer debug); Output landet unter `godot-3d/exports/index.html` (samt
+`.wasm`/`.pck`/Audio-Worklets). FastAPI mountet `/godot/` auf das exports-
+Verzeichnis und setzt COOP/COEP-Response-Headers, sodass der WASM-Build im
+Browser SharedArrayBuffer nutzen kann. Lokaler Smoke:
+`scripts/godot-web-export.sh --serve`, dann `http://localhost:8000/godot/`.
+Production-Deploy auf EC2 ist noch nicht im Tarball-Step verdrahtet.
 
 ### 3.2 Was die Demo kann (verifiziert)
 
@@ -290,7 +296,7 @@ godot-3d/
 - Keine Mini-Game-Modals (5 Mini-Games existieren server-/browser-seitig).
 - Kein Vent-Use, Body-Report, Take-Down, Use-Ability.
 - Kein Auto-Reconnect via `user://player.json` (siehe §9.5 / §10).
-- Kein Web-Export-Build, kein HTML5-Profile getestet.
+- Web-Export-Build laeuft lokal (`scripts/godot-web-export.sh`). EC2-Deploy noch nicht durchverdrahtet.
 - `private_state` (Coffee-Energy, Cooldowns) wird empfangen aber nicht
   gerendert.
 - Wand-Rendering gegen den **Live-Server** funktioniert nicht (siehe §3.6).
@@ -1145,7 +1151,8 @@ Empfohlene Reihenfolge:
 **Bereits durch die 3D-Demo abgedeckt (Architektur, nicht final):**
 
 - **Tier 4.1 (Setup)** — `project.godot` läuft, WS-Connect funktioniert
-  lokal. Open: Web-Export-Profile in `export_presets.cfg` füllen
+  lokal, Web-Export-Profile gefüllt + Build-Skript da
+  (`scripts/godot-web-export.sh`). Open: EC2-Deploy-Step für den Web-Build
   (Tier 4.13).
 - **Tier 4.2 (Lobby)** — `main.gd` deckt Connect, Lobby, Player-Liste,
   Demo-Mode-Checkbox, Start-Button ab. Open: Map-Selection-UI an
@@ -1170,7 +1177,6 @@ Empfohlene Reihenfolge:
 **Neue Slices (von 0):**
 
 1. **Tier 4.6 (2 Tage) — Task-Interaction + Mini-Game-Modals**
-
    - "Halten zum Bearbeiten" (E) am `taskAnchors[]`-Marker → `task_hold_start` /
      `task_hold_stop`.
    - Server sendet `mini_game_started{taskId, miniGameId, view}` →
@@ -1182,7 +1188,6 @@ Empfohlene Reihenfolge:
    - Progress-Ring auf dem Char, Completion-VFX.
 
 2. **Tier 4.7 (1 Tag) — Sabotage-Buttons**
-
    - Aus `private_role.availableSabotages` Liste rendern.
    - Cooldown-Display (Quelle: `private_state.takedownCooldown` /
      analoge Felder).
@@ -1192,14 +1197,12 @@ Empfohlene Reihenfolge:
    - Repair-Panels für Release: `repair_sabotage` mit F-Hold.
 
 3. **Tier 4.8 (1 Tag) — Voting-Overlay**
-
    - `game_state.meeting` enthält Phase + Players.
    - Voting-Liste, Countdown, "Skip" Option.
    - `cast_vote{targetPlayerId}` bzw. `skip_vote`.
    - `voting_result` → Toast mit Slide-In.
 
 4. **Tier 4.9 (1 Tag) — Endscreen**
-
    - `game_ended.players` enthält Per-Player-Stats + Awards (Tier 3.7).
    - `game_ended.aiPostmortem` ist der KI-Text (optional anzeigen).
    - Confetti-Particles wenn Release-Team gewinnt, anders wenn Chaos.
@@ -1207,7 +1210,6 @@ Empfohlene Reihenfolge:
      das ist die zu ersetzende Stelle in `world.gd:_apply_state`.
 
 5. **Tier 4.10 (5–8 Tage) — Among-Us-Features**
-
    - Vents: V cyclet durch verbundene `vents[].connectedTo`, Click TP.
    - Body-Discovery: tote Spieler haben `bodies[]` Eintrag.
    - Report-Button wenn nahe an Body → `report_body{bodyPlayerId}`.
@@ -1218,7 +1220,6 @@ Empfohlene Reihenfolge:
    - `use_ability` für aktive Rollen.
 
 6. **Tier 4.11 (1 Tag) — Sound-Polish**
-
    - Footsteps abhängig von `room.floorMaterial` (aktuell: nur Carpet).
    - UI-SFX-Abdeckung (Toast, Slide-In, Stat-Blink).
    - BGM-Auswahl für Lobby + Match (optional, BGM bewusst aus dem Demo
@@ -1226,7 +1227,6 @@ Empfohlene Reihenfolge:
    - Audio-Bus für Mute/Volume (Tier 1 hatte das schon im Browser).
 
 7. **Tier 4.12 (3–5 Tage) — Polish + Reconnect**
-
    - Settings-UI (Sound, Graphics, Keybinds).
    - Auto-Reconnect via `user://player.json` (siehe §5.3 / §9.5).
    - Edge-Cases: Sabotage während Meeting, Body-Discovery Race-Conditions,
@@ -1234,7 +1234,6 @@ Empfohlene Reihenfolge:
    - `test_world.gd` + `test_world.tscn` cleanen (siehe §3.4).
 
 8. **Tier 4.13 (0.5 Tag) — Web-Export-Deploy**
-
    - Godot Web-Export bauen.
    - Auf `prod-is-lava.dev` unter `/godot/` deployen
      (Backend-`scripts/deploy.sh` erweitern).
