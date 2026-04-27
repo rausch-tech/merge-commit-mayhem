@@ -513,6 +513,23 @@ function drawSelectionHighlight() {
       const dh = o.rotation === 90 || o.rotation === 270 ? o.width : o.height;
       ctx2d.strokeRect(o.x - dw / 2 - 4, o.y - dh / 2 - 4, dw + 8, dh + 8);
     }
+  } else if (sel.kind === "door") {
+    const d = state.map.doors?.[sel.index];
+    if (d) {
+      const a = state.map.rooms.find((r) => r.id === d.betweenRoomA);
+      const b = state.map.rooms.find((r) => r.id === d.betweenRoomB);
+      if (a && b) {
+        const edge = _findSharedEdge(a, b);
+        if (edge) {
+          const half = Math.floor((d.width || 240) / 2);
+          if (edge.axis === "x") {
+            ctx2d.strokeRect(edge.position - 12, d.position - half - 4, 24, half * 2 + 8);
+          } else {
+            ctx2d.strokeRect(d.position - half - 4, edge.position - 12, half * 2 + 8, 24);
+          }
+        }
+      }
+    }
   }
   ctx2d.restore();
 }
@@ -601,6 +618,8 @@ function deleteSelection() {
     state.map.taskAnchors.splice(sel.index, 1);
   } else if (sel.kind === "object") {
     state.map.mapObjects.splice(sel.index, 1);
+  } else if (sel.kind === "door") {
+    state.map.doors.splice(sel.index, 1);
   }
   state.selection = null;
   toolContext.markDirty();
@@ -677,6 +696,7 @@ function renderPropsSidebar() {
   if (sel.kind === "spawn") return renderSpawnProps(sel.index);
   if (sel.kind === "task") return renderTaskProps(sel.index);
   if (sel.kind === "object") return renderObjectProps(sel.index);
+  if (sel.kind === "door") return renderDoorProps(sel.index);
 }
 
 function makeField(label, value, onChange, type = "text") {
@@ -937,6 +957,86 @@ function renderObjectProps(i) {
   strField("task_id (optional)", "taskId");
   strField("sabotage_repair_id (optional)", "sabotageRepairId");
   strField("object_type (optional, Tier 2.7 sabotage trigger)", "objectType");
+  appendDeleteButton(root);
+}
+
+function renderDoorProps(i) {
+  const d = state.map.doors?.[i];
+  if (!d) return;
+  const root = dom.propsContent;
+  // Read-only room labels — door reassignment isn't allowed via the props
+  // sidebar. To "move" a door to a different shared edge, delete it and
+  // re-create it with the door tool. Shows the labels so the user can see
+  // which two rooms are connected.
+  const a = state.map.rooms.find((r) => r.id === d.betweenRoomA);
+  const b = state.map.rooms.find((r) => r.id === d.betweenRoomB);
+  const info = document.createElement("p");
+  info.className = "props-empty";
+  info.style.color = "#a0a4a8";
+  info.textContent = `Verbindet: ${a?.title || d.betweenRoomA} ↔ ${b?.title || d.betweenRoomB}`;
+  root.appendChild(info);
+
+  root.appendChild(
+    makeField(
+      "ID",
+      d.id,
+      (v) => {
+        d.id = v.trim();
+        toolContext.markDirty();
+        requestRender();
+      },
+      "text"
+    )
+  );
+  root.appendChild(
+    makeField(
+      "Position (entlang Wand)",
+      d.position,
+      (v) => {
+        const n = parseInt(v, 10);
+        if (Number.isFinite(n)) {
+          d.position = n;
+          toolContext.markDirty();
+          requestRender();
+        }
+      },
+      "number"
+    )
+  );
+  root.appendChild(
+    makeField(
+      "Breite",
+      d.width,
+      (v) => {
+        const n = parseInt(v, 10);
+        if (Number.isFinite(n) && n > 0) {
+          d.width = n;
+          toolContext.markDirty();
+          requestRender();
+        }
+      },
+      "number"
+    )
+  );
+  // doorKind is a Godot scene key — kept simple as a select with the
+  // currently-supported values from docs/maps.md.
+  const kindWrap = document.createElement("label");
+  kindWrap.textContent = "Tür-Typ (Godot)";
+  const kindSel = document.createElement("select");
+  for (const k of ["office_door", "glass_panel", "vault", "none"]) {
+    const opt = document.createElement("option");
+    opt.value = k;
+    opt.textContent = k;
+    if ((d.doorKind || "office_door") === k) opt.selected = true;
+    kindSel.appendChild(opt);
+  }
+  kindSel.addEventListener("change", () => {
+    d.doorKind = kindSel.value;
+    toolContext.markDirty();
+    requestRender();
+  });
+  kindWrap.appendChild(kindSel);
+  root.appendChild(kindWrap);
   appendDeleteButton(root);
 }
 
