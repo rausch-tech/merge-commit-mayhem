@@ -11,17 +11,32 @@ extends RefCounted
 #   Walls/<segment_n>    — extruded box-mesh per wall segment (between doors)
 #   SpawnPoints/<i>      — invisible Marker3D per spawn (used by world.gd)
 #   TaskAnchors/<task_id>— invisible Marker3D per task anchor
-#   Furniture            — placed Office decor (KayKit Bits)
+#   MapObjects/<kind_n>  — Tier-4 props (desks, chairs, monitors, …) gerendert
+#                          aus map.mapObjects[]. Kinds mit echten KayKit-Assets
+#                          → instanced asset; sonst → Fallback-Box mit Kind-
+#                          Label (sieht hässlich aus, aber zeigt klar wo Assets
+#                          fehlen — Asset-Pipeline ist Tier 4.0.x).
 
 const WALL_HEIGHT: float = 2.6
 const WALL_THICKNESS: float = 0.12
 const FLOOR_THICKNESS: float = 0.05
 const WORLD_SCALE: float = Protocol.WORLD_SCALE
 
-# Asset references — shared furniture pool used to decorate rooms heuristically.
-const DESK_SCENE: PackedScene = preload("res://assets/furniture/desk.gltf")
-const CHAIR_SCENE: PackedScene = preload("res://assets/furniture/chair_desk_A.gltf")
-const MONITOR_SCENE: PackedScene = preload("res://assets/furniture/monitor.gltf")
+# kind → PackedScene mapping. Kinds, die hier nicht aufgelistet sind, fallen
+# auf einen grauen Fallback-Box mit Kind-Label zurück (siehe _make_map_object).
+# Wenn neue Assets dazukommen: hier registrieren, Eintrag aus `docs/maps.md`
+# Kind-Catalogue als Wahrheits-Source nutzen.
+const KIND_ASSETS: Dictionary = {
+	"desk":       preload("res://assets/furniture/desk.gltf"),
+	"chair_desk": preload("res://assets/furniture/chair_desk_A.gltf"),
+	"monitor":    preload("res://assets/furniture/monitor.gltf"),
+}
+
+# Fallback-Box-Farbe + Höhe für Kinds ohne Asset. Höhe ist absichtlich klein
+# damit er nicht visuell mit Wänden konkurriert.
+const COLOR_PROP_FALLBACK: Color = Color(0.55, 0.55, 0.58)
+const PROP_FALLBACK_HEIGHT: float = 0.6
+const PROP_LABEL_HEIGHT: float = 0.95
 
 # Visual tone per room id — falls back to room.color from JSON.
 const ROOM_TINT_OVERRIDE: Dictionary = {
@@ -99,10 +114,10 @@ static func build(map: Dictionary) -> Node3D:
 		diamond.position.y = 1.2
 		marker.add_child(diamond)
 
-	var furniture := Node3D.new()
-	furniture.name = "Furniture"
-	root.add_child(furniture)
-	_decorate_rooms(furniture, map.get("rooms", []))
+	var props := Node3D.new()
+	props.name = "MapObjects"
+	root.add_child(props)
+	_build_map_objects(props, map.get("mapObjects", []))
 
 	return root
 
@@ -381,76 +396,74 @@ static func _build_perimeter(parent: Node3D, map_w: float, map_h: float) -> void
 		parent.add_child(wall)
 		idx += 1
 
-# -- Furniture decoration ---------------------------------------------------
+# -- MapObjects rendering ----------------------------------------------------
+#
+# Map-JSON ist single source of truth für alle Furniture/Props (jeder Eintrag
+# in mapObjects[] = ein 3D-Objekt). Heuristische Furniture-Platzierung pro
+# Room-Id (vor Slice A1) ist gedroppt — Map-Editor und Schema beschreiben
+# jetzt vollständig was wo steht.
+#
+# object.x/y ist CENTER (nicht top-left). object.rotation ∈ {0, 90, 180, 270}
+# rotiert das Mesh um die Y-Achse. Die object.width/height beziehen sich auf
+# die UN-rotierte Form — Rotation 90/270 swapped den AABB-Footprint, aber
+# da wir das Mesh selbst rotieren, brauchen wir den Swap visuell nicht.
+# (Server-side Collision macht das Swap für blocks_movement, siehe
+# game_map.map_object_aabb().)
 
-static func _decorate_rooms(parent: Node3D, rooms: Array) -> void:
-	for room in rooms:
-		var room_id := str(room.get("id", ""))
-		var rx: float = float(room.get("x", 0))
-		var ry: float = float(room.get("y", 0))
-		var rw: float = float(room.get("width", 0))
-		var rh: float = float(room.get("height", 0))
-		var cx: float = rx + rw * 0.5
-		var cz: float = ry + rh * 0.5
-		match room_id:
-			"open_space":
-				_place_desk_row(parent, rx + 200, ry + 250, 3, 0)
-				_place_desk_row(parent, rx + 200, ry + 600, 3, 0)
-			"meeting_room":
-				_place_meeting_table(parent, cx, cz)
-			"server_room":
-				_place_server_racks(parent, rx, ry, rw, rh)
-			"war_room":
-				_place_meeting_table(parent, cx, cz)
-			"kitchen":
-				_place_desk_row(parent, rx + 250, ry + 200, 2, 0)
-			"legacy_basement":
-				_place_desk_row(parent, rx + 200, ry + 250, 2, 0)
-				_place_desk_row(parent, rx + 200, ry + 600, 2, 0)
-			_:
-				pass
+static func _build_map_objects(parent: Node3D, map_objects: Array) -> void:
+	for i in map_objects.size():
+		var obj: Dictionary = map_objects[i]
+		var kind := str(obj.get("kind", ""))
+		var node := _make_map_object(kind, obj)
+		node.name = "%s_%d" % [kind if kind != "" else "obj", i]
+		parent.add_child(node)
 
-static func _place_desk_row(parent: Node3D, start_x: float, start_z: float, count: int, _rotation: float) -> void:
-	var spacing_world: float = 1.8
-	for i in count:
-		var pos_world := Protocol.server_to_world(start_x, start_z)
-		pos_world.x += i * spacing_world
-		var desk := DESK_SCENE.instantiate() as Node3D
-		desk.position = pos_world
-		parent.add_child(desk)
-		var monitor := MONITOR_SCENE.instantiate() as Node3D
-		monitor.position = pos_world + Vector3(0, 0.78, -0.25)
-		parent.add_child(monitor)
-		var chair := CHAIR_SCENE.instantiate() as Node3D
-		chair.position = pos_world + Vector3(0, 0, 0.9)
-		chair.rotation.y = PI
-		parent.add_child(chair)
+static func _make_map_object(kind: String, obj: Dictionary) -> Node3D:
+	var holder := Node3D.new()
+	var ox: float = float(obj.get("x", 0))
+	var oy: float = float(obj.get("y", 0))
+	var rot_deg: int = int(obj.get("rotation", 0))
 
-static func _place_meeting_table(parent: Node3D, server_x: float, server_z: float) -> void:
-	var table_pos := Protocol.server_to_world(server_x, server_z)
-	# Use desk as a long table proxy; KayKit doesn't ship a dedicated meeting table here.
-	for i in range(-1, 2):
-		var t := DESK_SCENE.instantiate() as Node3D
-		t.position = table_pos + Vector3(i * 1.8, 0, 0)
-		parent.add_child(t)
-	for i in range(-2, 3):
-		var c := CHAIR_SCENE.instantiate() as Node3D
-		c.position = table_pos + Vector3(i * 0.9, 0, 1.0)
-		c.rotation.y = PI
-		parent.add_child(c)
-		var c2 := CHAIR_SCENE.instantiate() as Node3D
-		c2.position = table_pos + Vector3(i * 0.9, 0, -1.0)
-		parent.add_child(c2)
+	holder.position = Protocol.server_to_world(ox, oy)
+	holder.rotation.y = deg_to_rad(float(rot_deg))
 
-static func _place_server_racks(parent: Node3D, rx: float, ry: float, rw: float, rh: float) -> void:
-	# Stack monitors as makeshift "server racks" along the room edges.
-	for i in 4:
-		var pos_world := Protocol.server_to_world(rx + 200 + i * 250.0, ry + 200)
-		var rack := MONITOR_SCENE.instantiate() as Node3D
-		rack.position = pos_world + Vector3(0, 1.2, 0)
-		rack.scale = Vector3(0.8, 1.6, 0.8)
-		parent.add_child(rack)
-		var stand := DESK_SCENE.instantiate() as Node3D
-		stand.position = pos_world
-		stand.scale = Vector3(0.7, 0.5, 0.7)
-		parent.add_child(stand)
+	if KIND_ASSETS.has(kind):
+		var asset := (KIND_ASSETS[kind] as PackedScene).instantiate() as Node3D
+		holder.add_child(asset)
+	else:
+		holder.add_child(_make_fallback_prop(kind, obj))
+
+	return holder
+
+# Fallback-Visual für Kinds ohne registriertes Asset: graue Box mit Kind-Label.
+# Bewusst hässlich, damit man auf einen Blick sieht, welche Assets noch
+# fehlen. Lange Liste pro Map = Asset-Pipeline-Slice ist überfällig.
+static func _make_fallback_prop(kind: String, obj: Dictionary) -> Node3D:
+	var holder := Node3D.new()
+	var ow: float = float(obj.get("width", 0))
+	var oh: float = float(obj.get("height", 0))
+
+	var box := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(ow * WORLD_SCALE, PROP_FALLBACK_HEIGHT, oh * WORLD_SCALE)
+	box.mesh = mesh
+	box.position.y = PROP_FALLBACK_HEIGHT * 0.5
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = COLOR_PROP_FALLBACK
+	mat.metallic = 0.05
+	mat.roughness = 0.85
+	box.material_override = mat
+	holder.add_child(box)
+
+	if kind != "":
+		var label := Label3D.new()
+		label.text = kind
+		label.position.y = PROP_LABEL_HEIGHT
+		label.font_size = 28
+		label.outline_size = 4
+		label.modulate = Color(1.0, 1.0, 1.0, 0.85)
+		label.no_depth_test = true
+		holder.add_child(label)
+
+	return holder
