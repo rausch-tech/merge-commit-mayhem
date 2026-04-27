@@ -336,3 +336,66 @@ h3 {
   font-size: 10px;
   color: #7a808a;
 }
+
+/* Layer toggles ------------------------------------------------------------ */
+
+.layer-toggles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 6px;
+  margin-bottom: 12px;
+}
+
+.layer-toggles label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #c0c4c8;
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.layer-toggles label:hover {
+  background: #2f343c;
+}
+
+.layer-toggles input[type="checkbox"] {
+  margin: 0;
+}
+
+/* Validation strip --------------------------------------------------------- */
+
+#status-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - 12px);
+}
+
+.validation-strip {
+  color: #fbbf24;
+  font-family: monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: help;
+  max-width: 60vw;
+}
+
+.validation-strip.ok {
+  color: #4ade80;
+}
+
+.validation-strip.empty {
+  color: #5a6478;
+}
+
+/* Undo/redo buttons -------------------------------------------------------- */
+
+#editor-topbar button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

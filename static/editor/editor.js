@@ -14,8 +14,33 @@ import {
   serializeMap,
   validateMap,
 } from "/static/editor/editor-state.js";
+import { History } from "/static/editor/editor-history.js";
 import { KIND_BY_NAME, KIND_CATALOGUE, KIND_CATEGORIES } from "/static/editor/editor-kinds.js";
 import { snap, TOOLS } from "/static/editor/editor-tools.js";
+
+// Layers the user can hide. Each key matches a draw-call below; toggling
+// hides the layer in the canvas without removing the data from the model.
+const DEFAULT_LAYERS = {
+  rooms: true,
+  walls: true,
+  doors: true,
+  objects: true,
+  spawns: true,
+  tasks: true,
+  panels: true,
+  vents: true,
+};
+
+const LAYER_LABELS = {
+  rooms: "Räume",
+  walls: "Wände",
+  doors: "Türen",
+  objects: "Objekte",
+  spawns: "Spawns",
+  tasks: "Tasks",
+  panels: "Sabotage",
+  vents: "Vents",
+};
 
 const state = {
   map: blankMap(),
@@ -26,7 +51,10 @@ const state = {
   dirty: false,
   shiftHeld: false,
   view: { scale: 1, offsetX: 0, offsetY: 0 },
+  layers: { ...DEFAULT_LAYERS },
 };
+
+const history = new History();
 
 const dom = {
   canvas: document.getElementById("editor-canvas"),
@@ -47,6 +75,10 @@ const dom = {
   kindPending: document.getElementById("kind-library-pending"),
   kindPendingName: document.getElementById("kind-library-pending-name"),
   kindClear: document.getElementById("kind-library-clear"),
+  btnUndo: document.getElementById("btn-undo"),
+  btnRedo: document.getElementById("btn-redo"),
+  layerToggles: document.getElementById("layer-toggles"),
+  validationStrip: document.getElementById("validation-strip"),
 };
 
 const ctx2d = dom.canvas.getContext("2d");
@@ -68,7 +100,12 @@ const toolContext = {
   markDirty() {
     state.dirty = true;
     dom.dirtyFlag.classList.remove("hidden");
+    refreshValidationStrip();
     requestRender();
+  },
+  pushUndo() {
+    history.push(state.map);
+    refreshUndoButtons();
   },
   refreshWarRoomChoices() {
     refreshWarRoomChoices();
@@ -173,58 +210,62 @@ function render() {
   drawGrid();
 
   // Rooms.
-  for (const r of state.map.rooms) {
-    ctx2d.fillStyle = r.color || "#3a4560";
-    ctx2d.fillRect(r.x, r.y, r.width, r.height);
-    ctx2d.strokeStyle = "rgba(255, 255, 255, 0.15)";
-    ctx2d.lineWidth = 1 / state.view.scale;
-    ctx2d.strokeRect(r.x, r.y, r.width, r.height);
-    // Label.
-    ctx2d.fillStyle = "#ffffff";
-    ctx2d.font = `${Math.max(14, 18 / state.view.scale)}px system-ui`;
-    ctx2d.fillText(r.title || r.id, r.x + 8, r.y + 22 / state.view.scale);
+  if (state.layers.rooms) {
+    for (const r of state.map.rooms) {
+      ctx2d.fillStyle = r.color || "#3a4560";
+      ctx2d.fillRect(r.x, r.y, r.width, r.height);
+      ctx2d.strokeStyle = "rgba(255, 255, 255, 0.15)";
+      ctx2d.lineWidth = 1 / state.view.scale;
+      ctx2d.strokeRect(r.x, r.y, r.width, r.height);
+      // Label.
+      ctx2d.fillStyle = "#ffffff";
+      ctx2d.font = `${Math.max(14, 18 / state.view.scale)}px system-ui`;
+      ctx2d.fillText(r.title || r.id, r.x + 8, r.y + 22 / state.view.scale);
+    }
   }
 
   // Walls (Slice-3): auto-derived from room edges minus doors.
   // Editor mirrors what the server computes so the user sees the live
   // result of moving rooms or adding/removing doors.
-  drawAutoWalls();
-  drawDoors();
+  if (state.layers.walls) drawAutoWalls();
+  if (state.layers.doors) drawDoors();
 
   // Spawn points.
-  for (let i = 0; i < state.map.spawnPoints.length; i++) {
-    const s = state.map.spawnPoints[i];
-    ctx2d.fillStyle = "#3aa850";
-    ctx2d.beginPath();
-    ctx2d.arc(s.x, s.y, 14, 0, Math.PI * 2);
-    ctx2d.fill();
-    ctx2d.strokeStyle = "#1f5028";
-    ctx2d.lineWidth = 2 / state.view.scale;
-    ctx2d.stroke();
-  }
+  if (state.layers.spawns)
+    for (let i = 0; i < state.map.spawnPoints.length; i++) {
+      const s = state.map.spawnPoints[i];
+      ctx2d.fillStyle = "#3aa850";
+      ctx2d.beginPath();
+      ctx2d.arc(s.x, s.y, 14, 0, Math.PI * 2);
+      ctx2d.fill();
+      ctx2d.strokeStyle = "#1f5028";
+      ctx2d.lineWidth = 2 / state.view.scale;
+      ctx2d.stroke();
+    }
 
   // Task anchors (orange diamonds).
-  for (let i = 0; i < state.map.taskAnchors.length; i++) {
-    const t = state.map.taskAnchors[i];
-    ctx2d.fillStyle = "#e0902a";
-    ctx2d.beginPath();
-    ctx2d.moveTo(t.x, t.y - 18);
-    ctx2d.lineTo(t.x + 18, t.y);
-    ctx2d.lineTo(t.x, t.y + 18);
-    ctx2d.lineTo(t.x - 18, t.y);
-    ctx2d.closePath();
-    ctx2d.fill();
-    ctx2d.strokeStyle = "#7a4f15";
-    ctx2d.lineWidth = 2 / state.view.scale;
-    ctx2d.stroke();
-    ctx2d.fillStyle = "#ffffff";
-    ctx2d.font = `${Math.max(11, 14 / state.view.scale)}px monospace`;
-    ctx2d.fillText(t.taskId, t.x + 22, t.y + 4);
-  }
+  if (state.layers.tasks)
+    for (let i = 0; i < state.map.taskAnchors.length; i++) {
+      const t = state.map.taskAnchors[i];
+      ctx2d.fillStyle = "#e0902a";
+      ctx2d.beginPath();
+      ctx2d.moveTo(t.x, t.y - 18);
+      ctx2d.lineTo(t.x + 18, t.y);
+      ctx2d.lineTo(t.x, t.y + 18);
+      ctx2d.lineTo(t.x - 18, t.y);
+      ctx2d.closePath();
+      ctx2d.fill();
+      ctx2d.strokeStyle = "#7a4f15";
+      ctx2d.lineWidth = 2 / state.view.scale;
+      ctx2d.stroke();
+      ctx2d.fillStyle = "#ffffff";
+      ctx2d.font = `${Math.max(11, 14 / state.view.scale)}px monospace`;
+      ctx2d.fillText(t.taskId, t.x + 22, t.y + 4);
+    }
 
   // Map objects (Tier 4 props — drawn as bounding-box rectangles with kind
   // label so the editor matches the in-game placeholder render).
-  if (Array.isArray(state.map.mapObjects)) {
+  if (state.layers.objects && Array.isArray(state.map.mapObjects)) {
     for (let i = 0; i < state.map.mapObjects.length; i++) {
       const o = state.map.mapObjects[i];
       const dw = o.rotation === 90 || o.rotation === 270 ? o.height : o.width;
@@ -247,7 +288,7 @@ function render() {
   // Sabotage panels (Tier 2.4 — repair points). Read-only marker for now;
   // no edit tool yet, but at least visible so the data isn't invisible
   // when authoring a map.
-  if (Array.isArray(state.map.sabotagePanels)) {
+  if (state.layers.panels && Array.isArray(state.map.sabotagePanels)) {
     for (const p of state.map.sabotagePanels) {
       ctx2d.save();
       ctx2d.fillStyle = "#dc2626";
@@ -268,7 +309,7 @@ function render() {
 
   // Vents (Tier 2.3 — chaos teleport). Read-only diamond marker plus
   // dotted lines to connected destinations, so the network is visible.
-  if (Array.isArray(state.map.vents)) {
+  if (state.layers.vents && Array.isArray(state.map.vents)) {
     const ventById = new Map(state.map.vents.map((v) => [v.id, v]));
     // Draw connection lines first so the diamonds sit on top.
     ctx2d.save();
@@ -563,6 +604,9 @@ function pointerCoords(evt) {
 dom.canvas.addEventListener("mousedown", (e) => {
   if (e.button !== 0) return;
   const p = pointerCoords(e);
+  // Snapshot for undo BEFORE the tool runs. Even pure clicks that just change
+  // selection are cheap to record and the History dedups identical snapshots.
+  toolContext.pushUndo();
   if (state.toolInstance && state.toolInstance.onDown) {
     state.toolInstance.onDown(toolContext, p.x, p.y);
   }
@@ -588,10 +632,38 @@ dom.canvas.addEventListener("mouseup", (e) => {
 
 window.addEventListener("keydown", (e) => {
   if (e.key === "Shift") state.shiftHeld = true;
+  // Most shortcuts must NOT fire while a form field is focused — typing
+  // "z" in the map-name input would trigger undo otherwise.
+  const inField =
+    document.activeElement &&
+    (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "SELECT");
   if (e.key === "Delete" || e.key === "Backspace") {
-    if (document.activeElement && document.activeElement.tagName === "INPUT") return;
-    if (document.activeElement && document.activeElement.tagName === "SELECT") return;
+    if (inField) return;
     deleteSelection();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "z" || e.key === "Z")) {
+    if (inField) return;
+    e.preventDefault();
+    performUndo();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && (e.key === "y" || e.key === "Y")) {
+    if (inField) return;
+    e.preventDefault();
+    performRedo();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "z" || e.key === "Z")) {
+    if (inField) return;
+    e.preventDefault();
+    performRedo();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S")) {
+    e.preventDefault(); // even when in field — save is a global shortcut
+    triggerDownload();
+    return;
   }
 });
 window.addEventListener("keyup", (e) => {
@@ -601,6 +673,7 @@ window.addEventListener("keyup", (e) => {
 function deleteSelection() {
   const sel = state.selection;
   if (!sel) return;
+  toolContext.pushUndo();
   if (sel.kind === "room") {
     const removed = state.map.rooms.splice(sel.index, 1)[0];
     if (removed && state.map.warRoomId === removed.id) state.map.warRoomId = "";
@@ -1061,8 +1134,11 @@ dom.btnNew.addEventListener("click", () => {
   state.selection = null;
   state.dirty = false;
   dom.dirtyFlag.classList.add("hidden");
+  history.clear();
+  refreshUndoButtons();
   syncTopbarFields();
   renderPropsSidebar();
+  refreshValidationStrip();
   computeFitView();
   requestRender();
 });
@@ -1083,8 +1159,11 @@ dom.fileInput.addEventListener("change", async () => {
     state.selection = null;
     state.dirty = false;
     dom.dirtyFlag.classList.add("hidden");
+    history.clear();
+    refreshUndoButtons();
     syncTopbarFields();
     renderPropsSidebar();
+    refreshValidationStrip();
     computeFitView();
     requestRender();
   } catch (err) {
@@ -1092,7 +1171,9 @@ dom.fileInput.addEventListener("change", async () => {
   }
 });
 
-dom.btnDownload.addEventListener("click", () => {
+dom.btnDownload.addEventListener("click", () => triggerDownload());
+
+function triggerDownload() {
   const warnings = validateMap(state.map);
   if (warnings.length > 0) {
     const msg =
@@ -1114,7 +1195,7 @@ dom.btnDownload.addEventListener("click", () => {
   setTimeout(() => URL.revokeObjectURL(url), 0);
   state.dirty = false;
   dom.dirtyFlag.classList.add("hidden");
-});
+}
 
 window.addEventListener("beforeunload", (e) => {
   if (state.dirty) {
@@ -1209,10 +1290,91 @@ function renderKindPending() {
 
 dom.kindClear?.addEventListener("click", clearPendingKind);
 
+// --- Layer toggles ---------------------------------------------------------
+
+function renderLayerToggles() {
+  const root = dom.layerToggles;
+  if (!root) return;
+  root.innerHTML = "";
+  for (const key of Object.keys(DEFAULT_LAYERS)) {
+    const wrap = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = state.layers[key] !== false;
+    cb.addEventListener("change", () => {
+      state.layers[key] = cb.checked;
+      requestRender();
+    });
+    wrap.appendChild(cb);
+    wrap.appendChild(document.createTextNode(" " + (LAYER_LABELS[key] || key)));
+    root.appendChild(wrap);
+  }
+}
+
+// --- Undo / redo wiring ----------------------------------------------------
+
+function performUndo() {
+  if (!history.canUndo()) return;
+  const restored = history.undo(state.map);
+  if (!restored) return;
+  applyRestoredMap(restored);
+}
+
+function performRedo() {
+  if (!history.canRedo()) return;
+  const restored = history.redo(state.map);
+  if (!restored) return;
+  applyRestoredMap(restored);
+}
+
+function applyRestoredMap(map) {
+  state.map = map;
+  state.selection = null;
+  state.dirty = true;
+  dom.dirtyFlag.classList.remove("hidden");
+  syncTopbarFields();
+  renderPropsSidebar();
+  refreshValidationStrip();
+  refreshUndoButtons();
+  computeFitView();
+  requestRender();
+}
+
+function refreshUndoButtons() {
+  if (dom.btnUndo) dom.btnUndo.disabled = !history.canUndo();
+  if (dom.btnRedo) dom.btnRedo.disabled = !history.canRedo();
+}
+
+dom.btnUndo?.addEventListener("click", performUndo);
+dom.btnRedo?.addEventListener("click", performRedo);
+
+// --- Validation strip ------------------------------------------------------
+
+function refreshValidationStrip() {
+  if (!dom.validationStrip) return;
+  const warnings = validateMap(state.map);
+  if (warnings.length === 0) {
+    dom.validationStrip.classList.add("ok");
+    dom.validationStrip.classList.remove("empty");
+    dom.validationStrip.textContent = "Validierung: alles gut";
+    dom.validationStrip.title = "";
+    return;
+  }
+  dom.validationStrip.classList.remove("ok");
+  dom.validationStrip.classList.remove("empty");
+  const summary =
+    warnings.length === 1 ? warnings[0] : `${warnings.length} Warnungen — ${warnings[0]}`;
+  dom.validationStrip.textContent = summary;
+  dom.validationStrip.title = warnings.join("\n");
+}
+
 // --- Boot ------------------------------------------------------------------
 
 renderKindLibrary();
+renderLayerToggles();
 setTool("select");
 syncTopbarFields();
 renderPropsSidebar();
+refreshValidationStrip();
+refreshUndoButtons();
 fitCanvas();
