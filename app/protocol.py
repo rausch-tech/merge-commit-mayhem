@@ -289,7 +289,11 @@ class _IncomingEnvelope(BaseModel):
 
 
 def parse_incoming(raw: dict[str, Any]) -> IncomingMessage:
-    return _IncomingEnvelope(root=raw).root
+    # Pydantic resolves the discriminated union from the raw dict — mypy
+    # can't follow that flow through ``_IncomingEnvelope``, so suppress the
+    # arg-type complaint here. Round-trip behaviour is covered by
+    # tests/test_protocol.py.
+    return _IncomingEnvelope(root=raw).root  # type: ignore[arg-type]
 
 
 # --- outgoing messages ------------------------------------------------------

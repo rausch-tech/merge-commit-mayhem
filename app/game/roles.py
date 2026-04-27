@@ -235,9 +235,12 @@ CHAOS_ROLES: Final[tuple[str, ...]] = tuple(
 )
 
 
-def role_by_id(role_id: str) -> RoleDefinition:
-    """Lookup helper. Falls back to Developer for unknown ids so a stale
-    client/save can never crash the round."""
+def role_by_id(role_id: str | None) -> RoleDefinition:
+    """Lookup helper. Falls back to Developer for unknown / None ids so a
+    stale client/save can never crash the round (and so callers don't have
+    to guard against ``Player.role is None`` mid-round)."""
+    if role_id is None:
+        return DEVELOPER
     return _BY_ID.get(role_id, DEVELOPER)
 
 

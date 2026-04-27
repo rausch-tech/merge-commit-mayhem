@@ -12,9 +12,10 @@ class _PlayerLike(Protocol):
     """Structural type for ``all_chaos_eliminated``: anything with the two
     fields the function needs. Player satisfies it; the test doubles in
     test_voting.py do too. Avoids ``getattr`` indirection without coupling
-    voting.py to the full ``Player`` model."""
+    voting.py to the full ``Player`` model. ``team`` is Optional because
+    ``Player.team`` is None until assign() runs at round start."""
 
-    team: str
+    team: str | None
     is_alive: bool
 
 

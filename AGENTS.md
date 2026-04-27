@@ -120,15 +120,21 @@ Wenn dein Patch das ändert, fix die Tests im selben Commit.
 
 ## 3. CI Gates (`.github/workflows/`)
 
-Fünf Jobs laufen parallel auf jedem Push/PR:
+Sechs Jobs laufen parallel auf jedem Push/PR:
 
-1. **`pytest`** — `uv run pytest`. Muss grün sein.
+1. **`pytest (+ coverage gate)`** — `uv run pytest -q --cov=app/game --cov-fail-under=88`.
+   Muss grün sein. Coverage-Threshold ist Slice 6 von v1-Hardening; aktueller
+   Stand 92 % auf `app/game/`, 88 % als CI-Floor.
 2. **`vitest`** — `npx vitest run`. Muss grün sein.
 3. **`ruff (lint + format)`** — `uv run ruff check .` + `uv run ruff format --check .`.
-4. **`prettier`** — `npx --yes prettier@3.3.3 ...`. **Version-Pin ist kritisch** —
+4. **`mypy`** — `uv run mypy`. Läuft gegen `app/` (siehe `[tool.mypy]` in
+   `pyproject.toml`). Moderate Konfiguration: `strict_optional`,
+   `warn_unreachable`, `warn_unused_ignores`. Mini-Game-Plugins sind dict-shape-
+   heavy und haben einen eigenen Override mit gelockerten Codes.
+5. **`prettier`** — `npx --yes prettier@3.3.3 ...`. **Version-Pin ist kritisch** —
    Prettier 3.3 vs 4.0 formatieren Markdown-Tabellen unterschiedlich. Lokal
    wenn du Prettier hast, immer mit `prettier@3.3.3` aufrufen, sonst CI rot.
-5. **`deploy to EC2`** — läuft nur auf `main`-Push, _nachdem_ die anderen
+6. **`deploy to EC2`** — läuft nur auf `main`-Push, _nachdem_ die anderen
    Gates grün sind. Tarball + scp + ssh-restart auf `t4g.nano` in
    eu-central-1. Braucht GitHub-Secrets `EC2_SSH_KEY` und `EC2_HOST`.
 
