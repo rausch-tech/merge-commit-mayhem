@@ -36,5 +36,21 @@ Vier Packs als Quelle, alle **CC0 / Public Domain Dedication**:
 Attribution ist bei CC0 nicht erforderlich, aber wir tun's freiwillig — Kay
 Lousberg, Quaternius und Kenney Vleugels haben hochwertige Pakete bereitgestellt.
 
+### Welche Files sind aus welchem Pack vendored?
+
+`godot-3d/assets/` ist die Single-Source-of-Truth für 3D-Assets im Repo. Pro
+Subdir liegt ein License-Anker:
+
+- `godot-3d/assets/KAYKIT_LICENSE.txt` — KayKit Bits Bundle 1 v1.1 (CC0). Wird
+  von `furniture/`, `kitchen/` und `server/` referenziert.
+- `godot-3d/assets/character/kenney_mini/` — Kenney Mini Characters (CC0).
+- `godot-3d/assets/audio/{footsteps,sting,ui}/` — Kenney Impact / Sci-Fi /
+  UI-Audio (CC0).
+
+Welche Source-Pack-Files genau für welchen MapObject-Kind kopiert werden, hält
+`maps/kinds.json` im Feld `kaykit_source` fest. `scripts/import_kaykit_assets.py`
+ist die Pipeline, die aus diesem Mapping `godot-3d/assets/` neu erzeugt — siehe
+[`docs/maps.md`](docs/maps.md) für die Kind-Spec.
+
 The source code of this project is licensed separately under the MIT License;
 see `LICENSE`.

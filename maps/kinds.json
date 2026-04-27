@@ -28,7 +28,7 @@
     "default_size": [180, 80],
     "blocks_movement": true,
     "browser_2d": { "fill": "#7c5a3a", "label": "DESK" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/furniture/desk_large.gltf",
     "kaykit_source": "Furniture/desk_large.fbx"
   },
   "desk_decorated": {
@@ -37,7 +37,7 @@
     "default_size": [110, 60],
     "blocks_movement": true,
     "browser_2d": { "fill": "#7c5a3a", "label": "DESK" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/furniture/desk_decorated.gltf",
     "kaykit_source": "Furniture/desk_decorated.fbx"
   },
   "chair_desk": {
@@ -64,7 +64,7 @@
     "default_size": [50, 20],
     "blocks_movement": false,
     "browser_2d": { "fill": "#1f2937", "label": "" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/furniture/keyboard.gltf",
     "kaykit_source": "Furniture/keyboard.fbx"
   },
   "mug": {
@@ -73,7 +73,7 @@
     "default_size": [20, 20],
     "blocks_movement": false,
     "browser_2d": { "fill": "#a16207", "label": "" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/furniture/mug_A.gltf",
     "kaykit_source": "Furniture/mug_A.fbx"
   },
   "lamp_desk": {
@@ -82,7 +82,7 @@
     "default_size": [30, 30],
     "blocks_movement": false,
     "browser_2d": { "fill": "#fbbf24", "label": "" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/furniture/lamp_desk.gltf",
     "kaykit_source": "Furniture/lamp_desk.fbx"
   },
 
@@ -92,7 +92,7 @@
     "default_size": [80, 100],
     "blocks_movement": true,
     "browser_2d": { "fill": "#1e293b", "label": "RACK" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/server/structure_tall.gltf",
     "kaykit_source": "Space Base/structure_tall.fbx"
   },
   "monitoring_panel": {
@@ -101,7 +101,7 @@
     "default_size": [200, 60],
     "blocks_movement": false,
     "browser_2d": { "fill": "#0ea5e9", "label": "PANEL" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/furniture/pictureframe_large_A.gltf",
     "kaykit_source": "Furniture/pictureframe_large_A.fbx"
   },
   "cabinet": {
@@ -110,7 +110,7 @@
     "default_size": [80, 80],
     "blocks_movement": true,
     "browser_2d": { "fill": "#3f3f46", "label": "" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/furniture/cabinet_medium.gltf",
     "kaykit_source": "Furniture/cabinet_medium.fbx"
   },
 
@@ -120,7 +120,7 @@
     "default_size": [480, 140],
     "blocks_movement": true,
     "browser_2d": { "fill": "#52525b", "label": "TABLE" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/furniture/table_medium_long.gltf",
     "kaykit_source": "Furniture/table_medium_long.fbx"
   },
   "presentation_screen": {
@@ -129,7 +129,7 @@
     "default_size": [200, 30],
     "blocks_movement": false,
     "browser_2d": { "fill": "#1e1b4b", "label": "SCRN" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/furniture/pictureframe_large_B.gltf",
     "kaykit_source": "Furniture/pictureframe_large_B.fbx"
   },
   "chair_meeting": {
@@ -138,7 +138,7 @@
     "default_size": [50, 50],
     "blocks_movement": false,
     "browser_2d": { "fill": "#3f3128", "label": "" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/furniture/chair_A.gltf",
     "kaykit_source": "Furniture/chair_A.fbx"
   },
 
@@ -148,7 +148,7 @@
     "default_size": [320, 80],
     "blocks_movement": true,
     "browser_2d": { "fill": "#9ca3af", "label": "CNTR" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/kitchen/kitchencounter_straight_A.gltf",
     "kaykit_source": "Restaurant/kitchencounter_straight_A.fbx"
   },
   "kitchen_corner": {
@@ -157,7 +157,7 @@
     "default_size": [120, 120],
     "blocks_movement": true,
     "browser_2d": { "fill": "#9ca3af", "label": "CNTR" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/kitchen/kitchencounter_innercorner.gltf",
     "kaykit_source": "Restaurant/kitchencounter_innercorner.fbx"
   },
   "kitchen_sink": {
@@ -166,7 +166,7 @@
     "default_size": [120, 80],
     "blocks_movement": true,
     "browser_2d": { "fill": "#94a3b8", "label": "SINK" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/kitchen/kitchencounter_sink.gltf",
     "kaykit_source": "Restaurant/kitchencounter_sink.fbx"
   },
   "coffee_machine": {
@@ -175,7 +175,7 @@
     "default_size": [90, 90],
     "blocks_movement": false,
     "browser_2d": { "fill": "#854d0e", "label": "COFFEE" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/kitchen/icecream_machine.gltf",
     "kaykit_source": "Restaurant/icecream_machine.fbx"
   },
   "fridge": {
@@ -184,7 +184,7 @@
     "default_size": [100, 130],
     "blocks_movement": true,
     "browser_2d": { "fill": "#cbd5e1", "label": "FRIDGE" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/kitchen/fridge_A.gltf",
     "kaykit_source": "Restaurant/fridge_A.fbx"
   },
   "chair_stool": {
@@ -193,7 +193,7 @@
     "default_size": [50, 50],
     "blocks_movement": false,
     "browser_2d": { "fill": "#3f3128", "label": "" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/furniture/chair_stool.gltf",
     "kaykit_source": "Furniture/chair_stool.fbx"
   },
 
@@ -203,7 +203,7 @@
     "default_size": [60, 60],
     "blocks_movement": false,
     "browser_2d": { "fill": "#15803d", "label": "" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/furniture/cactus_medium_A.gltf",
     "kaykit_source": "Furniture/cactus_medium_A.fbx"
   },
   "picture_frame": {
@@ -212,7 +212,7 @@
     "default_size": [80, 30],
     "blocks_movement": false,
     "browser_2d": { "fill": "#a78bfa", "label": "" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/furniture/pictureframe_medium.gltf",
     "kaykit_source": "Furniture/pictureframe_medium.fbx"
   },
   "rug": {
@@ -221,7 +221,7 @@
     "default_size": [200, 120],
     "blocks_movement": false,
     "browser_2d": { "fill": "#7e22ce", "label": "" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/furniture/rug_rectangle_A.gltf",
     "kaykit_source": "Furniture/rug_rectangle_A.fbx"
   },
 
@@ -231,7 +231,7 @@
     "default_size": [70, 70],
     "blocks_movement": true,
     "browser_2d": { "fill": "#78350f", "label": "CRATE" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/server/cargo_A.gltf",
     "kaykit_source": "Space Base/cargo_A.fbx"
   },
   "old_workstation": {
@@ -240,7 +240,7 @@
     "default_size": [110, 60],
     "blocks_movement": true,
     "browser_2d": { "fill": "#44403c", "label": "OLD" },
-    "godot_asset": null,
+    "godot_asset": "res://assets/furniture/desk_decorated.gltf",
     "kaykit_source": "Furniture/desk_decorated.fbx"
   }
 }
