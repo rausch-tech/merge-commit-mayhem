@@ -142,7 +142,7 @@ Jeder Schritt einzeln testbar, jeder eigener Commit, jeder muss grün gegen loka
 
 - **Lokales Backend:** `uv run uvicorn app.main:app --reload` auf Port 8000. Godot connectet zu `ws://localhost:8000/ws`.
 - **Manueller Test pro Schritt:** ein Browser-Tab als Host, ein Godot-Client als zweiter Spieler.
-- **Live-Smoke:** finaler Test gegen `wss://game.prod-is-lava.dev/ws` — nur als Sanity-Check, nicht für Iteration.
+- **Live-Smoke:** finaler Test gegen `wss://prod-is-lava.dev/ws` — nur als Sanity-Check, nicht für Iteration.
 - **Keine automatisierten Godot-Tests im Spike.** GUT-Framework wäre Overkill für vier Acceptance-Pfade.
 
 ## 8. Erwarteter Output

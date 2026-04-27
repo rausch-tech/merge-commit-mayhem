@@ -5,7 +5,7 @@ Voraussetzung: solide Godot-4-Erfahrung. MCM-Vorwissen brauchst du keins —
 diese Doku liefert Kontext, Architektur, Protokoll, vorhandene 3D-Demo und
 einen konkreten Slice-Plan ab dem Punkt, an dem die Demo aufhört.
 
-- **Live-Backend:** https://game.prod-is-lava.dev (auto-deploy von `main`)
+- **Live-Backend:** https://prod-is-lava.dev (auto-deploy von `main`)
 - **Repo:** https://github.com/rausch-tech/merge-commit-mayhem
 - **Stand 2026-04-27:** Tier 0–3.7 ist live; 3D-Demo (Tier-4-Prototyp) liegt
   unter `godot-3d/` direkt in `main`. Sie deckt die Architektur (Lobby,
@@ -1236,7 +1236,7 @@ Empfohlene Reihenfolge:
 8. **Tier 4.13 (0.5 Tag) — Web-Export-Deploy**
 
    - Godot Web-Export bauen.
-   - Auf `game.prod-is-lava.dev` unter `/godot/` deployen
+   - Auf `prod-is-lava.dev` unter `/godot/` deployen
      (Backend-`scripts/deploy.sh` erweitern).
    - HTTPS/WSS-Endpoint testen — der Live-Server hat bereits ein
      valides Cert.
@@ -1298,7 +1298,7 @@ Empfohlene Reihenfolge:
 
 - Sven Rausch ([sr@rausch.se](mailto:sr@rausch.se)) — Product/Architect.
 - Repo: https://github.com/rausch-tech/merge-commit-mayhem
-- Live: https://game.prod-is-lava.dev
+- Live: https://prod-is-lava.dev
 - Stand dieser Doku: 2026-04-27, nach `slice/tier4-3d-demo`-Merge in
   main (Tier-4-Prototyp) und Editor-Slices 1–5 (Wand-Modell C +
   Editor-UX-Redesign abgeschlossen). Diese v2 ersetzt die v1

@@ -2,11 +2,11 @@
 
 ## Aktueller Stand
 
-Live-Server: `https://game.prod-is-lava.dev`
+Live-Server: `https://prod-is-lava.dev`
 
 - **Provider:** AWS EC2, eu-central-1, Instance `i-0dcff98f735883d60`, Type `t4g.nano`, Public IP `3.78.184.97`
 - **OS:** Ubuntu 24.04 (ARM64)
-- **Reverse Proxy:** Caddy mit Auto-HTTPS (LetsEncrypt) auf Domain `game.prod-is-lava.dev` (+ `mcm.3-78-184-97.sslip.io` als sslip-Fallback)
+- **Reverse Proxy:** Caddy mit Auto-HTTPS (LetsEncrypt) auf Domain `prod-is-lava.dev` (+ `mcm.3-78-184-97.sslip.io` als sslip-Fallback)
 - **App:** uvicorn auf `127.0.0.1:8000`, läuft als systemd-Unit `mcm-server.service`
 - **Code-Pfad auf Server:** `/opt/mcm`
 - **Logs:** `journalctl -u mcm-server.service`
@@ -77,7 +77,7 @@ Wieder starten:
 aws ec2 start-instances --region eu-central-1 --instance-ids i-0dcff98f735883d60
 ```
 
-**Achtung:** ohne Elastic IP wechselt die Public IP beim Start. Aktuell hängt das Setup an `3.78.184.97` (sslip.io URL braucht IP-Update; Route53-A-Record für game.prod-is-lava.dev braucht Update). Bei IP-Wechsel:
+**Achtung:** ohne Elastic IP wechselt die Public IP beim Start. Aktuell hängt das Setup an `3.78.184.97` (sslip.io URL braucht IP-Update; Route53-A-Record für prod-is-lava.dev braucht Update). Bei IP-Wechsel:
 
 - `EC2_HOST` Secret aktualisieren
 - `EC2_HOST` in diesem Doc aktualisieren
@@ -108,7 +108,7 @@ sudo systemctl restart mcm-server.service
 Aktuell:
 
 ```caddy
-mcm.3-78-184-97.sslip.io, game.prod-is-lava.dev {
+mcm.3-78-184-97.sslip.io, prod-is-lava.dev {
     reverse_proxy 127.0.0.1:8000
     encode zstd gzip
 }

@@ -16,7 +16,7 @@
 - **Architektur-Nordstern:** **Python entscheidet, der Client zeigt nur an.**
   Backend ist autoritativ für ALLEN State. Client sendet Inputs, rendert
   Snapshots. Wenn eine Idee Spiellogik in den Client drückt → zurück.
-- **Live-Server:** https://game.prod-is-lava.dev (auto-deployed auf jedem
+- **Live-Server:** https://prod-is-lava.dev (auto-deployed auf jedem
   `main`-Push via GitHub Actions).
 - **Repo:** https://github.com/rausch-tech/merge-commit-mayhem · `origin/main`.
 - **Roadmap:** `docs/ROADMAP.md` ist DIE Wahrheit über Reihenfolge + Stand.
@@ -159,7 +159,7 @@ Sechs Jobs laufen parallel auf jedem Push/PR:
    Gates grün sind. Tarball + scp + ssh-restart auf `t4g.nano` in
    eu-central-1. Braucht GitHub-Secrets `EC2_SSH_KEY` und `EC2_HOST`.
 
-Nach dem Deploy ist der neue Build live unter https://game.prod-is-lava.dev.
+Nach dem Deploy ist der neue Build live unter https://prod-is-lava.dev.
 
 ---
 
@@ -447,7 +447,7 @@ only) · `mini_game_completed` (Owner-only) · `error`
 7. **Tests:** `uv run pytest && npx vitest run`.
 8. **Commit** mit conventional Prefix + Co-Author-Trailer wenn AI-generiert.
 9. **Pause vor Push.** User fragen: "OK zum Push und Live-Deploy?".
-10. **Nach Merge auf main:** Live-Smoke per `curl https://game.prod-is-lava.dev/`.
+10. **Nach Merge auf main:** Live-Smoke per `curl https://prod-is-lava.dev/`.
     Roadmap-Eintrag updaten (`✅ done`).
 
 ---
@@ -513,4 +513,4 @@ einen Patch oben drauf.
 
 **Stand: 2026-04-27 · Tier 0–3.7 deployed · v8 chaos roles (Vibe Coder, Rogue
 Consultant, Shadow Admin) · 5 release roles · 8 Sabotagen object-bound · 5/8
-Tasks mit Mini-Game · Live: https://game.prod-is-lava.dev**
+Tasks mit Mini-Game · Live: https://prod-is-lava.dev**

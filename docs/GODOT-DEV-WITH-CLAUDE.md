@@ -368,7 +368,7 @@ Dauer: 30–90s pro Iteration. Schnell genug für tight loops mit Sven.
 
 - **Web-Export** (`exports/spike2.html`): Web-Build siehe alte Spike-Doku.
   Aktuell nicht der primäre Test-Pfad.
-- **Live-Server-Integration** (gegen `https://game.prod-is-lava.dev`):
+- **Live-Server-Integration** (gegen `https://prod-is-lava.dev`):
   läuft, aber für Demo-Workflow uninteressant.
 - **Wall-Auto-Derivation** aus Map-Doors: Server kann das schon
   (`compute_walls()` in `app/game/game_map.py`), Godot-Client noch nicht

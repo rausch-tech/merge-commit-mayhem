@@ -1324,7 +1324,7 @@ und `../docs/CLIENT.md`.
 
 Im Editor: F5 (Run Project). Es öffnet sich ein Fenster mit Connect-UI.
 
-- **WebSocket URL:** `ws://localhost:8000/ws` (default; oder `wss://game.prod-is-lava.dev/ws` für Live-Smoke).
+- **WebSocket URL:** `ws://localhost:8000/ws` (default; oder `wss://prod-is-lava.dev/ws` für Live-Smoke).
 - **Room Code:** vier Buchstaben, z.B. `ABCD`.
 - **Player Name:** beliebig.
 - **Connect** klicken.
