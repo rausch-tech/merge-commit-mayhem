@@ -27,6 +27,14 @@ func _ready() -> void:
 		"team": "release_team",
 		"description": "Du bist Developer. Beende Tasks und finde die Chaos-Agenten.",
 	}
+	# Mock private_state — fuer den Demo-Mode ohne Backend, damit der Personal-
+	# Coffee-Bar im HUD bei ~80% statt leer steht. Live-Server pusht das spaeter.
+	var mock_private_state := {
+		"coffeeEnergy": 80.0,
+		"coffeeMax": 100.0,
+		"abilityUsed": false,
+		"takedownCooldownRemaining": 0.0,
+	}
 
 	var ws := WSClient.new()
 	# We don't actually connect — the WSClient just sits there silently.
@@ -39,6 +47,7 @@ func _ready() -> void:
 	world.set("map_data", map)
 	world.set("role_info", role_info)
 	world.set("initial_state", initial_state)
+	world.set("private_state", mock_private_state)
 	# Aerial mode is the default for screenshots; flip to false to test the
 	# real game-mode follow-camera locally via:
 	#   godot --path godot-3d --scene res://scenes/demo_world.tscn

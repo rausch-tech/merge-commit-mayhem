@@ -31,6 +31,13 @@ func _ready() -> void:
 		"role": "developer",
 		"team": "release_team",
 	}
+	# Mock private_state — Personal-Coffee-Bar im HUD bei ~65% statt leer.
+	var mock_private_state := {
+		"coffeeEnergy": 65.0,
+		"coffeeMax": 100.0,
+		"abilityUsed": false,
+		"takedownCooldownRemaining": 0.0,
+	}
 
 	var ws := WSClient.new()
 	add_child(ws)
@@ -42,6 +49,7 @@ func _ready() -> void:
 	world.set("map_data", map)
 	world.set("role_info", role_info)
 	world.set("initial_state", initial_state)
+	world.set("private_state", mock_private_state)
 	world.set("aerial_demo_camera", false)  # follow-cam mode
 	get_tree().root.add_child.call_deferred(world)
 

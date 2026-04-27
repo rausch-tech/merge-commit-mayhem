@@ -38,6 +38,10 @@ var is_host: bool = false
 var map_data: Dictionary = {}
 var role_info: Dictionary = {}
 var initial_state: Dictionary = {}
+# Per-Owner-Stream (coffeeEnergy, coffeeMax, abilityUsed, takedownCooldownRemaining).
+# Tickt nicht jeden Frame, sondern nur wenn sich was aendert. Cached fuers HUD
+# zwischen den Updates.
+var private_state: Dictionary = {}
 
 # Runtime
 var _world_root: Node3D
@@ -102,6 +106,10 @@ func _ready() -> void:
 		_hud.call("set_role_info", role_info)
 	if _hud.has_method("set_map_name"):
 		_hud.call("set_map_name", str(map_data.get("name", "?")))
+	# Initial private_state (coffee-Bar) wenn Demo-Mode oder Reconnect schon
+	# einen mitgegeben hat. Live-Server pusht spaeter via TYPE_PRIVATE_STATE.
+	if not private_state.is_empty() and _hud.has_method("apply_private_state"):
+		_hud.call("apply_private_state", private_state)
 
 	# Apply initial game state if provided
 	if not initial_state.is_empty():
@@ -157,9 +165,16 @@ func _on_message(type_: String, payload: Dictionary) -> void:
 			if not _role_sting_played:
 				_play_sting(STING_ROLE_REVEAL)
 				_role_sting_played = true
+		Protocol.TYPE_PRIVATE_STATE:
+			# Per-Owner-Stream — Coffee-Energy + Cooldowns. HUD zeigt aktuell
+			# nur die Coffee-Bar; Ability/Takedown-UI kommen in Tier 4.7/4.10.
+			private_state = payload.duplicate()
+			if _hud and _hud.has_method("apply_private_state"):
+				_hud.call("apply_private_state", private_state)
 		_:
-			# Many other message types (private_state, voting_result, etc.) —
-			# the demo doesn't render them but logs help debugging.
+			# Voting/meeting/mini-game etc. — Tier 4.6+ rendert sie, vorher
+			# fallen sie hier durch. Logs auf Debugging-Bedarf nicht hier
+			# anwerfen, sonst flutet das die Konsole bei 20 Hz.
 			pass
 
 func _on_disconnected() -> void:

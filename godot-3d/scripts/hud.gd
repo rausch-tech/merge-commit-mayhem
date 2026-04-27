@@ -2,7 +2,13 @@ extends CanvasLayer
 
 # Game HUD — overlays the 3D world with stat bars, timer, role chip, and a
 # right-side player roster. Pure UI; updates come from world.gd via:
-#   - apply_game_state(state)
+#   - apply_game_state(state)         — team-level stats (release, pipeline,
+#                                       team-coffee-Mittelwert, incidents)
+#   - apply_private_state(state)      — per-Owner: persoenliche Coffee-Energie,
+#                                       Cooldowns. Separat von apply_game_state
+#                                       weil das Wire-Format zwei Coffee-Werte
+#                                       hat (game_state.coffeeLevel = team,
+#                                       private_state.coffeeEnergy = self).
 #   - set_role_info(payload)
 #   - set_player_id(id)
 #   - set_map_name(name)
@@ -35,6 +41,8 @@ var _role_chip: Label
 var _team_chip: Label
 var _map_label: Label
 var _roster: VBoxContainer
+var _personal_coffee_fill: ColorRect
+var _personal_coffee_max_width: float = 180.0
 
 func _ready() -> void:
 	_build_top_bar()
@@ -69,6 +77,18 @@ func set_role_info(role_info: Dictionary) -> void:
 	else:
 		_team_chip.text = "—"
 		_team_chip.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+
+func apply_private_state(state: Dictionary) -> void:
+	var energy: float = float(state.get("coffeeEnergy", 100.0))
+	var max_e: float = float(state.get("coffeeMax", 100.0))
+	if max_e <= 0.0:
+		max_e = 100.0
+	var ratio: float = clampf(energy / max_e, 0.0, 1.0)
+	if _personal_coffee_fill != null:
+		_personal_coffee_fill.size = Vector2(_personal_coffee_max_width * ratio, 8)
+	# ability_used + takedown_cooldown_remaining werden absichtlich noch nicht
+	# visualisiert — kommt in Tier 4.7 (Sabotage-/Ability-Buttons) und Tier 4.10
+	# (Take-Down-UI). Hier nur cachen via state (world.gd haelt es).
 
 func apply_game_state(state: Dictionary) -> void:
 	# Stats
@@ -241,6 +261,41 @@ func _build_role_chip() -> void:
 	_role_chip.add_theme_color_override("font_color", COLOR_TEXT)
 	_role_chip.add_theme_font_size_override("font_size", 22)
 	vbox.add_child(_role_chip)
+
+	# Persoenliche Coffee-Energie (private_state.coffeeEnergy / coffeeMax) —
+	# bewusst optisch klar getrennt vom Team-Coffee-Stat-Pill oben (anderer
+	# Akzent + thinner). Default voll, wird via apply_private_state geupdated.
+	var coffee_row := HBoxContainer.new()
+	coffee_row.add_theme_constant_override("separation", 6)
+	vbox.add_child(coffee_row)
+
+	var coffee_label := Label.new()
+	coffee_label.text = "ENERGIE"
+	coffee_label.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+	coffee_label.add_theme_font_size_override("font_size", 10)
+	coffee_label.custom_minimum_size = Vector2(58, 0)
+	coffee_row.add_child(coffee_label)
+
+	var bar_container := PanelContainer.new()
+	bar_container.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var bar_bg := StyleBoxFlat.new()
+	bar_bg.bg_color = Color(0.08, 0.10, 0.14, 0.8)
+	bar_bg.set_corner_radius_all(3)
+	bar_bg.set_content_margin_all(2)
+	bar_container.add_theme_stylebox_override("panel", bar_bg)
+	coffee_row.add_child(bar_container)
+
+	var bar_inner := Control.new()
+	bar_inner.custom_minimum_size = Vector2(_personal_coffee_max_width, 8)
+	bar_container.add_child(bar_inner)
+
+	_personal_coffee_fill = ColorRect.new()
+	_personal_coffee_fill.color = COLOR_ACCENT
+	_personal_coffee_fill.anchor_top = 0.0
+	_personal_coffee_fill.anchor_bottom = 1.0
+	_personal_coffee_fill.anchor_left = 0.0
+	_personal_coffee_fill.size = Vector2(_personal_coffee_max_width, 8)
+	bar_inner.add_child(_personal_coffee_fill)
 
 	var hint := Label.new()
 	hint.text = "ESC = Menü"
