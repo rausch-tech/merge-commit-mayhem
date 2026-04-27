@@ -312,6 +312,40 @@ class LobbyStateMsg(BaseModel):
     map: dict[str, Any] = Field(default_factory=dict)
 
 
+class MeetingBody(BaseModel):
+    model_config = _camel_config()
+    victim_name: str
+    x: float
+    y: float
+    room: str
+
+
+class MeetingRecentEvent(BaseModel):
+    model_config = _camel_config()
+    severity: str
+    message: str
+    seq: int
+
+
+class MeetingAlive(BaseModel):
+    model_config = _camel_config()
+    id: str
+    name: str
+
+
+class MeetingContext(BaseModel):
+    """Tier 3.6: discussion fuel block embedded in `meeting`. Keys are
+    camelCase on the wire (the frontend reads `reporterName`, `recentEvents`).
+    Modelling this explicitly keeps the alias generator authoritative — manual
+    dict-building was drifting from the rest of the protocol."""
+
+    model_config = _camel_config()
+    reporter_name: str = ""
+    body: MeetingBody | None = None
+    recent_events: list[MeetingRecentEvent] = Field(default_factory=list)
+    alive: list[MeetingAlive] = Field(default_factory=list)
+
+
 class GameStateMsg(BaseModel):
     model_config = _camel_config()
     phase: str
