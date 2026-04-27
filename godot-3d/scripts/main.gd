@@ -63,19 +63,25 @@ func _ready() -> void:
 # -- UI construction ---------------------------------------------------------
 
 func _build_ui() -> void:
-	# Background gradient
+	# Root mouse_filter: PASS so the root Control doesn't swallow events.
+	mouse_filter = Control.MOUSE_FILTER_PASS
+
+	# Background gradient — both layers are click-through (IGNORE) so they
+	# never block the buttons sitting on top.
 	var bg := ColorRect.new()
 	bg.color = COLOR_BG_BOTTOM
 	bg.anchor_right = 1.0
 	bg.anchor_bottom = 1.0
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
 	var bg_overlay := _make_gradient_panel()
 	bg_overlay.anchor_right = 1.0
 	bg_overlay.anchor_bottom = 1.0
+	bg_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg_overlay)
 
-	# Title block (top-center)
+	# Title block (top-center) — click-through so it never sits on a button.
 	var title_container := VBoxContainer.new()
 	title_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	title_container.anchor_left = 0.5
@@ -85,6 +91,7 @@ func _build_ui() -> void:
 	title_container.offset_right = 300
 	title_container.offset_top = 60
 	title_container.offset_bottom = 200
+	title_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(title_container)
 
 	var title := Label.new()
@@ -211,11 +218,13 @@ func _build_ui() -> void:
 	var log_panel := PanelContainer.new()
 	log_panel.anchor_left = 0.0
 	log_panel.anchor_right = 1.0
+	log_panel.anchor_top = 1.0
 	log_panel.anchor_bottom = 1.0
 	log_panel.offset_left = 16
 	log_panel.offset_right = -16
 	log_panel.offset_top = -120
 	log_panel.offset_bottom = -16
+	log_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var log_style := StyleBoxFlat.new()
 	log_style.bg_color = Color(0.04, 0.05, 0.08, 0.85)
 	log_style.set_corner_radius_all(8)
@@ -231,6 +240,7 @@ func _build_ui() -> void:
 	_log_area.add_theme_color_override("font_color", COLOR_ACCENT)
 	_log_area.add_theme_color_override("background_color", Color(0, 0, 0, 0))
 	_log_area.add_theme_font_size_override("font_size", 12)
+	_log_area.mouse_filter = Control.MOUSE_FILTER_PASS
 	log_panel.add_child(_log_area)
 
 func _make_card() -> PanelContainer:
