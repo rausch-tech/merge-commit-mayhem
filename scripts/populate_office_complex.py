@@ -50,6 +50,22 @@ TASK_OBJECT_TYPES: dict[str, str] = {
 }
 
 
+# Per-Room floor material — drives the procedural texture in the 3D-Vorschau
+# (and later real materials in the Godot client). Falls back to "office" if
+# a room id isn't listed here.
+ROOM_FLOOR_MATERIALS: dict[str, str] = {
+    "reception": "office",
+    "open_space": "office",
+    "open_space_east": "office",
+    "meeting_room": "office",
+    "corridor": "office",
+    "server_room": "server",
+    "war_room": "office",
+    "kitchen": "kitchen",
+    "legacy_basement": "legacy",
+}
+
+
 def _id_seq(prefix: str) -> Any:
     """Tiny id generator so we can `next(seq)` without manual counters."""
     counter = 0
@@ -402,6 +418,17 @@ def main() -> None:
         ot = TASK_OBJECT_TYPES.get(ta["taskId"])
         if ot:
             ta["objectType"] = ot
+
+    # Stamp per-room floorMaterial so the 3D-Vorschau picks the right
+    # procedural texture (carpet/tiles/concrete/old-carpet).
+    for room in raw["rooms"]:
+        fm = ROOM_FLOOR_MATERIALS.get(room["id"], "office")
+        if fm != "office":
+            room["floorMaterial"] = fm
+        else:
+            # Reset any previous explicit "office" so the JSON stays terse;
+            # default in the schema covers it.
+            room.pop("floorMaterial", None)
 
     seq = _id_seq("oc")
     raw["mapObjects"] = []

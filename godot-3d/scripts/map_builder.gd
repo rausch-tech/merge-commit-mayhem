@@ -48,6 +48,27 @@ const ROOM_TINT_OVERRIDE: Dictionary = {
 	"legacy_basement": Color(0.38, 0.55, 0.40),
 }
 
+# Floor-Material-Farben — überstimmen ROOM_TINT_OVERRIDE wenn das Map-JSON
+# ``floorMaterial`` setzt. Echte Texturen kommen mit Tier 4.0.x; hier nur
+# distinkte Farbtöne damit Räume visuell unterscheidbar sind ohne Assets.
+const FLOOR_MATERIAL_COLOR: Dictionary = {
+	"office":  Color(0.65, 0.55, 0.42),  # warm carpet beige
+	"kitchen": Color(0.80, 0.83, 0.86),  # cool tile grey
+	"server":  Color(0.42, 0.45, 0.50),  # concrete grey
+	"legacy":  Color(0.37, 0.46, 0.28),  # dim olive
+}
+
+# Door-Frame-Farbe je doorKind. ``none`` skip we die Tür komplett. Passt zur
+# 3D-Vorschau im Editor.
+const DOOR_FRAME_COLOR: Dictionary = {
+	"office_door": Color(0.29, 0.22, 0.13),  # dark wood
+	"glass_panel": Color(0.53, 0.67, 0.80),  # light cool glass
+	"vault":       Color(0.20, 0.21, 0.24),  # dark steel
+}
+
+const DOOR_LINTEL_HEIGHT: float = 0.25
+const DOOR_FRAME_THICKNESS: float = 0.20
+
 const COLOR_WALL: Color = Color(0.92, 0.93, 0.96)
 const COLOR_FLOOR_FALLBACK: Color = Color(0.30, 0.34, 0.40)
 const COLOR_SPAWN_MARKER: Color = Color(0.30, 0.95, 0.50, 0.6)
@@ -73,6 +94,11 @@ static func build(map: Dictionary) -> Node3D:
 	walls.name = "Walls"
 	root.add_child(walls)
 	_build_walls(walls, map.get("rooms", []), map.get("doors", []), map.get("size", {}))
+
+	var door_frames := Node3D.new()
+	door_frames.name = "DoorFrames"
+	root.add_child(door_frames)
+	_build_door_frames(door_frames, map.get("rooms", []), map.get("doors", []))
 
 	var perimeter := Node3D.new()
 	perimeter.name = "Perimeter"
@@ -182,13 +208,31 @@ static func _build_room_floor(room_data: Dictionary) -> Node3D:
 
 	var mat := StandardMaterial3D.new()
 	var room_id := str(room_data.get("id", ""))
-	if ROOM_TINT_OVERRIDE.has(room_id):
+	# Priority: explicit floorMaterial > per-room id override > room.color hex.
+	var floor_material := str(room_data.get("floorMaterial", ""))
+	if floor_material != "" and FLOOR_MATERIAL_COLOR.has(floor_material):
+		mat.albedo_color = FLOOR_MATERIAL_COLOR[floor_material]
+		# Kitchen tiles read smoother, server concrete reads matte. Spreizen
+		# der Roughness damit man den Bodenunterschied auch ohne Textur fühlt.
+		match floor_material:
+			"kitchen":
+				mat.roughness = 0.45
+				mat.metallic = 0.08
+			"server":
+				mat.roughness = 0.88
+				mat.metallic = 0.10
+			_:
+				mat.roughness = 0.92
+				mat.metallic = 0.02
+	elif ROOM_TINT_OVERRIDE.has(room_id):
 		mat.albedo_color = ROOM_TINT_OVERRIDE[room_id]
+		mat.metallic = 0.05
+		mat.roughness = 0.85
 	else:
 		var hex := str(room_data.get("color", ""))
 		mat.albedo_color = Color(hex) if hex.begins_with("#") and hex.length() == 7 else COLOR_FLOOR_FALLBACK
-	mat.metallic = 0.05
-	mat.roughness = 0.85
+		mat.metallic = 0.05
+		mat.roughness = 0.85
 	plane.material_override = mat
 	holder.add_child(plane)
 
@@ -380,6 +424,92 @@ static func _make_wall_box(axis: String, pos: float, seg_start: float, seg_end: 
 	mat.roughness = 0.7
 	node.material_override = mat
 	return node
+
+# -- Door frames -------------------------------------------------------------
+#
+# Wand-Computation stanzt eine Lücke in die Wand pro Door. Ohne sichtbare
+# Geometrie liest sich der Gap als „fehlendes Wandsegment" statt als „Tür".
+# Diese Funktion setzt einen schmalen Lintel-Balken oben über jeden Gap;
+# Material variiert je doorKind (office_door / glass_panel / vault).
+
+static func _build_door_frames(parent: Node3D, rooms: Array, doors: Array) -> void:
+	for i in doors.size():
+		var door: Dictionary = doors[i]
+		var kind := str(door.get("doorKind", "office_door"))
+		if kind == "none":
+			continue
+		var edge: Dictionary = _find_shared_edge(rooms, str(door.get("betweenRoomA", "")), str(door.get("betweenRoomB", "")))
+		if edge.is_empty():
+			continue
+		var width: float = float(door.get("width", 240))
+		var pos: float = float(door.get("position", 0))
+		var w_world: float = width * WORLD_SCALE
+		var x_world: float
+		var z_world: float
+		var box := BoxMesh.new()
+		if edge.axis == "x":
+			# Vertikale Wand → Lintel orientiert entlang Z bei festem X.
+			box.size = Vector3(DOOR_FRAME_THICKNESS, DOOR_LINTEL_HEIGHT, w_world)
+			x_world = float(edge.edge_pos) * WORLD_SCALE
+			z_world = pos * WORLD_SCALE
+		else:
+			box.size = Vector3(w_world, DOOR_LINTEL_HEIGHT, DOOR_FRAME_THICKNESS)
+			x_world = pos * WORLD_SCALE
+			z_world = float(edge.edge_pos) * WORLD_SCALE
+
+		var mesh := MeshInstance3D.new()
+		mesh.mesh = box
+		mesh.position = Vector3(x_world, WALL_HEIGHT - DOOR_LINTEL_HEIGHT * 0.5, z_world)
+
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = DOOR_FRAME_COLOR.get(kind, DOOR_FRAME_COLOR["office_door"])
+		if kind == "glass_panel":
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.albedo_color.a = 0.55
+			mat.metallic = 0.4
+			mat.roughness = 0.2
+		elif kind == "vault":
+			mat.metallic = 0.85
+			mat.roughness = 0.4
+		else:
+			mat.metallic = 0.05
+			mat.roughness = 0.85
+		mesh.material_override = mat
+
+		mesh.name = "Door_%s_%d" % [kind, i]
+		parent.add_child(mesh)
+
+# Findet die geteilte Edge zwischen zwei Räumen. Adjacent-Räume teilen entweder
+# eine vertikale Edge (axis=x, ein Room rechts/links vom anderen) oder eine
+# horizontale (axis=y, ein Room oben/unten vom anderen). Returns leeres Dict
+# wenn die Räume nicht direkt benachbart sind.
+static func _find_shared_edge(rooms: Array, id_a: String, id_b: String) -> Dictionary:
+	var a: Dictionary = {}
+	var b: Dictionary = {}
+	for r in rooms:
+		if str(r.get("id", "")) == id_a:
+			a = r
+		elif str(r.get("id", "")) == id_b:
+			b = r
+	if a.is_empty() or b.is_empty():
+		return {}
+	var ax: float = float(a.get("x", 0))
+	var ay: float = float(a.get("y", 0))
+	var aw: float = float(a.get("width", 0))
+	var ah: float = float(a.get("height", 0))
+	var bx: float = float(b.get("x", 0))
+	var by: float = float(b.get("y", 0))
+	var bw: float = float(b.get("width", 0))
+	var bh: float = float(b.get("height", 0))
+	if ax + aw == bx:
+		return {"axis": "x", "edge_pos": bx}
+	if bx + bw == ax:
+		return {"axis": "x", "edge_pos": ax}
+	if ay + ah == by:
+		return {"axis": "y", "edge_pos": by}
+	if by + bh == ay:
+		return {"axis": "y", "edge_pos": ay}
+	return {}
 
 # Outer perimeter walls so the room edges close cleanly.
 static func _build_perimeter(parent: Node3D, map_w: float, map_h: float) -> void:

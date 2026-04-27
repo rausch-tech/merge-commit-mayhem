@@ -169,7 +169,7 @@ Naming-Prinzip: nerdig, dev-thematisch, „kill" wird vermieden zugunsten von ha
 | 3.6.1 | **Sabotage-Object-Binding (Tier 2.7 rework)** — dedizierte Console rausgeworfen (zu offensichtlich), stattdessen jede Sabotage an Task-Anchor mit passendem `object_type` gebunden. Same Anchor wie Release-Task → Ambiguität. | ✅ done |
 | 3.6.2 | **Meeting-Kontext** — `meeting.context = {reporterName, body? {victimName, room}, recentEvents[]}`. Snapshot zum Meeting-Start. UI zeigt Block über Voting-Liste. Hinweise, keine Beweise.                                     | ✅ done |
 | 3.6.3 | **AI-Flavor-Texte** — `app/game/ai_flavor.py` mit reichen LLM-styled Pools für Sabotage-Events („CI hatte einen Hallucinations-Anfall"), Repair, Body-Found, Vote-Kick. Vibe Coder bekommt AI-Sabotage-Themen.                 | ✅ done |
-| 3.6.4 | **Accusation-Tags / Voting-Polish** — Schritt nach hinten: Voting-UI bleibt erstmal wie sie ist, Tags sind ein eigener Slice (bringt mit Voice-Chat den meisten Wert).                                                         | ⏳ open |
+| 3.6.4 | **Accusation-Tags / Voting-Polish** — Schritt nach hinten: Voting-UI bleibt erstmal wie sie ist, Tags sind ein eigener Slice. Voice-Chat passiert outside-of-game (TeamSpeak/Slack), kein eigener Channel.                     | ⏳ open |
 | 3.6.5 | **Voting-Result-Story** — Roll-out kann später mit „last words" Flavor-Line erweitert werden.                                                                                                                                  | ⏳ open |
 
 **Done-Kriterium:** Meetings haben Substanz; Saboteure müssen sich physisch ans Object stellen (kein Verrats-Pattern); Eventfeed + Postmortem fühlen sich AI-generiert an.
@@ -306,7 +306,7 @@ Diese Tier ist absichtlich vage — was hier passiert hängt davon ab wie das Ga
 
 - **Tier 3.8.6** — Floor-Texturen + Door-Frames im 3D-Editor-Preview, damit die Vorschau dem Godot-Client visuell näher kommt. Halbe bis ein Tag.
 - **Live-Test mit Team** auf `office_complex` — Bug-Surface, Map-Layout-Feedback, ggf. Iteration via "In Spiel speichern".
-- **Tier 3.6.4 + 3.6.5** — Voting-Polish (Accusation-Tags, Voting-Result-Story); bringt mit Voice-Chat den meisten Wert, daher kein Top-Prio.
+- **Tier 3.6.4 + 3.6.5** — Voting-Polish (Accusation-Tags, Voting-Result-Story). Kein Top-Prio; Voice-Chat passiert outside-of-game (Teams nutzen TeamSpeak/Slack/Meet).
 
 **Vor dem Godot-Production-Sprint:**
 

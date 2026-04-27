@@ -231,6 +231,8 @@ export class MapPreview3D {
     // Materials shared across many meshes. Building them once costs less GPU
     // memory and keeps re-builds snappy.
     this.wallMaterial = this._makeWallMaterial();
+    this.floorMaterials = this._makeFloorMaterials();
+    this.doorFrameMaterials = this._makeDoorFrameMaterials();
 
     // Epoch counter — async GLTF loads check it on resolution so a stale
     // load from a previous applyMap() can't pollute the new mapGroup with
@@ -292,6 +294,7 @@ export class MapPreview3D {
 
     this._buildFloors(map);
     const wallCount = this._buildWalls(map);
+    const doorCount = this._buildDoorFrames(map);
     const objStats = this._buildMapObjects(map, epoch);
     const taskCount = this._buildTaskAnchors(map);
     this._buildPlayerPlaceholder(map);
@@ -300,7 +303,7 @@ export class MapPreview3D {
     return {
       stats: {
         rooms: map.rooms.length,
-        doors: (map.doors || []).length,
+        doors: doorCount,
         walls: wallCount,
         mapObjects: (map.mapObjects || []).length,
         taskAnchors: taskCount,
@@ -328,12 +331,14 @@ export class MapPreview3D {
       const d = (room.height || 0) * WORLD_SCALE;
       if (w <= 0 || d <= 0) continue;
       const geom = new THREE.BoxGeometry(w, FLOOR_THICKNESS, d);
-      const colour = ROOM_TINT_OVERRIDE[room.id] ?? this._parseHex(room.color, 0x4a5570);
-      const mat = new THREE.MeshStandardMaterial({
-        color: colour,
-        roughness: 0.85,
-        metallic: 0.05,
-      });
+      // UV-tile the floor so the procedural texture repeats roughly once
+      // every 4 Godot-units (~4m). Without this scaling a 14m server-room
+      // would stretch the noise pattern visibly.
+      const uvU = Math.max(1, w / 4);
+      const uvV = Math.max(1, d / 4);
+      this._scaleBoxUVs(geom, uvU, uvV);
+      const matKey = room.floorMaterial || "office";
+      const mat = this.floorMaterials[matKey] || this.floorMaterials.office;
       const mesh = new THREE.Mesh(geom, mat);
       mesh.position.set(
         (room.x + room.width / 2) * WORLD_SCALE,
@@ -540,24 +545,238 @@ export class MapPreview3D {
   }
 
   _disposeChildren(group) {
+    // Set of materials we share across many meshes — these must NEVER be
+    // disposed in the per-rebuild cleanup, otherwise the next applyMap()
+    // would render with disposed-out textures.
+    const shared = new Set([this.wallMaterial, ...Object.values(this.floorMaterials)]);
+    for (const m of Object.values(this.doorFrameMaterials)) shared.add(m);
+
     while (group.children.length > 0) {
       const child = group.children[0];
       group.remove(child);
       // GLTF clones SHARE geometry/material with the cached prototype. Disposing
       // them would invalidate the cache so subsequent clones render as empty
       // — the bug that made all furniture vanish on the second applyMap().
-      // Walls share `this.wallMaterial` and shouldn't dispose it either; the
-      // generic disposer below handles per-wall geometries correctly.
       const isShared = child.userData?.fromGltf === true;
       if (isShared) continue;
       child.traverse?.((node) => {
         if (node.geometry) node.geometry.dispose();
-        if (node.material && node.material !== this.wallMaterial) {
+        if (node.material && !shared.has(node.material)) {
           if (Array.isArray(node.material)) node.material.forEach((m) => m.dispose());
           else node.material.dispose();
         }
       });
     }
+  }
+
+  // --- Floor materials (procedural, per `room.floorMaterial`) ----------------
+  //
+  // Four flavours map onto the GameMap.floorMaterial enum:
+  //   - "office"  → warm beige carpet (default)
+  //   - "kitchen" → cool tiles with grid lines
+  //   - "server"  → grey concrete with speckle
+  //   - "legacy"  → dim olive carpet (legacy basement)
+  //
+  // Each is a CanvasTexture seeded with the same RNG-style speckle pass
+  // we use for walls, biased per-flavour. Tiled via UV-scaling per floor
+  // patch (~one tile per ~4m), wrapping cleanly on RepeatWrapping.
+
+  _makeFloorMaterials() {
+    return {
+      office: this._buildOfficeFloor(),
+      kitchen: this._buildKitchenFloor(),
+      server: this._buildServerFloor(),
+      legacy: this._buildLegacyFloor(),
+    };
+  }
+
+  _floorCanvas(size = 256) {
+    const c = document.createElement("canvas");
+    c.width = size;
+    c.height = size;
+    return { canvas: c, ctx: c.getContext("2d"), size };
+  }
+
+  _floorMaterial(canvas, { roughness, metalness }) {
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    return new THREE.MeshStandardMaterial({
+      map: tex,
+      color: 0xffffff,
+      roughness,
+      metalness,
+    });
+  }
+
+  _buildOfficeFloor() {
+    const { canvas, ctx, size } = this._floorCanvas();
+    ctx.fillStyle = "#a78d6a";
+    ctx.fillRect(0, 0, size, size);
+    // Carpet weave — many small flecks slightly warm, slightly cool
+    for (let i = 0; i < 2400; i++) {
+      const x = Math.random() * size;
+      const y = Math.random() * size;
+      const r = 0.4 + Math.random() * 0.7;
+      const tint = 150 + Math.floor(Math.random() * 60);
+      ctx.fillStyle = `rgba(${tint + 25}, ${tint + 5}, ${tint - 15}, 0.32)`;
+      ctx.fillRect(x, y, r, r);
+    }
+    return this._floorMaterial(canvas, { roughness: 0.92, metalness: 0.02 });
+  }
+
+  _buildKitchenFloor() {
+    const { canvas, ctx, size } = this._floorCanvas();
+    ctx.fillStyle = "#cfd6dc";
+    ctx.fillRect(0, 0, size, size);
+    // 4×4 tiles with subtle per-tile colour variation + dark grout lines
+    const grid = 4;
+    const tile = size / grid;
+    for (let i = 0; i < grid; i++) {
+      for (let j = 0; j < grid; j++) {
+        const tint = 215 + Math.floor(Math.random() * 25);
+        ctx.fillStyle = `rgba(${tint - 5}, ${tint}, ${tint + 5}, 0.55)`;
+        ctx.fillRect(i * tile + 2, j * tile + 2, tile - 4, tile - 4);
+      }
+    }
+    ctx.strokeStyle = "rgba(60, 70, 80, 0.55)";
+    ctx.lineWidth = 2;
+    for (let i = 0; i <= grid; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * tile, 0);
+      ctx.lineTo(i * tile, size);
+      ctx.moveTo(0, i * tile);
+      ctx.lineTo(size, i * tile);
+      ctx.stroke();
+    }
+    return this._floorMaterial(canvas, { roughness: 0.45, metalness: 0.06 });
+  }
+
+  _buildServerFloor() {
+    const { canvas, ctx, size } = this._floorCanvas();
+    ctx.fillStyle = "#6c7480";
+    ctx.fillRect(0, 0, size, size);
+    // Concrete: many small dark + light flecks, low contrast
+    for (let i = 0; i < 3200; i++) {
+      const x = Math.random() * size;
+      const y = Math.random() * size;
+      const r = Math.random() * 1.5;
+      const grey = 90 + Math.floor(Math.random() * 90);
+      ctx.fillStyle = `rgba(${grey}, ${grey + 4}, ${grey + 8}, 0.28)`;
+      ctx.fillRect(x, y, r, r);
+    }
+    return this._floorMaterial(canvas, { roughness: 0.88, metalness: 0.12 });
+  }
+
+  _buildLegacyFloor() {
+    const { canvas, ctx, size } = this._floorCanvas();
+    ctx.fillStyle = "#5e7548";
+    ctx.fillRect(0, 0, size, size);
+    // Old, "stained" carpet — uneven flecks, a few darker patches
+    for (let i = 0; i < 2000; i++) {
+      const x = Math.random() * size;
+      const y = Math.random() * size;
+      const r = 0.4 + Math.random() * 0.9;
+      const tint = 70 + Math.floor(Math.random() * 60);
+      ctx.fillStyle = `rgba(${tint + 30}, ${tint + 50}, ${tint + 10}, 0.4)`;
+      ctx.fillRect(x, y, r, r);
+    }
+    // Stains: a handful of darker blobs
+    for (let i = 0; i < 12; i++) {
+      const x = Math.random() * size;
+      const y = Math.random() * size;
+      const r = 8 + Math.random() * 14;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, "rgba(40, 50, 30, 0.35)");
+      g.addColorStop(1, "rgba(40, 50, 30, 0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return this._floorMaterial(canvas, { roughness: 0.95, metalness: 0.02 });
+  }
+
+  // --- Door frames -----------------------------------------------------------
+  //
+  // The wall-derive logic stamps a gap into the wall at each door's
+  // position. Without anything filling that gap visually, doors read as
+  // "missing wall section" rather than "doorway". This adds a slim
+  // lintel beam at the top of each gap, materialised per `doorKind`.
+
+  _makeDoorFrameMaterials() {
+    return {
+      office_door: new THREE.MeshStandardMaterial({
+        color: 0x4a3722,
+        roughness: 0.85,
+        metalness: 0.05,
+      }),
+      glass_panel: new THREE.MeshStandardMaterial({
+        color: 0x88aacc,
+        transparent: true,
+        opacity: 0.55,
+        roughness: 0.2,
+        metalness: 0.4,
+      }),
+      vault: new THREE.MeshStandardMaterial({
+        color: 0x32363c,
+        roughness: 0.4,
+        metalness: 0.85,
+      }),
+    };
+  }
+
+  _buildDoorFrames(map) {
+    const rooms = map.rooms || [];
+    const doors = map.doors || [];
+    if (!doors.length) return 0;
+
+    const lintelHeight = 0.25;
+    const frameThick = 0.2;
+    let placed = 0;
+
+    for (const door of doors) {
+      const kind = door.doorKind || "office_door";
+      if (kind === "none") continue;
+      const mat = this.doorFrameMaterials[kind] || this.doorFrameMaterials.office_door;
+      const edge = this._findSharedEdge(rooms, door.betweenRoomA, door.betweenRoomB);
+      if (!edge) continue;
+
+      const w = (door.width || 240) * WORLD_SCALE;
+      const xPos = (edge.axis === "x" ? edge.edgePos : door.position) * WORLD_SCALE;
+      const zPos = (edge.axis === "y" ? edge.edgePos : door.position) * WORLD_SCALE;
+
+      // Lintel runs along the door span, perpendicular to it goes through
+      // the wall (frameThick covers the wall thickness with a little overhang).
+      const geom =
+        edge.axis === "x"
+          ? new THREE.BoxGeometry(frameThick, lintelHeight, w)
+          : new THREE.BoxGeometry(w, lintelHeight, frameThick);
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.set(xPos, WALL_HEIGHT - lintelHeight / 2, zPos);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.mapGroup.add(mesh);
+      placed += 1;
+    }
+    return placed;
+  }
+
+  // Find which edge two rooms share. Two adjacent rooms either share a
+  // vertical edge (one's right wall = other's left wall, axis="x") or a
+  // horizontal edge (one's bottom = other's top, axis="y"). Returns null
+  // for rooms that don't actually touch.
+  _findSharedEdge(rooms, idA, idB) {
+    const a = rooms.find((r) => r.id === idA);
+    const b = rooms.find((r) => r.id === idB);
+    if (!a || !b) return null;
+    if (a.x + a.width === b.x) return { axis: "x", edgePos: b.x };
+    if (b.x + b.width === a.x) return { axis: "x", edgePos: a.x };
+    if (a.y + a.height === b.y) return { axis: "y", edgePos: b.y };
+    if (b.y + b.height === a.y) return { axis: "y", edgePos: a.y };
+    return null;
   }
 
   // Procedural drywall material — subtle off-white with low-frequency speckle
