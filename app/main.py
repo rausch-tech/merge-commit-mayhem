@@ -21,6 +21,7 @@ from app.game.models import InputState, Phase
 from app.game.sabotages import SABOTAGE_DEFINITIONS
 from app.protocol import (
     AbortRound,
+    AddBot,
     CallEmergencyMeeting,
     CastVote,
     ErrorMsg,
@@ -37,6 +38,7 @@ from app.protocol import (
     PrivateRoleMsg,
     PrivateStateMsg,
     Rejoin,
+    RemoveBot,
     RepairSabotage,
     ReportBody,
     ReturnToLobby,
@@ -72,6 +74,13 @@ class GameRegistry:
         room = self._rooms.get(code)
         if room is None:
             room = GameRoom(code=code)
+            # Tier 3.9.2: wire the LLM provider into newly-created rooms.
+            # Done here (not in GameRoom.__init__) so tests stay free of
+            # accidental LLM calls and so swapping providers across rooms
+            # is a one-line change in startup.
+            from app.game.llm import get_default_client
+
+            room._bots.set_llm(get_default_client())
             self._rooms[code] = room
         return room
 
@@ -284,6 +293,10 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                 await _handle_set_preferred_role(ws, msg)
             elif isinstance(msg, UseAbility):
                 await _handle_use_ability(ws)
+            elif isinstance(msg, AddBot):
+                await _handle_add_bot(ws, msg)
+            elif isinstance(msg, RemoveBot):
+                await _handle_remove_bot(ws, msg)
     except WebSocketDisconnect:
         pass
     finally:
@@ -609,6 +622,65 @@ async def _handle_select_map(ws: WebSocket, msg: SelectMap) -> None:
     except GameRoomError as exc:
         await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
         return
+    await manager.broadcast(room.code, envelope("lobby_state", _lobby_state_msg(room)))
+
+
+async def _handle_add_bot(ws: WebSocket, msg: AddBot) -> None:
+    """Tier 3.9.2: host adds an AI-NPC to the lobby.
+
+    Host-only — non-hosts get NOT_HOST. Bots can only be added in the
+    lobby (BotManager enforces this); after start they're regular
+    Player rows tied into the tick loop.
+    """
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    requester = room.players.get(session.player_id)
+    if requester is None or not requester.is_host:
+        await ws.send_json(
+            envelope("error", ErrorMsg(code="NOT_HOST", message="Only host can add bots."))
+        )
+        return
+    try:
+        room._bots.add_bot(name=msg.payload.name)
+    except GameRoomError as exc:
+        await ws.send_json(envelope("error", ErrorMsg(code=exc.code, message=exc.message)))
+        return
+    await manager.broadcast(room.code, envelope("lobby_state", _lobby_state_msg(room)))
+
+
+async def _handle_remove_bot(ws: WebSocket, msg: RemoveBot) -> None:
+    """Tier 3.9.2: host removes an AI-NPC from the lobby.
+
+    Silently no-op for unknown bot ids so a stale UI click after another
+    host already kicked the same bot doesn't error-toast every viewer.
+    """
+    session = manager.session_for(ws)
+    if session is None:
+        return
+    room = registry.get(session.room_code)
+    if room is None:
+        return
+    requester = room.players.get(session.player_id)
+    if requester is None or not requester.is_host:
+        await ws.send_json(
+            envelope("error", ErrorMsg(code="NOT_HOST", message="Only host can remove bots."))
+        )
+        return
+    if room.phase is not Phase.LOBBY:
+        await ws.send_json(
+            envelope(
+                "error",
+                ErrorMsg(code="WRONG_PHASE", message="Bots can only be removed in lobby."),
+            )
+        )
+        return
+    if not room._bots.is_bot(msg.payload.bot_id):
+        return
+    room._bots.remove_bot(msg.payload.bot_id)
     await manager.broadcast(room.code, envelope("lobby_state", _lobby_state_msg(room)))
 
 

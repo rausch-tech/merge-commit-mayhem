@@ -46,5 +46,10 @@ class Player(BaseModel):
     ability_used: bool = False
     # Tier 3.5: list of personal task ids (release: real, chaos: fake).
     assigned_task_ids: list[str] = Field(default_factory=list)
+    # Tier 3.9.2: AI-NPC marker. Bots are real Player rows so all the
+    # existing systems (movement, voting, body discovery, …) treat them
+    # uniformly. Only the BotManager's tick differentiates — it drives
+    # input_state and skips mini-games via direct apply_reward.
+    is_bot: bool = False
 
     model_config = {"arbitrary_types_allowed": False}

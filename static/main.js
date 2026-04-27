@@ -83,6 +83,8 @@ const els = {
   lobbyPlayerList: document.getElementById("lobby-player-list"),
   btnJoin: document.getElementById("btn-join"),
   btnStart: document.getElementById("btn-start"),
+  btnAddBot: document.getElementById("btn-add-bot"),
+  botControls: document.getElementById("bot-controls"),
   demoModeRow: document.getElementById("demo-mode-row"),
   demoMode: document.getElementById("demo-mode"),
   mapSelector: document.getElementById("map-selector"),
@@ -217,6 +219,7 @@ function renderLobby() {
   els.lobbyPlayerList.innerHTML = "";
   for (const p of state.players) {
     const li = document.createElement("li");
+    if (p.isBot) li.classList.add("lobby-bot-row");
     const dot = document.createElement("span");
     dot.className = "color-dot";
     dot.style.background = p.color;
@@ -224,6 +227,7 @@ function renderLobby() {
     const text = document.createElement("span");
     let suffix = "";
     if (p.isHost) suffix += "  (Host)";
+    if (p.isBot) suffix += "  [BOT]";
     if (p.preferredRole) {
       const niceRole =
         {
@@ -237,10 +241,21 @@ function renderLobby() {
     }
     text.textContent = p.name + suffix;
     li.appendChild(text);
+    if (p.isBot && state.isHost) {
+      const kickBtn = document.createElement("button");
+      kickBtn.type = "button";
+      kickBtn.className = "lobby-bot-kick";
+      kickBtn.textContent = "Kick";
+      kickBtn.addEventListener("click", () => {
+        ws.send("remove_bot", { botId: p.id });
+      });
+      li.appendChild(kickBtn);
+    }
     els.lobbyPlayerList.appendChild(li);
   }
   els.btnStart.classList.toggle("hidden", !state.isHost);
   els.demoModeRow.classList.toggle("hidden", !state.isHost);
+  if (els.botControls) els.botControls.classList.toggle("hidden", !state.isHost);
   renderMapSelector();
 }
 
@@ -504,6 +519,13 @@ els.btnStart.addEventListener("click", () => {
   const demo = !!els.demoMode.checked;
   ws.send("start_game", { demo });
 });
+
+if (els.btnAddBot) {
+  els.btnAddBot.addEventListener("click", () => {
+    if (!state.isHost) return;
+    ws.send("add_bot", {});
+  });
+}
 
 if (els.mapDropdown) {
   els.mapDropdown.addEventListener("change", () => {
