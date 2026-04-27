@@ -4,7 +4,7 @@ Eine kompakte, vollständige Beschreibung des Spiels — gedacht zum Teilen mit
 Leuten, die noch keine Runde gespielt haben. Stand: **2026-04-27**, Tier 0–3.7
 auf Live deployt, vor Godot-Migration.
 
-**Live-Server:** https://game.prod-is-lava.dev
+**Live-Server:** https://prod-is-lava.dev
 **Repo:** https://github.com/rausch-tech/merge-commit-mayhem
 
 ---
@@ -358,7 +358,7 @@ geht sie zurück.
 
 ## Wie ihr selbst spielen könnt
 
-1. https://game.prod-is-lava.dev öffnen (Phone, Tablet, Desktop)
+1. https://prod-is-lava.dev öffnen (Phone, Tablet, Desktop)
 2. Raumcode ausdenken (4 Buchstaben), Namen eintragen, optional Wunschrolle
    wählen, **Join**
 3. Andere joinen mit gleichem Code

@@ -56,7 +56,7 @@ Specs/Plans pro Slice sind nicht mehr persistiert — die Roadmap ist die Wahrhe
 - **Roadmap** (`docs/ROADMAP.md`) bestimmt Reihenfolge. Nicht eigenmächtig springen.
 - **Specs/Plans** schreiben wir nur für nicht-triviale Slices (>1 Tag). Kleinere Slices werden direkt via Implementer-Prompt umgesetzt.
 - **Live-Tests** validieren Tier-Übergänge — Tier ist erst „done" wenn mit echten Spielern getestet.
-- **Live-Server** läuft auf https://game.prod-is-lava.dev (AWS EC2, eu-central-1). Deploy via Tarball + scp.
+- **Live-Server** läuft auf https://prod-is-lava.dev (AWS EC2, eu-central-1). Deploy via Tarball + scp.
 
 Kleinere Fixes dürfen direkt im aktuellen Branch passieren.
 

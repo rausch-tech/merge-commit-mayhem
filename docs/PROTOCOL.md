@@ -2,7 +2,7 @@
 
 Single Source of Truth fuer das Netzwerk-Protokoll zwischen MCM-Server und Client. Beide Clients (Browser jetzt, Godot spaeter) sprechen dieses Protokoll. Stand: nach Tier 3.4 (`coffee_pour`) — alle Tier-0/1/2/3-Features abgedeckt.
 
-**Endpoint:** `wss://<host>/ws` (live: `wss://game.prod-is-lava.dev/ws`)
+**Endpoint:** `wss://<host>/ws` (live: `wss://prod-is-lava.dev/ws`)
 **Format:** UTF-8 JSON, ein Frame = eine Message.
 **Konvention:** Wire-Format ist **camelCase**. Server validiert mit Pydantic; unbekannte Typen oder fehlerhafte Payloads werfen `ValidationError` und der Server schickt einen `error`-Frame zurueck.
 **Authoritative source:** `app/protocol.py` (Pydantic-Modelle) plus `app/game/game_room.py::_public_state_base`. Wenn dieses Doc widerspricht, hat der Code recht — und dann ist dieses Doc zu aktualisieren.
@@ -879,7 +879,7 @@ GDScript-Beispiel, das die wichtigsten Frame-Typen abdeckt (inkl. Mini-Game und 
 
 ```gdscript
 extends Node
-const WS_URL = "wss://game.prod-is-lava.dev/ws"
+const WS_URL = "wss://prod-is-lava.dev/ws"
 
 var _socket = WebSocketPeer.new()
 var _player_id: String = ""
