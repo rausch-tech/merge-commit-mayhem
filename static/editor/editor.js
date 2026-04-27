@@ -69,8 +69,11 @@ const dom = {
   btnNew: document.getElementById("btn-new"),
   btnLoad: document.getElementById("btn-load"),
   btnDownload: document.getElementById("btn-download"),
+  btnLoadServer: document.getElementById("btn-load-server"),
+  btnSaveServer: document.getElementById("btn-save-server"),
   fileInput: document.getElementById("file-input"),
   dirtyFlag: document.getElementById("dirty-flag"),
+  statusFlash: document.getElementById("status-flash"),
   cursorCoords: document.getElementById("cursor-coords"),
   propsEmpty: document.getElementById("props-empty"),
   propsContent: document.getElementById("props-content"),
@@ -86,6 +89,9 @@ const dom = {
   preview3DHost: document.getElementById("preview-3d-host"),
   previewStats: document.getElementById("preview-stats"),
   toggle3DPreview: document.getElementById("toggle-3d-preview"),
+  serverLoadModal: document.getElementById("server-load-modal"),
+  serverLoadList: document.getElementById("server-load-list"),
+  serverLoadClose: document.getElementById("server-load-close"),
 };
 
 const ctx2d = dom.canvas.getContext("2d");
@@ -1513,6 +1519,203 @@ function refreshValidationStrip() {
   dom.validationStrip.textContent = summary;
   dom.validationStrip.title = warnings.join("\n");
 }
+
+// --- Server-side Map storage ------------------------------------------------
+//
+// Designers should be able to push the current map straight into the live
+// registry so a host picks it up in the lobby without a download/commit/
+// deploy round-trip. Save is **ephemeral** — the maps/ directory belongs
+// to the deployed snapshot and gets overwritten on the next deploy. So a
+// "saved on server" map still needs its JSON downloaded + committed for
+// permanence. The "JSON herunterladen" button stays the source of truth
+// for git-tracked maps.
+
+function slugifyMapId(name) {
+  return (name || "")
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^[_-]+|[_-]+$/g, "")
+    .slice(0, 40);
+}
+
+let cachedServerMaps = []; // [{ id, name }]
+
+async function fetchServerMaps() {
+  const r = await fetch("/api/maps");
+  if (!r.ok) throw new Error(`GET /api/maps → ${r.status}`);
+  const data = await r.json();
+  cachedServerMaps = Array.isArray(data.maps) ? data.maps : [];
+  return cachedServerMaps;
+}
+
+async function fetchServerMap(mapId) {
+  const r = await fetch("/api/maps/" + encodeURIComponent(mapId));
+  if (!r.ok) throw new Error(`GET /api/maps/${mapId} → ${r.status}`);
+  return await r.json();
+}
+
+async function putServerMap(mapId, payload) {
+  const r = await fetch("/api/maps/" + encodeURIComponent(mapId), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: r.statusText }));
+    throw new Error(typeof err.detail === "string" ? err.detail : r.statusText);
+  }
+  return await r.json();
+}
+
+async function onSaveToServer() {
+  const baseName = dom.mapName?.value?.trim() || state.map.name || "";
+  const mapId = slugifyMapId(baseName);
+  if (!mapId) {
+    flashStatus("Bitte einen Map-Namen vergeben.", true);
+    return;
+  }
+  // Refresh cache so the overwrite check is accurate (someone else might
+  // have pushed in the meantime).
+  try {
+    await fetchServerMaps();
+  } catch (err) {
+    flashStatus("Server nicht erreichbar: " + err.message, true);
+    return;
+  }
+  const exists = cachedServerMaps.some((m) => m.id === mapId);
+  if (exists) {
+    const ok = window.confirm(
+      `Karte "${mapId}" existiert bereits auf dem Server.\n\nÜberschreiben?`
+    );
+    if (!ok) return;
+  }
+  let payload;
+  try {
+    payload = JSON.parse(serializeMap(state.map));
+  } catch (err) {
+    flashStatus("Map serialisieren fehlgeschlagen: " + err.message, true);
+    return;
+  }
+  try {
+    const result = await putServerMap(mapId, payload);
+    state.dirty = false;
+    dom.dirtyFlag.classList.add("hidden");
+    flashStatus(`In Spiel gespeichert: ${result.id} (${result.name})`);
+    fetchServerMaps().catch(() => {});
+  } catch (err) {
+    flashStatus("Speichern fehlgeschlagen: " + err.message, true);
+  }
+}
+
+async function onLoadFromServerOpen() {
+  if (!dom.serverLoadModal) return;
+  dom.serverLoadModal.classList.remove("hidden");
+  dom.serverLoadList.innerHTML = '<p class="server-load-empty">Lade…</p>';
+  try {
+    const maps = await fetchServerMaps();
+    renderServerLoadList(maps);
+  } catch (err) {
+    dom.serverLoadList.innerHTML = `<p class="server-load-empty">Server nicht erreichbar: ${err.message}</p>`;
+  }
+}
+
+function renderServerLoadList(maps) {
+  if (!maps.length) {
+    dom.serverLoadList.innerHTML = '<p class="server-load-empty">Keine Karten auf dem Server.</p>';
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  for (const m of maps) {
+    const row = document.createElement("div");
+    row.className = "server-map-row";
+    row.dataset.id = m.id;
+    const left = document.createElement("div");
+    left.innerHTML = `<strong>${escapeHtml(m.name)}</strong>`;
+    const meta = document.createElement("span");
+    meta.className = "server-map-meta";
+    meta.textContent = m.id;
+    row.appendChild(left);
+    row.appendChild(meta);
+    row.addEventListener("click", () => loadServerMapInto(m.id));
+    frag.appendChild(row);
+  }
+  dom.serverLoadList.innerHTML = "";
+  dom.serverLoadList.appendChild(frag);
+}
+
+async function loadServerMapInto(mapId) {
+  if (state.dirty) {
+    const ok = window.confirm(
+      "Es gibt nicht gespeicherte Änderungen. Trotzdem laden und verwerfen?"
+    );
+    if (!ok) return;
+  }
+  try {
+    const json = await fetchServerMap(mapId);
+    const text = JSON.stringify(json);
+    state.map = deserializeMap(text);
+    state.selection = null;
+    state.dirty = false;
+    history.reset?.();
+    history.push?.(state.map);
+    dom.dirtyFlag.classList.add("hidden");
+    syncTopbarFields();
+    renderPropsSidebar();
+    refreshValidationStrip();
+    refreshUndoButtons();
+    computeFitView();
+    requestRender();
+    closeServerLoadModal();
+    flashStatus(`Karte geladen: ${mapId}`);
+  } catch (err) {
+    flashStatus("Laden fehlgeschlagen: " + err.message, true);
+  }
+}
+
+function closeServerLoadModal() {
+  dom.serverLoadModal?.classList.add("hidden");
+}
+
+function escapeHtml(s) {
+  return String(s).replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
+  );
+}
+
+let flashTimer = null;
+function flashStatus(message, isError = false) {
+  if (!dom.statusFlash) return;
+  clearTimeout(flashTimer);
+  dom.statusFlash.textContent = message;
+  dom.statusFlash.classList.remove("hidden", "fading");
+  dom.statusFlash.classList.toggle("error", !!isError);
+  flashTimer = window.setTimeout(() => {
+    dom.statusFlash.classList.add("fading");
+    flashTimer = window.setTimeout(() => {
+      dom.statusFlash.classList.add("hidden");
+      dom.statusFlash.classList.remove("fading");
+    }, 400);
+  }, 3500);
+}
+
+dom.btnSaveServer?.addEventListener("click", onSaveToServer);
+dom.btnLoadServer?.addEventListener("click", onLoadFromServerOpen);
+dom.serverLoadClose?.addEventListener("click", closeServerLoadModal);
+dom.serverLoadModal?.addEventListener("click", (e) => {
+  if (e.target === dom.serverLoadModal) closeServerLoadModal();
+});
+window.addEventListener("keydown", (e) => {
+  if (
+    e.code === "Escape" &&
+    dom.serverLoadModal &&
+    !dom.serverLoadModal.classList.contains("hidden")
+  ) {
+    closeServerLoadModal();
+  }
+});
 
 // --- Boot ------------------------------------------------------------------
 

@@ -33,6 +33,13 @@ export class History {
     return this.future.length > 0;
   }
 
+  /** Drop all undo + redo state. Used when the user loads a fresh map so
+   *  Undo can't accidentally roll the new map back into the previous one. */
+  reset() {
+    this.past = [];
+    this.future = [];
+  }
+
   /**
    * Capture the current state. Call this BEFORE applying a mutation —
    * undo() then restores this snapshot. Pushing also clears the redo
