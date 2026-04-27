@@ -9,11 +9,8 @@ import random
 
 import pytest
 
-from app.game.game_room import (
-    REPORT_RADIUS,
-    GameRoom,
-    GameRoomError,
-)
+from app.game.controllers.meeting import REPORT_RADIUS
+from app.game.game_room import GameRoom, GameRoomError
 from app.game.models import Phase
 
 

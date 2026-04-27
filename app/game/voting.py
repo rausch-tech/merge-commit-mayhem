@@ -1,16 +1,26 @@
-"""
-Reine Tally-Helfer fuers Voting. Trennt Pure-Logic vom GameRoom-State,
-damit Tests einfacher werden.
+"""Pure tally helpers for voting. Decoupled from GameRoom state so the
+unit tests stay tiny — they pass dict literals and tiny ad-hoc structs
+instead of standing up a full game room.
 """
 
-from typing import Final
+from typing import Final, Protocol
 
 SKIP_TARGET: Final[str] = ""
 
 
+class _PlayerLike(Protocol):
+    """Structural type for ``all_chaos_eliminated``: anything with the two
+    fields the function needs. Player satisfies it; the test doubles in
+    test_voting.py do too. Avoids ``getattr`` indirection without coupling
+    voting.py to the full ``Player`` model."""
+
+    team: str
+    is_alive: bool
+
+
 def tally(votes: dict[str, str]) -> str | None:
-    """
-    Returns the player_id of the eliminated player, or None if nobody is removed.
+    """Returns the player_id of the eliminated player, or None if nobody is
+    removed.
 
     Rules:
     - Empty dict → None.
@@ -25,7 +35,6 @@ def tally(votes: dict[str, str]) -> str | None:
     counts: dict[str, int] = {}
     for target in votes.values():
         counts[target] = counts.get(target, 0) + 1
-    # Find max.
     max_count = max(counts.values())
     winners = [t for t, c in counts.items() if c == max_count]
     if len(winners) > 1:
@@ -36,14 +45,10 @@ def tally(votes: dict[str, str]) -> str | None:
     return winner
 
 
-def all_chaos_eliminated(
-    players: list, team_field: str = "team", alive_field: str = "is_alive"
-) -> bool:
-    """
-    True if every player on team 'chaos_agents' has is_alive=False.
-    Returns False if no chaos players exist (vacuous-truth would mislead).
-    """
-    chaos = [p for p in players if getattr(p, team_field) == "chaos_agents"]
+def all_chaos_eliminated(players: list[_PlayerLike]) -> bool:
+    """True if every player on team 'chaos_agents' has is_alive=False.
+    Returns False if no chaos players exist (vacuous-truth would mislead)."""
+    chaos = [p for p in players if p.team == "chaos_agents"]
     if not chaos:
         return False
-    return all(not getattr(p, alive_field) for p in chaos)
+    return all(not p.is_alive for p in chaos)
