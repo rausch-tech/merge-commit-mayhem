@@ -95,8 +95,12 @@ func _process(delta: float) -> void:
 	# In aerial demo-camera mode the rig stays parked at map center.
 	if aerial_demo_camera:
 		return
-	# Camera follow: aim CameraRig at the local player's position.
-	var anchor: Vector3 = _local_player_position()
+	# Camera follow: only lerp if we actually have the local player. Otherwise
+	# the camera would drift toward (0,0,0) and miss the map entirely.
+	if not _players_by_id.has(player_id):
+		return
+	var ch_local: Node3D = _players_by_id[player_id]
+	var anchor: Vector3 = ch_local.global_position
 	var current := _camera_rig.position
 	var t = clamp(CAMERA_LERP_SPEED * delta, 0.0, 1.0)
 	_camera_rig.position = current.lerp(anchor, t)
@@ -111,6 +115,13 @@ func _on_message(type_: String, payload: Dictionary) -> void:
 	match type_:
 		Protocol.TYPE_GAME_STATE:
 			_apply_state(payload)
+			# After state apply, ensure camera reaches local player even if first
+			# few states arrived without our id (spectator/late-join recovery).
+			if not _world_initialized and not aerial_demo_camera and _players_by_id.has(player_id):
+				var ch_local: Node3D = _players_by_id[player_id]
+				_camera_rig.position = ch_local.global_position
+				_world_initialized = true
+				print("[world] late camera-snap to local player at ", ch_local.global_position)
 		Protocol.TYPE_LOBBY_STATE:
 			# Could happen on return-to-lobby; bounce back to main.
 			_return_to_main()
@@ -173,12 +184,19 @@ func _apply_state(state: Dictionary) -> void:
 		_hud.call("apply_game_state", state)
 
 	# On first state apply: snap camera onto local player so we don't drift in.
-	# Aerial-demo mode keeps the rig parked at map center, so skip the snap.
-	if not _world_initialized:
-		if not aerial_demo_camera:
-			var anchor := _local_player_position()
-			_camera_rig.position = anchor
+	# Only mark "initialized" once we actually found the local player — otherwise
+	# we'd skip the snap forever if the first state arrived without a positioned
+	# local player (e.g. spectator/late-join scenarios).
+	if aerial_demo_camera:
 		_world_initialized = true
+	elif not _world_initialized:
+		if _players_by_id.has(player_id):
+			var ch_local: Node3D = _players_by_id[player_id]
+			_camera_rig.position = ch_local.global_position
+			_world_initialized = true
+			print("[world] camera snapped to local player ", player_id, " at ", ch_local.global_position)
+		else:
+			print("[world] WARN: no local player ", player_id, " in players=", _players_by_id.keys())
 
 func _local_player_position() -> Vector3:
 	if _players_by_id.has(player_id):
