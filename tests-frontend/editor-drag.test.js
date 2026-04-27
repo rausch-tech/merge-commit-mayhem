@@ -1,9 +1,23 @@
 // Editor-Slice-2: SelectTool supports drag-to-move on rooms, spawns, task
 // anchors, and map objects. Before the slice the user could only edit
 // positions via the props sidebar — clumsy for layout work.
+//
+// ObjectTool reads default-size + blocks_movement from KIND_BY_NAME, which
+// post-2026-04-27 comes from /api/kinds. Seed the registry from the
+// on-disk maps/kinds.json so that lookup matches production.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { _seedFromRegistryForTests } from "../static/editor/editor-kinds.js";
 import { ObjectTool, SelectTool, hitTest } from "../static/editor/editor-tools.js";
+
+beforeAll(() => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const path = resolve(here, "../maps/kinds.json");
+  _seedFromRegistryForTests(JSON.parse(readFileSync(path, "utf-8")));
+});
 
 function makeMap() {
   return {

@@ -3,8 +3,24 @@
 // happy-dom doesn't ship a real Canvas2D backend, so we record calls
 // against a fake context and assert the renderer issues the right
 // fillRect/strokeRect/fillText sequence per object kind.
-import { beforeEach, describe, expect, it } from "vitest";
+//
+// Post-2026-04-27: render.js looks up kind→style via /api/kinds. Tests
+// seed the kinds registry synchronously from the on-disk maps/kinds.json
+// so the assertions about specific labels ("PANEL", "MON", …) match
+// production behaviour without needing a real HTTP endpoint.
+
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { seedKinds } from "../static/kinds.js";
 import { Renderer } from "../static/render.js";
+
+beforeAll(() => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const path = resolve(here, "../maps/kinds.json");
+  seedKinds(JSON.parse(readFileSync(path, "utf-8")));
+});
 
 function makeFakeContext() {
   const calls = [];
