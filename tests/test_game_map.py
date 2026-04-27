@@ -97,10 +97,14 @@ def test_load_map_raises_on_extra_field_in_room():
 # --- compute_walls -----------------------------------------------------------
 
 
-def test_compute_walls_returns_10_segments():
-    """Default map: 3 vertical wall segs x 2 walls + 4 horizontal segs = 10."""
+def test_compute_walls_includes_wall_lines_plus_blocking_objects():
+    """Default map: 10 segments from wall_lines (3+3+4) + N AABBs from
+    map_objects with blocks_movement=True. The exact number of blocking
+    objects depends on the default-map content; we assert the lower
+    bound (the wall lines) and that the total > 10."""
     walls = compute_walls(DEFAULT_MAP)
-    assert len(walls) == 10
+    blocking = sum(1 for o in DEFAULT_MAP.map_objects if o.blocks_movement)
+    assert len(walls) == 10 + blocking
 
 
 def test_compute_walls_are_tuples_of_four_ints():
