@@ -24,10 +24,11 @@ from typing import TYPE_CHECKING
 from app.game.minigames.base import MiniGamePluginError
 from app.game.minigames.registry import get_plugin as get_mini_game_plugin
 from app.game.minigames.registry import is_known as mini_game_is_known
+from app.game.runtime import GameRoomError, MiniGameSession
 from app.game.tasks import TASK_RESPAWN_COOLDOWN
 
 if TYPE_CHECKING:
-    from app.game.game_room import GameRoom, MiniGameSession  # noqa: F401
+    from app.game.game_room import GameRoom
 
 
 class MiniGameController:
@@ -42,8 +43,6 @@ class MiniGameController:
         Called from ``TasksController.apply_task_hold_start`` when the task
         carries a mini_game field. Emits a 'started' event for the WS layer.
         """
-        from app.game.game_room import GameRoomError, MiniGameSession
-
         if not mini_game_is_known(mini_game_id):
             raise GameRoomError(
                 code="UNKNOWN_MINI_GAME", message=f"Unknown mini-game {mini_game_id!r}."
@@ -73,8 +72,6 @@ class MiniGameController:
 
     def apply_input(self, player_id: str, action: str, params: dict) -> None:
         """WS-facing entry point for a player's mini-game action."""
-        from app.game.game_room import GameRoomError
-
         session = self._room.active_mini_games.get(player_id)
         if session is None:
             raise GameRoomError(

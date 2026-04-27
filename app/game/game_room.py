@@ -1,7 +1,6 @@
 import collections
 import random
 import uuid
-from dataclasses import dataclass, field
 
 from app.game.ai_flavor import generate_postmortem
 from app.game.game_map import (
@@ -22,6 +21,17 @@ from app.game.roles import (
 from app.game.roles import assign as assign_roles
 from app.game.roles import (
     info_for as role_info_for,
+)
+from app.game.runtime import (
+    VALID_EVENT_SEVERITIES as _VALID_EVENT_SEVERITIES,
+)
+from app.game.runtime import (
+    Body,
+    EventEntry,
+    GameRoomError,
+    MiniGameSession,
+    SabotageRuntime,
+    TaskRuntime,
 )
 from app.game.sabotages import (
     COFFEE_SLOW_SPEED,
@@ -82,64 +92,6 @@ _COLOR_PALETTE = [
     "#94a3b8",  # slate
     "#e879f9",  # fuchsia
 ]
-
-
-@dataclass
-class GameRoomError(Exception):
-    code: str
-    message: str
-
-    def __str__(self) -> str:
-        return f"{self.code}: {self.message}"
-
-
-_VALID_EVENT_SEVERITIES = ("info", "warn", "danger")
-
-
-@dataclass
-class EventEntry:
-    seq: int  # monotonic per room, starts at 1, only increases
-    severity: str  # "info" | "warn" | "danger"
-    message: str  # plain German text shown to all players
-
-
-@dataclass
-class TaskRuntime:
-    definition: TaskDefinition
-    x: float
-    y: float
-    status: str = "available"  # "available" | "in_progress" | "cooldown"
-    cooldown_remaining: float = 0.0
-    per_player_progress: dict[str, float] = field(default_factory=dict)
-
-
-@dataclass
-class SabotageRuntime:
-    definition: SabotageDefinition
-    cooldown_remaining: float = 0.0
-    active: bool = (
-        False  # True for coffee_outage while coffee==0, for meeting while meeting_active_for>0
-    )
-
-
-@dataclass
-class Body:
-    id: str  # uuid hex
-    x: float
-    y: float
-    victim_player_id: str
-    victim_name: str
-    color: str  # victim's color, for rendering
-
-
-@dataclass
-class MiniGameSession:
-    """Tier 3.1: per-player live mini-game state. The framework owns this
-    dict; the plugin owns its inner ``state`` schema."""
-
-    plugin_id: str
-    task_id: str
-    state: dict
 
 
 class GameRoom:
