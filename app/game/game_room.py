@@ -166,6 +166,7 @@ class GameRoom:
         # controller owns its rules. Controllers reach back via self._room
         # for cross-domain reads (e.g. mini-game completion triggers a task
         # reward).
+        from app.game.bots.manager import BotManager
         from app.game.controllers.meeting import MeetingController
         from app.game.controllers.mini_game import MiniGameController
         from app.game.controllers.movement import MovementController
@@ -177,6 +178,10 @@ class GameRoom:
         self._tasks_ctl = TasksController(self)
         self._movement_ctl = MovementController(self)
         self._meeting_ctl = MeetingController(self)
+        # Tier 3.9.2: AI-NPCs. Constructed empty; populated by host
+        # via the `add_bot` WS action (slice 53). Ticks alongside the
+        # other controllers but only acts during PLAYING.
+        self._bots = BotManager(self)
 
     def _emit_event(self, severity: str, message: str) -> None:
         """Append an event to the rolling buffer. Internal use only."""
@@ -361,6 +366,8 @@ class GameRoom:
         self._walls = compute_walls(new_map)
         self._war_room_bounds = war_room_bounds_for(new_map)
         self._task_position = task_position_map(new_map)
+        # New map → room graph cache must be invalidated.
+        self._bots.invalidate_graph()
 
     # --- lifecycle ---------------------------------------------------------
 
@@ -491,6 +498,12 @@ class GameRoom:
             return
         if self.phase is not Phase.PLAYING:
             return
+        # Bots set their input_state BEFORE movement tick so the
+        # MovementController treats them like any other player. Order
+        # matters: tasks-tick uses task.per_player_progress which the
+        # bot's auto-complete in pick_next_target sets to 0 — bots
+        # finish via apply_reward, not via the per-tick progress loop.
+        self._bots.tick(dt)
         self._movement_ctl.tick_movement(dt)
         self._tasks_ctl.tick(dt)
         self._sabotages_ctl.tick(dt)
@@ -920,6 +933,7 @@ class GameRoom:
                 "isHost": p.is_host,
                 "isAlive": p.is_alive,
                 "isConnected": p.is_connected,
+                "isBot": p.is_bot,
             }
             for p in self.players.values()
         ]
@@ -1086,6 +1100,7 @@ class GameRoom:
                     "color": p.color,
                     "isHost": p.is_host,
                     "preferredRole": p.preferred_role,
+                    "isBot": p.is_bot,
                 }
                 for p in self.players.values()
             ],

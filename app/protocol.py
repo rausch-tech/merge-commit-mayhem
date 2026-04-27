@@ -255,6 +255,34 @@ class UseAbility(BaseModel):
     payload: UseAbilityPayload = Field(default_factory=UseAbilityPayload)
 
 
+# --- Tier 3.9.2: AI-NPC lobby controls --------------------------------------
+
+
+class AddBotPayload(BaseModel):
+    """Optional `name` lets the host pre-name the bot; default picks the
+    next free curated name. Empty payload is the common path."""
+
+    model_config = _camel_config()
+    name: str | None = None
+
+
+class AddBot(BaseModel):
+    model_config = _camel_config()
+    type: Literal["add_bot"]
+    payload: AddBotPayload = Field(default_factory=AddBotPayload)
+
+
+class RemoveBotPayload(BaseModel):
+    model_config = _camel_config()
+    bot_id: str
+
+
+class RemoveBot(BaseModel):
+    model_config = _camel_config()
+    type: Literal["remove_bot"]
+    payload: RemoveBotPayload
+
+
 IncomingMessage = Annotated[
     JoinRoom
     | Rejoin
@@ -276,7 +304,9 @@ IncomingMessage = Annotated[
     | UseVent
     | MiniGameInput
     | SetPreferredRole
-    | UseAbility,
+    | UseAbility
+    | AddBot
+    | RemoveBot,
     Discriminator("type"),
 ]
 

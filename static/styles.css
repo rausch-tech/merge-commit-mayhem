@@ -1784,6 +1784,61 @@ button:hover {
   font-style: italic;
 }
 
+/* Tier 3.9.2: AI-NPC lobby controls -------------------------------------- */
+
+#bot-controls {
+  margin: 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: rgba(30, 41, 59, 0.55);
+  border-radius: 8px;
+  border: 1px dashed rgba(148, 163, 184, 0.4);
+}
+
+#btn-add-bot {
+  align-self: flex-start;
+  padding: 6px 12px;
+  background: #334155;
+  color: #f1f5f9;
+  border: 1px solid #64748b;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+#btn-add-bot:hover {
+  background: #475569;
+}
+
+.lobby-bot-hint {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin: 0;
+  font-style: italic;
+}
+
+.lobby-bot-row {
+  opacity: 0.85;
+  font-style: italic;
+}
+
+.lobby-bot-kick {
+  margin-left: 8px;
+  padding: 2px 8px;
+  background: transparent;
+  color: #f87171;
+  border: 1px solid #f87171;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.lobby-bot-kick:hover {
+  background: rgba(248, 113, 113, 0.18);
+}
+
 /* Tier 3.5: Personal coffee meter (HUD) ---------------------------------- */
 
 .hud-pill-my-coffee {
