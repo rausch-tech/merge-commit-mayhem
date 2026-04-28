@@ -30,6 +30,7 @@ const COLOR_INPUT_BORDER: Color = Color(0.20, 0.30, 0.40)
 
 var _ws: WSClient
 var _player_id: String = ""
+var _room_code: String = ""
 var _is_host: bool = false
 var _map: Dictionary = {}
 var _role_info: Dictionary = {}
@@ -503,10 +504,11 @@ func _on_message(type_: String, payload: Dictionary) -> void:
 			_player_id = str(payload.get("playerId", ""))
 			_is_host = bool(payload.get("isHost", false))
 			_map = payload.get("map", {})
+			_room_code = str(payload.get("roomCode", ""))
 			_append_log("[room_joined] playerId=%s isHost=%s mapName=%s" % [
 				_player_id, _is_host, _map.get("name", "?")
 			])
-			_lobby_room_label.text = "Raum: %s" % str(payload.get("roomCode", "?"))
+			_lobby_room_label.text = "Raum: %s" % _room_code
 			_set_lobby_status("In der Lobby — warte auf Spielstart.", false)
 			_demo_check.visible = _is_host
 			_start_btn.visible = _is_host
@@ -684,6 +686,7 @@ func _transition_to_world(initial_state: Dictionary) -> void:
 	var world := world_packed.instantiate()
 	world.set("ws_client", _ws)
 	world.set("player_id", _player_id)
+	world.set("room_code", _room_code)
 	world.set("is_host", _is_host)
 	world.set("map_data", _map)
 	world.set("role_info", _role_info)

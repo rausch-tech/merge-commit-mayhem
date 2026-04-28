@@ -34,6 +34,7 @@ const CAMERA_PITCH_RAD: float = -0.8961  # = -deg_to_rad(51.34)
 # State (set by main.gd before scene is added to the tree)
 var ws_client: WSClient
 var player_id: String = ""
+var room_code: String = ""
 var is_host: bool = false
 var map_data: Dictionary = {}
 var role_info: Dictionary = {}
@@ -544,9 +545,57 @@ func _local_in_war_room() -> bool:
 	return px >= _war_room_bounds[0] and py >= _war_room_bounds[1] and px <= _war_room_bounds[2] and py <= _war_room_bounds[3]
 
 
+var _reconnect_attempts: int = 0
+const MAX_RECONNECT_ATTEMPTS: int = 3
+const RECONNECT_DELAY_SEC: float = 2.0
+
+
 func _on_disconnected() -> void:
-	push_warning("world: disconnected — returning to main")
-	_return_to_main()
+	# Tier 4.12: Auto-Reconnect statt sofort zurueck zur Lobby. Server haelt
+	# die Spieler-Identitaet 30 s nach disconnect — wir versuchen rejoin
+	# mit player_id+room_code. Nach MAX_RECONNECT_ATTEMPTS gehen wir
+	# definitiv in die Lobby zurueck.
+	if _player_intentionally_left:
+		_return_to_main()
+		return
+	if _reconnect_attempts >= MAX_RECONNECT_ATTEMPTS:
+		push_warning("world: reconnect failed after %d attempts — returning to main" % _reconnect_attempts)
+		_return_to_main()
+		return
+	_reconnect_attempts += 1
+	push_warning("world: disconnected — reconnect attempt %d/%d in %.1fs" % [
+		_reconnect_attempts, MAX_RECONNECT_ATTEMPTS, RECONNECT_DELAY_SEC,
+	])
+	if _hud and _hud.has_method("show_voting_result"):
+		# Reuse den voting-toast als generischen Notice-Toast — kein eigener
+		# Reconnect-Toast noetig, der Inhalt erklaert sich.
+		_hud.call("show_voting_result", {
+			"removedPlayerName": "(Reconnect %d/%d)" % [_reconnect_attempts, MAX_RECONNECT_ATTEMPTS],
+			"lastWords": "Server-Verbindung verloren — versuche rejoin ...",
+			"wasChaosAgent": false,
+		})
+	# Rejoin-URL ist die gleiche wie der ursprungliche Connect — wir kennen
+	# sie nicht direkt, aber ws_client hat connected_url.
+	var url := ws_client.connected_url if ws_client.has_method("connect_to_server") else ""
+	if url == "":
+		_return_to_main()
+		return
+	await get_tree().create_timer(RECONNECT_DELAY_SEC).timeout
+	if _player_intentionally_left:
+		return
+	ws_client.connected.connect(_on_reconnected, CONNECT_ONE_SHOT)
+	ws_client.connect_to_server(url)
+
+
+var _player_intentionally_left: bool = false
+
+
+func _on_reconnected() -> void:
+	# Reconnect erfolgreich — Server schickt uns rejoin-State.
+	_reconnect_attempts = 0
+	if ws_client == null:
+		return
+	ws_client.send(Protocol.TYPE_REJOIN, {"roomCode": room_code, "playerId": player_id})
 
 func _apply_state(state: Dictionary) -> void:
 	_last_state = state
@@ -685,6 +734,9 @@ func _on_pause_close() -> void:
 		_pause_menu = null
 
 func _on_leave_requested() -> void:
+	# Markiert das Disconnect als "intentional" damit der Reconnect-Loop nicht
+	# laeuft (Tier 4.12).
+	_player_intentionally_left = true
 	if ws_client != null:
 		ws_client.close()
 	_return_to_main()
