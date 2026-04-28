@@ -33,9 +33,18 @@ const COLOR_TO_INDEX: Dictionary = {
 }
 
 # Movement smoothing — target is updated at 20 Hz, we lerp every frame.
-const POSITION_LERP_SPEED: float = 14.0
+# 22.0 ergibt ~45 ms zum Erreichen von 50 % Distanz — sichtbar straffer als
+# 14.0, ohne den smoothen "schweben"-Eindruck zu verlieren. Plus
+# snap-on-pushback unten faengt den "ich laufe durch den Tisch"-Effekt ab.
+const POSITION_LERP_SPEED: float = 22.0
 const ROTATION_LERP_SPEED: float = 10.0
 const MOVE_DEADZONE: float = 0.04
+# Wenn Server uns plotzlich in die entgegengesetzte Bewegungsrichtung
+# zurueckschiebt (= wir sind gegen einen Tisch gerannt, Server hat uns
+# rausgeclamped), snappen wir sofort statt durch das Hindernis zu gleiten.
+# Schwellwert: Pushback-Distanz > 0.06 World-Units (= 6 Server-Pixel)
+# UND wir hatten gerade Bewegung in die entgegengesetzte Richtung.
+const SNAP_PUSHBACK_DISTANCE: float = 0.06
 const NAMEPLATE_HEIGHT: float = 2.4
 const CHARACTER_SCALE: float = 2.2  # Kenney Mini chars are tiny raw, scale up
 
@@ -139,8 +148,22 @@ func set_player_data(player_name: String, color_hex: String, is_alive: bool) -> 
 func _process(delta: float) -> void:
 	# Position lerp
 	var current := global_position
-	var t = clamp(POSITION_LERP_SPEED * delta, 0.0, 1.0)
-	global_position = current.lerp(_target_pos, t)
+	var to_target := _target_pos - current
+	var moved_last_frame := current - _last_pos
+	# Snap-on-pushback: wenn der naechste Server-Snapshot uns gegen die
+	# Richtung schubst in die wir gerade gelaufen sind (= Server hat uns aus
+	# einem Tisch geclamped), nicht erst lerpen, sondern hart snappen. Sonst
+	# rendert man visuell noch ~100 ms im Tisch drin.
+	var pushback := (
+		to_target.length() > SNAP_PUSHBACK_DISTANCE
+		and moved_last_frame.length_squared() > 0.0
+		and to_target.dot(moved_last_frame) < 0.0
+	)
+	if pushback:
+		global_position = _target_pos
+	else:
+		var t = clamp(POSITION_LERP_SPEED * delta, 0.0, 1.0)
+		global_position = current.lerp(_target_pos, t)
 
 	# Movement detection (in world units / second)
 	var moved := global_position - _last_pos
