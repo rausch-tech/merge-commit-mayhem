@@ -122,6 +122,8 @@ func _ready() -> void:
 		_hud.connect("sabotage_pressed", _on_hud_sabotage_pressed)
 	if _hud.has_signal("vote_pressed"):
 		_hud.connect("vote_pressed", _on_hud_vote_pressed)
+	if _hud.has_signal("return_to_lobby_pressed"):
+		_hud.connect("return_to_lobby_pressed", _on_hud_return_to_lobby_pressed)
 
 	_sting_player = AudioStreamPlayer.new()
 	_sting_player.name = "StingPlayer"
@@ -382,6 +384,12 @@ func _on_hud_vote_pressed(target_id: String) -> void:
 		ws_client.send(Protocol.TYPE_SKIP_VOTE, {})
 	else:
 		ws_client.send(Protocol.TYPE_CAST_VOTE, {"targetPlayerId": target_id})
+
+
+func _on_hud_return_to_lobby_pressed() -> void:
+	# Tier 4.9: vom Endscreen — Server entscheidet host-only.
+	if ws_client != null:
+		ws_client.send(Protocol.TYPE_RETURN_TO_LOBBY, {})
 
 
 func _on_disconnected() -> void:

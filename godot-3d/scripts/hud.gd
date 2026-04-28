@@ -93,6 +93,11 @@ var _voting_already_cast: bool = false
 var _voting_toast: PanelContainer
 var _voting_toast_label: RichTextLabel
 var _voting_toast_timer: Timer
+# Endscreen-Modal (4.9) — sichtbar wenn phase=ended + game_state.finalSummary.
+var _endscreen_modal: PanelContainer
+var _endscreen_built: bool = false
+# Signal: Host klickt "Zurueck zur Lobby" — world.gd routet zu return_to_lobby.
+signal return_to_lobby_pressed
 
 func _ready() -> void:
 	_build_top_bar()
@@ -249,6 +254,16 @@ func apply_game_state(state: Dictionary) -> void:
 	# Meeting-Modal: zeigt sich nur waehrend phase=meeting, schliesst sich beim
 	# naechsten phase=playing/ended automatisch.
 	_update_meeting_modal(state.get("meeting", null), int(state.get("remainingSeconds", 0)))
+
+	# Endscreen: zeigt sich wenn phase=ended UND finalSummary mitgekommen ist.
+	# game_ended-Message ist nur Trigger; Awards/Postmortem leben in
+	# game_state.finalSummary (Tier 3.7).
+	if _phase == "ended":
+		var summary: Variant = state.get("finalSummary", null)
+		if typeof(summary) == TYPE_DICTIONARY:
+			show_endscreen(summary)
+	else:
+		hide_endscreen()
 
 # Build helpers --------------------------------------------------------------
 
@@ -1358,3 +1373,163 @@ func show_voting_result(payload: Dictionary) -> void:
 	_voting_toast_label.text = "\n".join(lines)
 	_voting_toast.visible = true
 	_voting_toast_timer.start(5.0)
+
+
+# Endscreen (4.9) — Modal mit Win-Banner, Awards, Per-Player-Stats und
+# AI-Postmortem-Block. Triggert beim phase=ended-Switch + finalSummary-Daten
+# aus dem game_state. Reset-Button (host-only) sendet return_to_lobby.
+
+const COLOR_WIN_RELEASE: Color = Color(0.30, 0.85, 0.45)
+const COLOR_WIN_CHAOS: Color = Color(0.95, 0.40, 0.40)
+
+
+func _build_endscreen_modal() -> void:
+	if _endscreen_built:
+		return
+	_endscreen_built = true
+	_endscreen_modal = PanelContainer.new()
+	_endscreen_modal.anchor_left = 0.5
+	_endscreen_modal.anchor_top = 0.5
+	_endscreen_modal.anchor_right = 0.5
+	_endscreen_modal.anchor_bottom = 0.5
+	_endscreen_modal.offset_left = -340
+	_endscreen_modal.offset_top = -260
+	_endscreen_modal.offset_right = 340
+	_endscreen_modal.offset_bottom = 260
+	_endscreen_modal.visible = false
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.04, 0.06, 0.10, 0.97)
+	style.set_corner_radius_all(14)
+	style.set_border_width_all(2)
+	style.border_color = COLOR_ACCENT
+	style.shadow_color = Color(0, 0, 0, 0.7)
+	style.shadow_size = 30
+	style.set_content_margin_all(24)
+	_endscreen_modal.add_theme_stylebox_override("panel", style)
+	add_child(_endscreen_modal)
+
+
+func show_endscreen(summary: Dictionary) -> void:
+	_build_endscreen_modal()
+	# Modal-Inhalt jedes Mal frisch rendern — finalSummary kommt nur einmal,
+	# aber falls Reconnect spaeter dasselbe schickt, vermeiden wir
+	# Stale-State.
+	for child in _endscreen_modal.get_children():
+		child.queue_free()
+
+	var winner: String = str(summary.get("winner", ""))
+	var reason: String = str(summary.get("reason", ""))
+	var awards: Array = summary.get("awards", [])
+	var per_player: Array = summary.get("perPlayer", [])
+	var postmortem: String = str(summary.get("postmortem", ""))
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_endscreen_modal.add_child(scroll)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(vbox)
+
+	# Banner
+	var banner := Label.new()
+	if winner == "release_team":
+		banner.text = "RELEASE-TEAM GEWINNT"
+		banner.add_theme_color_override("font_color", COLOR_WIN_RELEASE)
+	elif winner == "chaos_agents":
+		banner.text = "CHAOS-AGENTEN GEWINNEN"
+		banner.add_theme_color_override("font_color", COLOR_WIN_CHAOS)
+	else:
+		banner.text = "RUNDE BEENDET"
+		banner.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+	banner.add_theme_font_size_override("font_size", 28)
+	vbox.add_child(banner)
+
+	if reason != "":
+		var reason_label := Label.new()
+		reason_label.text = reason
+		reason_label.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+		reason_label.add_theme_font_size_override("font_size", 14)
+		reason_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		vbox.add_child(reason_label)
+
+	# Awards
+	if awards.size() > 0:
+		var awards_title := Label.new()
+		awards_title.text = "AWARDS"
+		awards_title.add_theme_color_override("font_color", COLOR_ACCENT)
+		awards_title.add_theme_font_size_override("font_size", 14)
+		vbox.add_child(awards_title)
+		for a in awards:
+			var aw_row := RichTextLabel.new()
+			aw_row.bbcode_enabled = true
+			aw_row.fit_content = true
+			aw_row.scroll_active = false
+			aw_row.add_theme_color_override("default_color", COLOR_TEXT)
+			aw_row.add_theme_font_size_override("normal_font_size", 12)
+			aw_row.text = "[b]%s[/b]: %s — %s" % [
+				str(a.get("title", "?")),
+				str(a.get("playerName", "?")),
+				str(a.get("reason", "")),
+			]
+			vbox.add_child(aw_row)
+
+	# Per-Player-Stats
+	if per_player.size() > 0:
+		var pp_title := Label.new()
+		pp_title.text = "STATS"
+		pp_title.add_theme_color_override("font_color", COLOR_ACCENT)
+		pp_title.add_theme_font_size_override("font_size", 14)
+		vbox.add_child(pp_title)
+		for p in per_player:
+			var row := RichTextLabel.new()
+			row.bbcode_enabled = true
+			row.fit_content = true
+			row.scroll_active = false
+			row.add_theme_color_override("default_color", COLOR_TEXT_DIM)
+			row.add_theme_font_size_override("normal_font_size", 12)
+			var team_color: String = "30c065" if str(p.get("team", "")) == "release_team" else "ef6464"
+			var role_label: String = str(p.get("role", "")).replace("_", " ").capitalize()
+			row.text = (
+				"[color=#%s]%s[/color]  ·  %s  ·  Tasks: %d  ·  Sabotagen: %d  ·  Coffee: %s%s" % [
+					team_color,
+					str(p.get("name", "?")),
+					role_label,
+					int(p.get("tasksCompleted", 0)),
+					int(p.get("sabotagesTriggered", 0)),
+					str(p.get("coffeeFinal", 0.0)),
+					"  ·  Ability used" if bool(p.get("abilityUsed", false)) else "",
+				]
+			)
+			vbox.add_child(row)
+
+	# AI-Postmortem
+	if postmortem != "":
+		var pm_title := Label.new()
+		pm_title.text = "POSTMORTEM (AI)"
+		pm_title.add_theme_color_override("font_color", COLOR_ACCENT)
+		pm_title.add_theme_font_size_override("font_size", 14)
+		vbox.add_child(pm_title)
+		var pm := Label.new()
+		pm.text = postmortem
+		pm.add_theme_color_override("font_color", COLOR_TEXT)
+		pm.add_theme_font_size_override("font_size", 12)
+		pm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		vbox.add_child(pm)
+
+	# Reset-Button — sendet return_to_lobby (server entscheidet ob Host).
+	var reset_btn := Button.new()
+	reset_btn.text = "Zurueck zur Lobby"
+	reset_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reset_btn.pressed.connect(func(): emit_signal("return_to_lobby_pressed"))
+	vbox.add_child(reset_btn)
+
+	_endscreen_modal.visible = true
+
+
+func hide_endscreen() -> void:
+	if _endscreen_modal != null:
+		_endscreen_modal.visible = false
