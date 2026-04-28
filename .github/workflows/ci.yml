@@ -79,9 +79,69 @@ jobs:
       - name: Run vitest
         run: npx vitest run
 
+  web-export:
+    # Baut den Godot-Web-Build (HTML5/WASM) als Deploy-Artifact.
+    # Laeuft auf jedem Push/PR — Godot + Web-Templates sind gecached, der
+    # eigentliche Export ist mit Cache-Hit ~30s, ohne Cache ~3min (Templates
+    # sind ~250 MB Download). Artifact wird vom deploy-Job konsumiert,
+    # sodass EC2 keine Godot-Toolchain installiert haben muss.
+    name: godot web-export
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Godot binary
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot-bin
+          key: godot-4.6-stable-linux-x86_64
+      - name: Install Godot 4.6 (cache miss)
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot-bin && cd ~/godot-bin
+          curl -fL -o godot.zip "https://github.com/godotengine/godot/releases/download/4.6-stable/Godot_v4.6-stable_linux.x86_64.zip"
+          unzip -q godot.zip && rm godot.zip
+          chmod +x Godot_v4.6-stable_linux.x86_64
+      - name: Add godot to PATH
+        run: |
+          mkdir -p ~/.local/bin
+          ln -sf ~/godot-bin/Godot_v4.6-stable_linux.x86_64 ~/.local/bin/godot
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Cache Godot Web-Export templates
+        id: cache-templates
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/godot/export_templates/4.6.stable
+          key: godot-export-templates-4.6-stable
+      - name: Install Web-Export templates (cache miss)
+        if: steps.cache-templates.outputs.cache-hit != 'true'
+        run: |
+          # .tpz ist ein Zip-Archiv; entpackt eine "templates/"-Wurzel,
+          # die Godot 4.6 unter "4.6.stable/" erwartet.
+          mkdir -p ~/.local/share/godot/export_templates
+          cd ~/.local/share/godot/export_templates
+          curl -fL -o tpl.tpz "https://github.com/godotengine/godot/releases/download/4.6-stable/Godot_v4.6-stable_export_templates.tpz"
+          unzip -q tpl.tpz
+          mv templates 4.6.stable
+          rm tpl.tpz
+      - name: Build Godot Web export (release)
+        run: ./scripts/godot-web-export.sh
+      - name: Verify export output
+        run: |
+          test -f godot-3d/exports/index.html
+          test -f godot-3d/exports/index.wasm
+          test -f godot-3d/exports/index.pck
+          ls -lh godot-3d/exports/
+      - name: Upload Web-Export artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-web-export
+          path: godot-3d/exports/
+          retention-days: 7
+
   deploy:
     name: deploy to EC2
-    needs: [test, lint-python, type-check, lint-frontend, test-frontend]
+    needs: [test, lint-python, type-check, lint-frontend, test-frontend, web-export]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     concurrency:
@@ -89,6 +149,12 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download Godot Web-Export artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: godot-web-export
+          path: godot-3d/exports/
 
       - name: Check secrets are configured
         id: secret-check

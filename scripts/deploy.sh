@@ -26,6 +26,15 @@ TARBALL=$(mktemp -t mcm-deploy-XXXXXX.tgz)
 trap 'rm -f "$TARBALL"' EXIT
 
 echo ">>> Building deploy tarball..."
+# Godot-Web-Build optional inkludieren — CI-Pipeline downloaded das Artifact
+# vor diesem Step in godot-3d/exports/, lokale Deploys laufen ohne falls
+# der Build fehlt. FastAPI mountet /godot/ nur wenn index.html existiert,
+# also kein Mount-Crash bei fehlendem Build.
+TAR_PATHS=(pyproject.toml app/ static/ images/ sounds/ maps/ tests/ README.md)
+if [[ -f godot-3d/exports/index.html ]]; then
+    echo ">>> Godot Web-Build erkannt — wird ins Tarball gepackt"
+    TAR_PATHS+=(godot-3d/exports/)
+fi
 tar --exclude='.git' \
     --exclude='.venv' \
     --exclude='.worktrees' \
@@ -35,7 +44,7 @@ tar --exclude='.git' \
     --exclude='node_modules' \
     --exclude='uv.lock' \
     -czf "$TARBALL" \
-    pyproject.toml app/ static/ images/ sounds/ maps/ tests/ README.md
+    "${TAR_PATHS[@]}"
 
 SIZE=$(stat -c %s "$TARBALL")
 echo ">>> Tarball: $TARBALL ($SIZE bytes)"
