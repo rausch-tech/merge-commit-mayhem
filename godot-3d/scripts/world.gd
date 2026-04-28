@@ -120,6 +120,8 @@ func _ready() -> void:
 		_hud.connect("ability_pressed", _on_hud_ability_pressed)
 	if _hud.has_signal("sabotage_pressed"):
 		_hud.connect("sabotage_pressed", _on_hud_sabotage_pressed)
+	if _hud.has_signal("vote_pressed"):
+		_hud.connect("vote_pressed", _on_hud_vote_pressed)
 
 	_sting_player = AudioStreamPlayer.new()
 	_sting_player.name = "StingPlayer"
@@ -232,10 +234,13 @@ func _on_message(type_: String, payload: Dictionary) -> void:
 				_play_sting(STING_TASK_COMPLETE)
 			_close_mini_game_modal()
 			_hold_task_id = ""
+		Protocol.TYPE_VOTING_RESULT:
+			# Tier 4.8: Toast mit "X wurde rausgevotet" + last-words.
+			if _hud and _hud.has_method("show_voting_result"):
+				_hud.call("show_voting_result", payload)
 		_:
-			# Voting/meeting etc. — Tier 4.7+ rendert sie, vorher fallen sie
-			# hier durch. Logs auf Debugging-Bedarf nicht hier anwerfen,
-			# sonst flutet das die Konsole bei 20 Hz.
+			# Andere Messages — Tier 4.9+ rendert sie. Logs auf Debugging-Bedarf
+			# nicht hier anwerfen, sonst flutet das die Konsole bei 20 Hz.
 			pass
 
 # -- Task-Interaction (Tier 4.6) --------------------------------------------
@@ -367,6 +372,16 @@ func _on_hud_sabotage_pressed(sabotage_id: String) -> void:
 	# Sabotage triggern (Tier 4.7) — Server prueft Object-Binding-Reichweite.
 	if ws_client != null and sabotage_id != "":
 		ws_client.send(Protocol.TYPE_TRIGGER_SABOTAGE, {"sabotageId": sabotage_id})
+
+
+func _on_hud_vote_pressed(target_id: String) -> void:
+	# Tier 4.8: target_id="" -> skip_vote, sonst cast_vote.
+	if ws_client == null:
+		return
+	if target_id == "":
+		ws_client.send(Protocol.TYPE_SKIP_VOTE, {})
+	else:
+		ws_client.send(Protocol.TYPE_CAST_VOTE, {"targetPlayerId": target_id})
 
 
 func _on_disconnected() -> void:

@@ -5,6 +5,8 @@ extends CanvasLayer
 # testbar.
 signal ability_pressed
 signal sabotage_pressed(sabotage_id: String)
+# vote_pressed(target_id) — "" target_id = skip-vote.
+signal vote_pressed(target_id: String)
 
 # Game HUD — overlays the 3D world with stat bars, timer, role chip, and a
 # right-side player roster. Pure UI; updates come from world.gd via:
@@ -81,6 +83,16 @@ var _sabotage_button_nodes: Dictionary = {}  # id -> {btn, cd_label}
 var _sabotage_states: Dictionary = {}        # id -> {cooldown, active}
 var _available_sabotages: Array = []
 var _is_chaos: bool = false
+# Meeting + Voting (4.8) — Modal-Overlay, sichtbar wenn phase=meeting.
+var _meeting_modal: PanelContainer
+var _meeting_title: Label
+var _meeting_context_label: RichTextLabel
+var _meeting_vote_box: VBoxContainer
+var _voting_already_cast: bool = false
+# Voting-Result-Toast.
+var _voting_toast: PanelContainer
+var _voting_toast_label: RichTextLabel
+var _voting_toast_timer: Timer
 
 func _ready() -> void:
 	_build_top_bar()
@@ -90,6 +102,8 @@ func _ready() -> void:
 	_build_eventfeed_panel()
 	_build_role_intro_modal()
 	_build_sabotage_strip()
+	_build_meeting_modal()
+	_build_voting_toast()
 	_build_map_label()
 	_build_task_prompt()
 	apply_game_state({})
@@ -231,6 +245,10 @@ func apply_game_state(state: Dictionary) -> void:
 	# Sabotage-Strip: Cooldowns aus dem game_state.sabotages cachen.
 	_cache_sabotage_states(state.get("sabotages", []))
 	_refresh_sabotage_buttons()
+
+	# Meeting-Modal: zeigt sich nur waehrend phase=meeting, schliesst sich beim
+	# naechsten phase=playing/ended automatisch.
+	_update_meeting_modal(state.get("meeting", null), int(state.get("remainingSeconds", 0)))
 
 # Build helpers --------------------------------------------------------------
 
@@ -1133,3 +1151,210 @@ func _sabotage_label(sab_id: String) -> String:
 		"lights_out":             return "PagerDuty"
 		"comms_outage":           return "Slack Down"
 	return sab_id.replace("_", " ").capitalize()
+
+
+# Meeting + Voting (4.8) — Modal-Overlay waehrend phase=meeting.
+# Zeigt Reporter, Body-Location, RecentEvents als AI-flavored Stimmungs-
+# Block, und Voting-Buttons pro lebendigem Spieler + Skip. Sendet
+# vote_pressed(target_id) ueber Signal — world.gd routet zu cast_vote /
+# skip_vote.
+
+const COLOR_MEETING_BG: Color = Color(0.04, 0.06, 0.10, 0.96)
+const COLOR_MEETING_BORDER: Color = Color(0.95, 0.70, 0.30, 0.85)
+const COLOR_VOTING_TOAST_BG: Color = Color(0.06, 0.10, 0.06, 0.95)
+
+
+func _build_meeting_modal() -> void:
+	_meeting_modal = PanelContainer.new()
+	_meeting_modal.anchor_left = 0.5
+	_meeting_modal.anchor_top = 0.5
+	_meeting_modal.anchor_right = 0.5
+	_meeting_modal.anchor_bottom = 0.5
+	_meeting_modal.offset_left = -300
+	_meeting_modal.offset_top = -240
+	_meeting_modal.offset_right = 300
+	_meeting_modal.offset_bottom = 240
+	_meeting_modal.visible = false
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = COLOR_MEETING_BG
+	style.set_corner_radius_all(14)
+	style.set_border_width_all(2)
+	style.border_color = COLOR_MEETING_BORDER
+	style.shadow_color = Color(0, 0, 0, 0.7)
+	style.shadow_size = 30
+	style.set_content_margin_all(24)
+	_meeting_modal.add_theme_stylebox_override("panel", style)
+	add_child(_meeting_modal)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	_meeting_modal.add_child(vbox)
+
+	_meeting_title = Label.new()
+	_meeting_title.text = "EMERGENCY MEETING"
+	_meeting_title.add_theme_color_override("font_color", COLOR_WARN)
+	_meeting_title.add_theme_font_size_override("font_size", 24)
+	vbox.add_child(_meeting_title)
+
+	_meeting_context_label = RichTextLabel.new()
+	_meeting_context_label.bbcode_enabled = true
+	_meeting_context_label.fit_content = true
+	_meeting_context_label.scroll_active = false
+	_meeting_context_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_meeting_context_label.add_theme_color_override("default_color", COLOR_TEXT_DIM)
+	_meeting_context_label.add_theme_font_size_override("normal_font_size", 12)
+	vbox.add_child(_meeting_context_label)
+
+	var vote_title := Label.new()
+	vote_title.text = "Wer soll geremoved werden?"
+	vote_title.add_theme_color_override("font_color", COLOR_ACCENT)
+	vote_title.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(vote_title)
+
+	_meeting_vote_box = VBoxContainer.new()
+	_meeting_vote_box.add_theme_constant_override("separation", 4)
+	_meeting_vote_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(_meeting_vote_box)
+
+
+func _update_meeting_modal(meeting_data: Variant, remaining_seconds: int) -> void:
+	if _meeting_modal == null:
+		return
+	if _phase != "meeting" or meeting_data == null:
+		_meeting_modal.visible = false
+		_voting_already_cast = false  # reset fuer naechstes Meeting
+		return
+	if not (typeof(meeting_data) == TYPE_DICTIONARY):
+		return
+	_meeting_modal.visible = true
+	var ctx: Dictionary = meeting_data
+	# Title mit Sekunden
+	_meeting_title.text = "EMERGENCY MEETING — %ds" % remaining_seconds
+
+	# Context block
+	var lines: PackedStringArray = []
+	var reporter: String = str(ctx.get("reporterName", ""))
+	if reporter != "":
+		lines.append("[color=#f5b042]Gemeldet von:[/color] %s" % reporter)
+	var body: Variant = ctx.get("body", null)
+	if typeof(body) == TYPE_DICTIONARY:
+		var bd: Dictionary = body
+		var victim: String = str(bd.get("victimName", "?"))
+		var room: String = str(bd.get("room", "?")).replace("_", " ")
+		lines.append("[color=#ef6464]Body:[/color] %s im [i]%s[/i]" % [victim, room])
+	var recent: Array = ctx.get("recentEvents", [])
+	if recent.size() > 0:
+		lines.append("")
+		lines.append("[color=#9ea4ad]Letzte Events:[/color]")
+		var max_show: int = min(6, recent.size())
+		for i in max_show:
+			var e: Dictionary = recent[i]
+			lines.append("• %s" % str(e.get("message", "")))
+	_meeting_context_label.text = "\n".join(lines)
+
+	# Voting buttons
+	var alive: Array = ctx.get("alive", [])
+	# Idempotent rebuild — nur wenn Liste sich geaendert hat.
+	var existing_ids: Array = []
+	for c in _meeting_vote_box.get_children():
+		if c.has_meta("vote_id"):
+			existing_ids.append(str(c.get_meta("vote_id")))
+	var fresh_ids: Array = ["__skip__"]
+	for a in alive:
+		fresh_ids.append(str(a.get("id", "")))
+	if existing_ids != fresh_ids or _voting_already_cast:
+		for c in _meeting_vote_box.get_children():
+			c.queue_free()
+		var skip_btn := Button.new()
+		skip_btn.text = "Skip"
+		skip_btn.set_meta("vote_id", "__skip__")
+		skip_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		skip_btn.disabled = _voting_already_cast
+		skip_btn.pressed.connect(func(): _on_vote_pressed(""))
+		_meeting_vote_box.add_child(skip_btn)
+		for a in alive:
+			var pid := str(a.get("id", ""))
+			var pname := str(a.get("name", "?"))
+			var btn := Button.new()
+			btn.text = pname
+			btn.set_meta("vote_id", pid)
+			btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			btn.disabled = _voting_already_cast or pid == _player_id
+			btn.pressed.connect(func(): _on_vote_pressed(pid))
+			_meeting_vote_box.add_child(btn)
+
+
+func _on_vote_pressed(target_id: String) -> void:
+	if _voting_already_cast:
+		return
+	_voting_already_cast = true
+	# Disable alle Buttons sofort.
+	for c in _meeting_vote_box.get_children():
+		if c is Button:
+			c.disabled = true
+	emit_signal("vote_pressed", target_id)
+
+
+# Voting-Result-Toast — slide-in von oben, fade nach 5 s.
+
+func _build_voting_toast() -> void:
+	_voting_toast = PanelContainer.new()
+	_voting_toast.anchor_left = 0.5
+	_voting_toast.anchor_top = 0.0
+	_voting_toast.anchor_right = 0.5
+	_voting_toast.anchor_bottom = 0.0
+	_voting_toast.offset_left = -260
+	_voting_toast.offset_top = 100
+	_voting_toast.offset_right = 260
+	_voting_toast.offset_bottom = 200
+	_voting_toast.visible = false
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = COLOR_VOTING_TOAST_BG
+	style.set_corner_radius_all(10)
+	style.set_border_width_all(1)
+	style.border_color = COLOR_ACCENT
+	style.shadow_color = Color(0, 0, 0, 0.6)
+	style.shadow_size = 20
+	style.set_content_margin_all(16)
+	_voting_toast.add_theme_stylebox_override("panel", style)
+	add_child(_voting_toast)
+
+	_voting_toast_label = RichTextLabel.new()
+	_voting_toast_label.bbcode_enabled = true
+	_voting_toast_label.fit_content = true
+	_voting_toast_label.scroll_active = false
+	_voting_toast_label.add_theme_color_override("default_color", COLOR_TEXT)
+	_voting_toast_label.add_theme_font_size_override("normal_font_size", 13)
+	_voting_toast.add_child(_voting_toast_label)
+
+	_voting_toast_timer = Timer.new()
+	_voting_toast_timer.one_shot = true
+	_voting_toast_timer.timeout.connect(func(): _voting_toast.visible = false)
+	add_child(_voting_toast_timer)
+
+
+func show_voting_result(payload: Dictionary) -> void:
+	if _voting_toast == null:
+		return
+	var lines: PackedStringArray = []
+	var skipped: bool = bool(payload.get("skipped", false))
+	var tie: bool = bool(payload.get("tie", false))
+	var name: String = str(payload.get("removedPlayerName", ""))
+	var was_chaos: bool = bool(payload.get("wasChaosAgent", false))
+	var last_words: String = str(payload.get("lastWords", ""))
+	if skipped:
+		lines.append("[color=#9ea4ad]Skip-Vote — niemand wurde rausgevotet.[/color]")
+	elif tie:
+		lines.append("[color=#9ea4ad]Patt — niemand wurde rausgevotet.[/color]")
+	elif name != "":
+		var color: String = "ef6464" if was_chaos else "30c065"
+		var team: String = "war Chaos-Agent" if was_chaos else "war Release-Team"
+		lines.append("[color=#%s][b]%s wurde rausgevotet[/b][/color] (%s)." % [color, name, team])
+	if last_words != "":
+		lines.append("")
+		lines.append("[i]\"%s\"[/i]" % last_words)
+	_voting_toast_label.text = "\n".join(lines)
+	_voting_toast.visible = true
+	_voting_toast_timer.start(5.0)
