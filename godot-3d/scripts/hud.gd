@@ -119,6 +119,12 @@ var _is_ghost: bool = false
 # Kill-Flash (4.10 Polish) — voller Screen-Edge-Tint beim Kill-Event.
 var _kill_flash: ColorRect
 var _kill_flash_tween: Tween
+# Phase-Transition-Banner (4.11/Demo) — kurzer Mid-Screen-Text beim Wechsel.
+var _phase_banner_label: Label
+var _phase_banner_tween: Tween
+var _last_phase_for_banner: String = ""
+# Confetti-Particles auf dem Endscreen (4.11/Demo) — CPUParticles2D.
+var _confetti: CPUParticles2D
 
 func _ready() -> void:
 	_build_top_bar()
@@ -134,6 +140,8 @@ func _ready() -> void:
 	_build_lights_overlay()
 	_build_ghost_banner()
 	_build_kill_flash()
+	_build_phase_banner()
+	_build_confetti()
 	_build_map_label()
 	_build_task_prompt()
 	apply_game_state({})
@@ -244,8 +252,11 @@ func apply_game_state(state: Dictionary) -> void:
 	if _timer_label != null:
 		_timer_label.text = _format_timer(seconds)
 
-	# Phase chip
+	# Phase chip + transition banner
+	var prev_phase: String = _phase
 	_phase = str(state.get("phase", ""))
+	if _phase != prev_phase and _phase != "":
+		_show_phase_banner_for(_phase)
 	if _phase_label != null:
 		match _phase:
 			"playing":
@@ -292,8 +303,10 @@ func apply_game_state(state: Dictionary) -> void:
 		var summary: Variant = state.get("finalSummary", null)
 		if typeof(summary) == TYPE_DICTIONARY:
 			show_endscreen(summary)
+		_set_confetti_active(true)
 	else:
 		hide_endscreen()
+		_set_confetti_active(false)
 
 # Build helpers --------------------------------------------------------------
 
@@ -1774,3 +1787,97 @@ func _play_full_screen_flash(color: Color, peak_alpha: float, fade_seconds: floa
 	_kill_flash.color = Color(color.r, color.g, color.b, peak_alpha)
 	_kill_flash_tween = create_tween()
 	_kill_flash_tween.tween_property(_kill_flash, "color:a", 0.0, fade_seconds)
+
+
+# Phase-Transition-Banner (4.11/Demo) — kurzer mid-screen Text bei jedem
+# Phase-Wechsel. "RUNDE LAEUFT" / "MEETING TIME" / "RUNDE BEENDET".
+
+func _build_phase_banner() -> void:
+	_phase_banner_label = Label.new()
+	_phase_banner_label.text = ""
+	_phase_banner_label.anchor_left = 0.5
+	_phase_banner_label.anchor_right = 0.5
+	_phase_banner_label.anchor_top = 0.5
+	_phase_banner_label.anchor_bottom = 0.5
+	_phase_banner_label.offset_left = -300
+	_phase_banner_label.offset_right = 300
+	_phase_banner_label.offset_top = -50
+	_phase_banner_label.offset_bottom = 50
+	_phase_banner_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_phase_banner_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_phase_banner_label.add_theme_color_override("font_color", COLOR_ACCENT)
+	_phase_banner_label.add_theme_font_size_override("font_size", 56)
+	_phase_banner_label.add_theme_constant_override("outline_size", 8)
+	_phase_banner_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	_phase_banner_label.modulate.a = 0.0
+	_phase_banner_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_phase_banner_label)
+
+
+func _show_phase_banner_for(phase: String) -> void:
+	if _phase_banner_label == null:
+		return
+	var text: String = ""
+	var color: Color = COLOR_ACCENT
+	match phase:
+		"playing":
+			text = "RUNDE LAEUFT"
+			color = COLOR_ACCENT
+		"meeting":
+			text = "MEETING TIME"
+			color = COLOR_WARN
+		"ended":
+			text = "RUNDE BEENDET"
+			color = COLOR_TEXT_DIM
+		_:
+			return
+	if _phase_banner_tween != null and _phase_banner_tween.is_valid():
+		_phase_banner_tween.kill()
+	_phase_banner_label.text = text
+	_phase_banner_label.add_theme_color_override("font_color", color)
+	_phase_banner_label.modulate.a = 0.0
+	_phase_banner_tween = create_tween()
+	_phase_banner_tween.tween_property(_phase_banner_label, "modulate:a", 1.0, 0.4)
+	_phase_banner_tween.tween_interval(1.4)
+	_phase_banner_tween.tween_property(_phase_banner_label, "modulate:a", 0.0, 0.6)
+
+
+# Confetti (4.11/Demo) — beim Endscreen-Trigger. CPUParticles2D regnet
+# bunte Punkte vom oberen Rand.
+
+func _build_confetti() -> void:
+	_confetti = CPUParticles2D.new()
+	_confetti.amount = 80
+	_confetti.lifetime = 4.0
+	_confetti.preprocess = 0.0
+	_confetti.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	_confetti.emission_rect_extents = Vector2(640, 4)
+	_confetti.gravity = Vector2(0, 200)
+	_confetti.initial_velocity_min = 50.0
+	_confetti.initial_velocity_max = 120.0
+	_confetti.angle_min = -180
+	_confetti.angle_max = 180
+	_confetti.angular_velocity_min = -180
+	_confetti.angular_velocity_max = 180
+	_confetti.scale_amount_min = 0.6
+	_confetti.scale_amount_max = 1.4
+	_confetti.color_ramp = _make_confetti_ramp()
+	_confetti.position = Vector2(640, 0)  # mittig oben — wird via anchors gerueckt
+	_confetti.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_confetti.emitting = false
+	add_child(_confetti)
+
+
+func _make_confetti_ramp() -> Gradient:
+	var g := Gradient.new()
+	g.set_color(0, Color(0.95, 0.40, 0.40))
+	g.add_point(0.25, Color(0.95, 0.85, 0.30))
+	g.add_point(0.5, Color(0.30, 0.85, 0.45))
+	g.add_point(0.75, Color(0.45, 0.65, 0.95))
+	return g
+
+
+func _set_confetti_active(on: bool) -> void:
+	if _confetti == null:
+		return
+	_confetti.emitting = on
