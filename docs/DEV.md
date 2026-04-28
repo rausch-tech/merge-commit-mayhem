@@ -72,7 +72,13 @@ uv run pytest tests/test_voting.py::test_majority_vote_eliminates_target -v
 uv run pytest -x
 ```
 
-Aktuell: 207 Backend-Tests. Frontend-Tests kommen mit Tier 0.3.
+Aktuell: ~714 Backend-Tests + ~109 Frontend-Tests (vitest, happy-dom).
+
+```bash
+# Frontend-Tests
+npx vitest run                  # alle einmal
+npx vitest                      # watch mode
+```
 
 ---
 
@@ -125,7 +131,7 @@ uv run pytest
 git add ... && git commit -m "..."
 
 # Wenn fertig: in Hauptpfad mergen + worktree weg
-cd /home/sven-rausch/se/mcm
+cd <repo-root>
 git merge --ff-only slice/<kurztitel>
 git push origin main
 git worktree remove .worktrees/<branch-basename>

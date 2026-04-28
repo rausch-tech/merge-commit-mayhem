@@ -1,6 +1,6 @@
 # WebSocket Protocol
 
-Single Source of Truth fuer das Netzwerk-Protokoll zwischen MCM-Server und Client. Beide Clients (Browser jetzt, Godot spaeter) sprechen dieses Protokoll. Stand: nach Tier 3.4 (`coffee_pour`) — alle Tier-0/1/2/3-Features abgedeckt.
+Single Source of Truth fuer das Netzwerk-Protokoll zwischen MCM-Server und Clients. Browser- und Godot-Client sprechen exakt das gleiche Protokoll. Stand: 2026-04-28, nach Tier 3.9.2 (AI-NPCs) und 3.9.2.1 (LLM-Async-Fix).
 
 **Endpoint:** `wss://<host>/ws` (live: `wss://prod-is-lava.dev/ws`)
 **Format:** UTF-8 JSON, ein Frame = eine Message.
@@ -400,6 +400,24 @@ Jeder Spieler. Trennt die Session ohne 30-s-Reconnect-Grace.
 
 Antwort: kein eigener Frame, aber `lobby_state` (Broadcast) reflektiert die Entfernung.
 
+### `add_bot` / `remove_bot` (Tier 3.9.2)
+
+Host-only, Lobby-only. Erstellt bzw. entfernt einen AI-NPC im Raum.
+
+```jsonc
+{ "type": "add_bot", "payload": { "name": "Bot-Custom" } }
+{ "type": "remove_bot", "payload": { "botId": "abc1234567890def" } }
+```
+
+`name` ist optional — Default ist der nächste freie Name aus der Curated-List
+(`Bot-Promptly`, `Bot-Cursor-Sr.`, `Bot-StackOverflow`, `Bot-Junior`, …).
+
+Antwort: kein eigener Frame, aber `lobby_state` (Broadcast) reflektiert das
+neue/entfernte Bot-Player-Row mit `isBot=true`. Errors: `NOT_HOST`,
+`WRONG_PHASE`, `NAME_TAKEN`, `ROOM_FULL`. Der Bot-Player ist aus Sicht aller
+anderen Subsysteme (Movement, Voting, Body-Discovery, …) ein normaler Player —
+nur `BotManager.tick` setzt sein `input_state` statt eines WS-Clients.
+
 ---
 
 ## 5. Server → Client
@@ -429,7 +447,16 @@ Antwort: kein eigener Frame, aber `lobby_state` (Broadcast) reflektiert die Entf
   "type": "lobby_state",
   "payload": {
     "roomCode": "ABCD",
-    "players": [{ "id": "abc...", "name": "Sven", "color": "#4ade80", "isHost": true }],
+    "players": [
+      {
+        "id": "abc...",
+        "name": "Host",
+        "color": "#4ade80",
+        "isHost": true,
+        "preferredRole": null, // optional, Tier 3.5
+        "isBot": false, // Tier 3.9.2 — true bei AI-NPCs
+      },
+    ],
     "availableMaps": [
       { "id": "default", "name": "Default Office" },
       { "id": "office_v2", "name": "Bigger Office" },
@@ -499,13 +526,14 @@ Dieser Frame ist **per-Viewer personalisiert** (Spectator-Mode, Tier 2.6): leben
     "players": [
       {
         "id": "abc...",
-        "name": "Sven",
+        "name": "Host",
         "x": 250.5,
         "y": 100.0,
         "color": "#4ade80",
         "isHost": true,
         "isAlive": true,
         "isConnected": true,
+        "isBot": false, // Tier 3.9.2 — true bei AI-NPCs
       },
     ],
     "tasks": [
@@ -598,6 +626,7 @@ Felder im Detail:
     "wasChaosAgent": true, // nur sinnvoll wenn removed
     "tie": false, // true bei Stimmengleichheit zwischen named targets
     "skipped": false, // true wenn Skip die Mehrheit gewann
+    "lastWords": "…", // Tier 3.6.5 — AI-flavored Eliminations-Zitat (team-spezifischer Pool); "" bei skip/tie
   },
 }
 ```
@@ -952,4 +981,4 @@ func _open_mini_game(payload):
     pass
 ```
 
-Volle Godot-Integration kommt mit Tier 4 der Roadmap. Bis dahin ist der Browser-Client (`static/`) die Referenz-Implementierung jedes Frame-Typs.
+Der Godot-Client unter `godot-3d/` implementiert dieses Protokoll bereits zum Großteil (Tier 4.x in Arbeit). Der Browser-Client (`static/`) bleibt parallel die Referenz-Implementierung jedes Frame-Typs — beide werden gegen denselben Server getestet.

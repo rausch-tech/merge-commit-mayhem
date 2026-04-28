@@ -4,7 +4,7 @@
 
 Ein Among-Us-artiges Social-Deduction-Game für Tech-Teams. Statt Raumstation: ein Software-Büro mitten im Release. Statt Crewmates und Imposter: Release-Team und Chaos-Agenten. Mit der Mechanik-Klarheit von Among Us und der Insider-Komik eines Engineering-Teams in der Krise.
 
-**Status:** Spielbar als Browser-Prototyp, in aktiver Entwicklung. Godot-Client folgt nach der Foundation-Cleanup-Phase. Siehe [`docs/ROADMAP.md`](docs/ROADMAP.md) für den vollständigen Plan.
+**Status:** Spielbar als Browser-Client (live, auto-deployed) und als Godot-3D-Client (parallel in Tier 4). Beide gegen denselben FastAPI-Server. Siehe [`docs/ROADMAP.md`](docs/ROADMAP.md) für Stand und nächste Schritte.
 
 **Live (Test-Server):** https://prod-is-lava.dev
 
@@ -23,7 +23,7 @@ Danach http://localhost:8000 im Browser öffnen.
 
 ### Alleine testen (Demo-Mode)
 
-In der Lobby gibt's eine Checkbox „Demo-Mode". Damit kannst du allein eine Runde starten — du wirst automatisch zum Chaos-Agent und siehst die Sabotage-UI.
+In der Lobby gibt's eine Checkbox „Demo-Mode". Damit kannst du allein eine Runde starten — du wirst automatisch zum Chaos-Agent und siehst die Sabotage-UI. Alternativ kannst du als Host KI-Bots in die Lobby einladen ("+ Bot hinzufügen"), die heuristisch oder LLM-getrieben mitspielen.
 
 ### Mit anderen testen
 
@@ -32,22 +32,25 @@ Drei Browser-Tabs (oder echte Geräte im selben Netz) öffnen, je einen Namen + 
 ## Tests
 
 ```bash
-uv run pytest
+uv run pytest          # ~714 Backend-Tests
+npx vitest run         # ~109 Frontend-Tests
 ```
-
-Aktuell: 207 Tests grün.
 
 ## Architektur (kurz)
 
 - **Backend autoritativ:** Python + FastAPI + WebSockets. Server hält allen Spielzustand, rechnet Positionen, verteilt Rollen, prüft Win-Conditions.
-- **Client minimal:** Vanilla JS + Canvas. Sendet Input-State, rendert empfangene Snapshots. Keine Spiellogik im Browser.
-- **Map als Daten:** `maps/default.json` ist Single Source of Truth für Räume, Wände, Türen, Spawns, Task-Anker. Vom Server validiert + an Client geschickt.
-- **Protokoll Godot-kompatibel:** JSON über WebSocket, camelCase auf der Wire. Browser-Client + späterer Godot-Client teilen sich denselben Server.
+- **Browser-Client:** Vanilla JS + Canvas. Sendet Input-State, rendert empfangene Snapshots. Keine Spiellogik im Browser.
+- **Godot-3D-Client (`godot-3d/`):** Godot 4.6, gleicher WebSocket-Vertrag wie der Browser-Client. 3D-Render mit echten KayKit-Assets, holt Map + Kinds-Registry zur Laufzeit vom Backend.
+- **Map als Daten:** `maps/*.json` ist Single Source of Truth für Räume, Türen, Spawns, Task-Anker, Möbel. Vom Server validiert + an Client geschickt. `maps/kinds.json` ist die zentrale Registry für MapObject-Typen (Desk, Server-Rack, …) inklusive Asset-Pfade pro Client.
+- **Wire-Format:** JSON über WebSocket, camelCase, client-agnostisch. Browser- und Godot-Client teilen sich denselben Server.
 
 ## Mehr Doku
 
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — der vollständige Plan: Vision, Stand, sechs Tier
-- [`docs/maps.md`](docs/maps.md) — Map-JSON-Schema
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — der vollständige Plan: Vision, Stand, Tier 0–7
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — Backend-Innenleben, Tick-Loop, Controller-Layout
+- [`docs/PROTOCOL.md`](docs/PROTOCOL.md) — vollständiger WebSocket-Vertrag
+- [`docs/maps.md`](docs/maps.md) — Map-JSON-Schema + MapObject-Kinds
+- [`docs/GODOT_HANDOFF.md`](docs/GODOT_HANDOFF.md) — Onboarding für Godot-Entwickler:innen
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — wie du beitragen kannst
 
 ## Lizenz

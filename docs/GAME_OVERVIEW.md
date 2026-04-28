@@ -1,8 +1,8 @@
 # Merge Conflict Mayhem — Game Overview
 
 Eine kompakte, vollständige Beschreibung des Spiels — gedacht zum Teilen mit
-Leuten, die noch keine Runde gespielt haben. Stand: **2026-04-27**, Tier 0–3.7
-auf Live deployt, vor Godot-Migration.
+Leuten, die noch keine Runde gespielt haben. Stand: **2026-04-28**, Tier 0–3.9.2
+auf Live deployt, parallel Godot-3D-Client (Tier 4) in aktiver Entwicklung.
 
 **Live-Server:** https://prod-is-lava.dev
 **Repo:** https://github.com/rausch-tech/merge-commit-mayhem

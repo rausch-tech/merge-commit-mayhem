@@ -55,9 +55,11 @@ Begründung: wir wollen langfristig einen Godot-Client, ohne den Browser-Client 
        ▲                                  ▲
        │ wss://...                        │ https://.../static/...
        │                                  │
-   Browser-Client                    Godot-Client (Tier 3)
-   (Vanilla JS + Canvas)             (Tilemap + GDScript)
+   Browser-Client                    Godot-Client (Tier 4)
+   (Vanilla JS + Canvas)             (3D + GDScript)
 ```
+
+Beide Clients sprechen das gleiche WebSocket-Protokoll. Der Godot-Client zieht Map + Kinds-Registry zur Laufzeit per HTTP vom Backend (Option C, PR #36) — keine Drift zwischen den Welten, ein Server bedient beide.
 
 ---
 
@@ -69,13 +71,22 @@ Begründung: wir wollen langfristig einen Godot-Client, ohne den Browser-Client 
 for room in registry.active_rooms():
     if room.phase == PLAYING:
         room.tick(dt):
-            for player: apply movement (input → velocity → position),
-                        respect walls, clamp to map bounds
-            tick tasks:  per-player progress, completion, cooldowns
-            tick sabotages: cooldowns, meeting timer
+            bots.tick(dt):                  # Bot-Input-State setzen vor Movement
+                tick LLM cooldowns + reap pending futures
+                apply reactive overrides (body-report, meeting-vote)
+                for each bot:
+                    pick_next_target (LLM via thread pool, fallback heuristic)
+                    step along path or steer straight to task
+                    auto-complete on hold timer
+            movement_ctl.tick:               # liest input_state egal von welchem player
+                for player: apply movement (input → velocity → position),
+                            respect walls + map objects, clamp to map bounds
+            tasks_ctl.tick:    per-player progress, completion, cooldowns
+            sabotages_ctl.tick: cooldowns, meeting timer
+            movement_ctl.tick_takedown_cooldowns + tick_coffee_energy
             decrement remaining_seconds
             check win conditions → maybe transition to ENDED
-        broadcast game_state(...)
+        broadcast game_state(...) per-viewer (alive sehen nur alive)
 
     if room.phase == MEETING:
         room.tick(dt):
@@ -93,6 +104,8 @@ for room in registry.active_rooms():
 ```
 
 Das Tick-Loop läuft serverweit als ein einziger asyncio-Task (in `app.main:_tick_loop`). Es iteriert über alle Räume — auch wenn ein Raum mal hängt (Exception), kommt der nächste dran.
+
+**Tick darf nicht blocken.** Der LLM-Call der Bots läuft in einem `ThreadPoolExecutor` (Tier 3.9.2.1, PR #38) — der Tick prüft pro Bot nur `Future.done()` (μs) und reapt das Result wenn da, sonst fällt er auf die Heuristik zurück. Vorher-Bug: 3 s `urllib.urlopen`-Timeout fror den Tick und damit ALLE Räume gleichzeitig ein.
 
 ---
 
@@ -115,11 +128,12 @@ Map-Schema-Detail siehe [`maps.md`](maps.md).
 
 ```text
 app/
-├── main.py                 FastAPI app, lifespan, /ws endpoint, all message handlers
+├── main.py                 FastAPI app, lifespan, /ws endpoint, all message handlers,
+│                           /api/maps + /api/kinds + /api/metrics
 ├── protocol.py             Pydantic models for incoming/outgoing messages
 ├── ws.py                   ConnectionManager — per-ws session tracking
 └── game/
-    ├── game_map.py         GameMap Pydantic + load_map + walls/war-room helpers
+    ├── game_map.py         GameMap Pydantic + load_map + compute_walls + war-room helpers
     ├── game_room.py        Orchestrator: phase, players, lifecycle, tick(),
     │                       win-conditions, public-state serialisation
     ├── runtime.py          Shared dataclasses (TaskRuntime, SabotageRuntime,
@@ -135,8 +149,17 @@ app/
     │   │                   cancel + pending-events queue
     │   └── movement.py     MovementController — per-tick step + collision,
     │                       coffee decay, current-speed-for, vent teleport
+    ├── bots/                AI-NPCs (Tier 3.9.2)
+    │   ├── manager.py      BotManager — lifecycle, tick, stuck-detection,
+    │   │                   ThreadPoolExecutor for non-blocking LLM calls
+    │   ├── pathfinding.py  Room-graph BFS via doors (no MapObject-awareness)
+    │   └── decision.py     LLM-intent picker + reactive overrides (body, vote)
+    ├── llm.py              LLMClient Protocol + AnthropicClient + LocalOpenAIClient
+    ├── kinds_registry.py   maps/kinds.json single source of truth + /api/kinds
+    ├── metrics_export.py + metrics_aggregate.py  per-day JSONL + /api/metrics
+    ├── ai_flavor.py        LLM-styled event-feed texts + postmortem template
     ├── minigames/          Per-task plugins (test_suite_repair, cable_pairing, …)
-    ├── models.py           Phase enum + Player domain model
+    ├── models.py           Phase enum + Player domain model (mit is_bot)
     ├── room_code.py        4-char ABCD generator (alphabet without I/O)
     ├── roles.py            5 release + 3 chaos roles + assign()
     ├── sabotages.py        SabotageDefinition + speed constants
@@ -163,7 +186,10 @@ app/
 
 ```text
 static/
-├── index.html              Lobby + game screen + endscreen + meeting overlay
+├── landing.html            Public marketing landing under /
+├── spielprinzip.html       Long-form game-tour subpage under /spielprinzip
+├── index.html              /play — lobby + game screen + endscreen + meeting overlay
+├── editor/                  Map-Editor under /editor (2D-Canvas + Three.js-3D-Vorschau)
 ├── styles.css              Dark navy theme + Among-Us-style HUD
 │
 ├── main.js                 Entry point: state machine, WebSocket handler dispatch
@@ -171,11 +197,17 @@ static/
 ├── input.js                Keyboard + E-key task interaction
 │
 ├── render.js               Canvas: camera transform, room rects, walls, tasks, players
-├── hud.js                  Top stat pills (release/pipeline/coffee/timer/role)
-├── tasks.js                Left sidebar with task list
+├── hud.js                  Top stat pills (release/pipeline/coffee/own-coffee/timer/role)
+├── tasks.js                Left sidebar with personal + global tasks
 ├── sabotages.js            Bottom-right chaos buttons (color-coded, with cooldown)
-├── meetings.js             Emergency-meeting button + voting overlay + result toast
-├── endscreen.js            End-of-round overlay with role reveal + stats
+├── meetings.js             Emergency-meeting button + voting overlay + result toast (lastWords)
+├── endscreen.js            End-of-round overlay with role reveal + stats + AI postmortem
+├── role_intro.js           Role-Intro modal (Tier 3.5)
+├── kinds.js                Holt /api/kinds, Browser-Render-Metadaten pro Kind
+├── takedown.js / report.js Force-Reboot + Body-Report buttons + interactions
+├── menu.js                 Pause + role recap
+├── touch-controls.js       Mobile touch joystick + edge tabs
+├── minigames/              Per-task plugins (1:1 mirror of server-side)
 │
 ├── audio.js                Click + task-complete sounds (Kenney UI)
 └── sprites.js              Spritesheet metadata + drawSprite helper for canvas
@@ -189,9 +221,12 @@ static/
 - `TaskList` — DOM-Updates für Sidebar
 - `SabotagePanel` — DOM-Updates für Chaos-Buttons
 - `MeetingOverlay` + `VotingResultToast` + `EmergencyMeetingBtn` — Voting-UI
-- `EndscreenOverlay` — End-Card
+- `EndscreenOverlay` — End-Card mit Awards + Postmortem
+- `RoleIntroModal` — Per-Round Role-Reveal
 
 Alle reagieren auf `game_state`-Updates, keine hat eigenen State außer dem letzten Snapshot.
+
+Daneben existiert der **Godot-3D-Client** unter `godot-3d/` (Tier 4) — gleiches WebSocket-Protokoll, GDScript statt JS, KayKit-3D-Assets statt Canvas-Rectangles. Beide Clients sind interchangeable; der Server kennt den Unterschied nicht.
 
 ---
 
@@ -210,12 +245,13 @@ Wenn das Frontend mal komplex genug wird (z. B. Map-Editor mit hunderten UI-Elem
 
 ## 8. Test-Strategie
 
-| Schicht                                 | Tool                            | Coverage-Stand                                             |
-| --------------------------------------- | ------------------------------- | ---------------------------------------------------------- |
-| Domain (`app/game/*`)                   | pytest                          | umfassend (~150 Tests, jede public Methode hat einen Test) |
-| Protokoll (`app/protocol.py`)           | pytest                          | Schema-Roundtrips für alle Message-Typen                   |
-| Transport (`app/ws.py` + `app/main.py`) | pytest mit FastAPI `TestClient` | End-to-End-Flows (lobby join, start, voting, etc.)         |
-| Frontend (`static/*.js`)                | —                               | **kein Coverage, Tier 0.3**                                |
+| Schicht                                 | Tool                            | Coverage-Stand                                              |
+| --------------------------------------- | ------------------------------- | ----------------------------------------------------------- |
+| Domain (`app/game/*`)                   | pytest                          | ~92 % auf `app/game/`, 88 % als CI-Gate-Floor               |
+| Protokoll (`app/protocol.py`)           | pytest                          | Schema-Roundtrips für alle Message-Typen                    |
+| Transport (`app/ws.py` + `app/main.py`) | pytest mit FastAPI `TestClient` | End-to-End-Flows (lobby join, start, voting, add_bot, etc.) |
+| Frontend (`static/*.js`)                | vitest + happy-dom              | ~109 Tests (smoke, render, eventfeed, hud, mini-games, …)   |
+| Godot-Scripts (`godot-3d/scripts/*`)    | `godot --check-only` (CI-gate)  | Parse-Check via `scripts/godot-check.sh`                    |
 
 Kritische Test-Patterns:
 
@@ -232,10 +268,10 @@ Siehe [`DEPLOY.md`](DEPLOY.md). Kurz: GitHub Actions baut Tarball, scp + ssh-res
 
 ## 10. Nächste Architektur-Entscheidungen (offen)
 
-1. **Reconnect-Mechanismus.** Aktuell: Disconnect = Spieler raus aus dem Raum. Tier 0.10: Identität 30 s nach Disconnect bewahren, Client kann mit selber Identität rejoin.
-2. **Multi-Map-Support.** Aktuell single global default-Map. Tier 1.8: Server lädt alle `maps/*.json`, Lobby hat Auswahl.
-3. **Godot-Client.** Tier 3. Setup-Aufwand: WebSocketPeer, Tilemap-Loader aus dem Map-JSON, Charakter-Animationen, Sound-Pipeline. Server bleibt unverändert.
-4. **JSON-Config für Tasks/Sabotagen/Rollen.** Tier 5. Macht Mod-Beiträge code-frei möglich.
+1. **MapObject-aware Pathfinder für Bots.** Aktueller Pathfinder kennt nur Räume + Türen. Bots können hinter blockierende Möbel laufen und stuck-detektion fängt das ab. Folge-Slice: A\* über ein Grid mit `compute_walls`-Output als Hindernissen.
+2. **Async LLM-Provider mit Prompt-Cache.** PR #38 bringt non-blocking via ThreadPool, aber jeder Call schickt den vollen System-Prompt unverwendet. Anthropic-Prompt-Caching wäre 1-Zeilen-Header.
+3. **JSON-Config für Tasks/Sabotagen/Rollen.** `kinds.json` ist erstes Beispiel. Tier 6: Tasks + Sabotagen + Rollen analog auslagern, macht Mod-Beiträge code-frei möglich.
+4. **Reconnect-Mechanismus** ist da (Tier 0.10): 30 s grace per Player nach Disconnect.
 
 Detail siehe `docs/ROADMAP.md`.
 
