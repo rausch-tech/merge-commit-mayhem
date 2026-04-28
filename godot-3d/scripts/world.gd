@@ -45,6 +45,14 @@ var private_state: Dictionary = {}
 
 # Task interaction state (Tier 4.6).
 var _tasks_by_id: Dictionary = {}              # taskId → task dict from game_state
+# Tier 4.10: Bodies + Vents fuer Proximity-Actions.
+var _bodies: Array = []                          # [{id, victimName, x, y, room}]
+var _vents: Array = []                           # [{id, x, y, connectedTo}]
+# Cooldown-Snapshot fuer Take-Down (private_state.takedownCooldownRemaining).
+var _takedown_cooldown: float = 0.0
+# Letzter "in war_room"-Flag des lokalen Spielers (kommt aus players[].inWarRoom
+# oder wird aus war_room_id + Position lokal abgeleitet — siehe _update_proximity_actions).
+var _war_room_bounds: Array = []  # [x_min, y_min, x_max, y_max] in server-pixels
 var _hold_task_id: String = ""                  # "" = nicht gehalten; sonst der Task auf dem E gehalten wird
 var _nearest_task_id: String = ""               # cached fuer HUD-Prompt
 var _mini_game_modal: CanvasLayer = null        # aktive Modal-Instance (nur 1 zur Zeit)
@@ -124,6 +132,12 @@ func _ready() -> void:
 		_hud.connect("vote_pressed", _on_hud_vote_pressed)
 	if _hud.has_signal("return_to_lobby_pressed"):
 		_hud.connect("return_to_lobby_pressed", _on_hud_return_to_lobby_pressed)
+	if _hud.has_signal("takedown_pressed"):
+		_hud.connect("takedown_pressed", _on_hud_takedown_pressed)
+	if _hud.has_signal("report_pressed"):
+		_hud.connect("report_pressed", _on_hud_report_pressed)
+	if _hud.has_signal("vent_pressed"):
+		_hud.connect("vent_pressed", _on_hud_vent_pressed)
 
 	_sting_player = AudioStreamPlayer.new()
 	_sting_player.name = "StingPlayer"
@@ -148,11 +162,27 @@ func _ready() -> void:
 			var ch: Node3D = _players_by_id[pid]
 			print("[world]   player ", pid, " at ", ch.global_position)
 
+	# Tier 4.10: Vents + War-Room-Bounds aus map_data cachen — beide aendern
+	# sich pro Round nicht (Map ist fix), also einmal extrahieren.
+	_vents = map_data.get("vents", [])
+	var rooms_arr: Array = map_data.get("rooms", [])
+	var war_id: String = str(map_data.get("warRoomId", "war_room"))
+	for r in rooms_arr:
+		if str(r.get("id", "")) == war_id:
+			var rx: float = float(r.get("x", 0))
+			var ry: float = float(r.get("y", 0))
+			var rw: float = float(r.get("width", 0))
+			var rh: float = float(r.get("height", 0))
+			_war_room_bounds = [rx, ry, rx + rw, ry + rh]
+			break
+
 func _process(delta: float) -> void:
 	# Task-Proximity-Check fuer den HUD-Prompt — laeuft auch im Aerial-Mode,
 	# aber wenn aerial-demo wir den lokalen Player gar nicht haben, gibt's
 	# nichts zu zeigen.
 	_update_nearest_task()
+	# Tier 4.10: Take-Down + Body-Report + Vent-Proximity. Setzt HUD-Buttons.
+	_update_proximity_actions()
 
 	# In aerial demo-camera mode the rig stays parked at map center.
 	if aerial_demo_camera:
@@ -214,9 +244,9 @@ func _on_message(type_: String, payload: Dictionary) -> void:
 				_play_sting(STING_ROLE_REVEAL)
 				_role_sting_played = true
 		Protocol.TYPE_PRIVATE_STATE:
-			# Per-Owner-Stream — Coffee-Energy + Cooldowns. HUD zeigt aktuell
-			# nur die Coffee-Bar; Ability/Takedown-UI kommen in Tier 4.7/4.10.
+			# Per-Owner-Stream — Coffee-Energy + Cooldowns.
 			private_state = payload.duplicate()
+			_takedown_cooldown = float(payload.get("takedownCooldownRemaining", 0.0))
 			if _hud and _hud.has_method("apply_private_state"):
 				_hud.call("apply_private_state", private_state)
 		Protocol.TYPE_MINI_GAME_STARTED:
@@ -392,6 +422,128 @@ func _on_hud_return_to_lobby_pressed() -> void:
 		ws_client.send(Protocol.TYPE_RETURN_TO_LOBBY, {})
 
 
+func _on_hud_takedown_pressed(target_id: String) -> void:
+	# Tier 4.10: Force-Reboot. Server prueft Cooldown + Reichweite +
+	# War-Room-Safe-Zone, Client schickt nur den Versuch.
+	if ws_client != null and target_id != "":
+		ws_client.send(Protocol.TYPE_TRIGGER_TAKEDOWN, {"targetPlayerId": target_id})
+
+
+func _on_hud_report_pressed(body_id: String) -> void:
+	# Tier 4.10: Body-Discovery + Report. Server triggert Meeting-Phase.
+	if ws_client != null and body_id != "":
+		ws_client.send(Protocol.TYPE_REPORT_BODY, {"bodyId": body_id})
+
+
+func _on_hud_vent_pressed(vent_id: String) -> void:
+	# Tier 4.10: Chaos teleportiert sich an einen connected Vent. Server
+	# entscheidet welchen aus connectedTo (cycle) — wir senden nur unser
+	# aktuelles Vent.
+	if ws_client != null and vent_id != "":
+		ws_client.send(Protocol.TYPE_USE_VENT, {"targetVentId": vent_id})
+
+
+func _update_proximity_actions() -> void:
+	# Tier 4.10: pro Frame fuer den lokalen Spieler:
+	#  - takedown_target: nearest fellow (alive, not-self) im 40 px Radius.
+	#    Nur wenn lokal Chaos ist, alive ist, Cooldown abgelaufen, NICHT im
+	#    War-Room-Safe-Zone.
+	#  - report_target: nearest body im 40 px Radius (jeder lebende Spieler
+	#    darf reporten).
+	#  - vent_target: nearest vent im 50 px Radius (nur fuer Chaos).
+	if _hud == null:
+		return
+	# Wenn wir schon ein Mini-Game oder Meeting im Vordergrund haben, keine
+	# Action-Buttons (sonst clickt man durcheinander).
+	if _mini_game_modal != null:
+		if _hud.has_method("set_proximity_actions"):
+			_hud.call("set_proximity_actions", {})
+		return
+	if not _players_by_id.has(player_id):
+		return
+	var local: Node3D = _players_by_id[player_id]
+	var local_pos: Vector3 = local.global_position
+	var radius_world: float = Protocol.TASK_INTERACTION_RADIUS * Protocol.WORLD_SCALE
+	var vent_radius_world: float = 50.0 * Protocol.WORLD_SCALE
+	var radius_sq: float = radius_world * radius_world
+	var vent_radius_sq: float = vent_radius_world * vent_radius_world
+
+	var team: String = str(role_info.get("team", ""))
+	var is_chaos: bool = team == "chaos_agents"
+	var local_is_alive: bool = bool(_alive_state.get(player_id, true))
+
+	var actions: Dictionary = {}
+
+	# Take-Down (nur Chaos, alive, Cooldown=0, nicht im War-Room).
+	if is_chaos and local_is_alive and _takedown_cooldown <= 0.0 and not _local_in_war_room():
+		var best_id: String = ""
+		var best_name: String = ""
+		var best_d: float = INF
+		for pid in _players_by_id.keys():
+			if pid == player_id:
+				continue
+			# Target muss alive sein.
+			if not bool(_alive_state.get(pid, true)):
+				continue
+			var ch: Node3D = _players_by_id[pid]
+			var d: float = (ch.global_position - local_pos).length_squared()
+			if d < radius_sq and d < best_d:
+				best_d = d
+				best_id = str(pid)
+				if ch.has_method("get") and ch.has_method("get_player_name"):
+					best_name = str(ch.call("get_player_name"))
+				else:
+					best_name = best_id
+		actions["takedownTargetId"] = best_id
+		actions["takedownTargetName"] = best_name
+
+	# Body-Report (jeder lebende Spieler).
+	if local_is_alive:
+		var best_body_id: String = ""
+		var best_body_d: float = INF
+		var best_body_name: String = ""
+		for b in _bodies:
+			var bx: float = float(b.get("x", 0))
+			var by: float = float(b.get("y", 0))
+			var bpos: Vector3 = Protocol.server_to_world(bx, by)
+			var d: float = (bpos - local_pos).length_squared()
+			if d < radius_sq and d < best_body_d:
+				best_body_d = d
+				best_body_id = str(b.get("id", ""))
+				best_body_name = str(b.get("victimName", "?"))
+		actions["reportBodyId"] = best_body_id
+		actions["reportBodyName"] = best_body_name
+
+	# Vent (nur Chaos).
+	if is_chaos and local_is_alive:
+		var best_vent_id: String = ""
+		var best_vent_d: float = INF
+		for v in _vents:
+			var vx: float = float(v.get("x", 0))
+			var vy: float = float(v.get("y", 0))
+			var vpos: Vector3 = Protocol.server_to_world(vx, vy)
+			var d: float = (vpos - local_pos).length_squared()
+			if d < vent_radius_sq and d < best_vent_d:
+				best_vent_d = d
+				best_vent_id = str(v.get("id", ""))
+		actions["ventId"] = best_vent_id
+
+	if _hud.has_method("set_proximity_actions"):
+		_hud.call("set_proximity_actions", actions)
+
+
+func _local_in_war_room() -> bool:
+	if _war_room_bounds.size() != 4:
+		return false
+	if not _players_by_id.has(player_id):
+		return false
+	var ch: Node3D = _players_by_id[player_id]
+	# Welt-Position zurueck zu Server-Koordinaten konvertieren.
+	var px: float = ch.global_position.x / Protocol.WORLD_SCALE
+	var py: float = ch.global_position.z / Protocol.WORLD_SCALE
+	return px >= _war_room_bounds[0] and py >= _war_room_bounds[1] and px <= _war_room_bounds[2] and py <= _war_room_bounds[3]
+
+
 func _on_disconnected() -> void:
 	push_warning("world: disconnected — returning to main")
 	_return_to_main()
@@ -457,6 +609,9 @@ func _apply_state(state: Dictionary) -> void:
 		var tid := str(t.get("taskId", t.get("id", "")))
 		if tid != "":
 			_tasks_by_id[tid] = t
+
+	# Tier 4.10: Bodies-Snapshot fuer Report-Proximity.
+	_bodies = state.get("bodies", [])
 
 	# HUD update
 	if _hud and _hud.has_method("apply_game_state"):

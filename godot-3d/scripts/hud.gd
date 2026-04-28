@@ -7,6 +7,10 @@ signal ability_pressed
 signal sabotage_pressed(sabotage_id: String)
 # vote_pressed(target_id) — "" target_id = skip-vote.
 signal vote_pressed(target_id: String)
+# Tier 4.10 — Proximity-Action-Buttons.
+signal takedown_pressed(target_player_id: String)
+signal report_pressed(body_id: String)
+signal vent_pressed(vent_id: String)
 
 # Game HUD — overlays the 3D world with stat bars, timer, role chip, and a
 # right-side player roster. Pure UI; updates come from world.gd via:
@@ -98,6 +102,14 @@ var _endscreen_modal: PanelContainer
 var _endscreen_built: bool = false
 # Signal: Host klickt "Zurueck zur Lobby" — world.gd routet zu return_to_lobby.
 signal return_to_lobby_pressed
+# Proximity-Action-Buttons (4.10) — bottom-left ueber dem Role-Chip.
+var _action_buttons_panel: PanelContainer
+var _takedown_btn: Button
+var _report_btn: Button
+var _vent_btn: Button
+var _last_takedown_target: String = ""
+var _last_report_body: String = ""
+var _last_vent_id: String = ""
 
 func _ready() -> void:
 	_build_top_bar()
@@ -109,6 +121,7 @@ func _ready() -> void:
 	_build_sabotage_strip()
 	_build_meeting_modal()
 	_build_voting_toast()
+	_build_action_buttons_panel()
 	_build_map_label()
 	_build_task_prompt()
 	apply_game_state({})
@@ -1533,3 +1546,95 @@ func show_endscreen(summary: Dictionary) -> void:
 func hide_endscreen() -> void:
 	if _endscreen_modal != null:
 		_endscreen_modal.visible = false
+
+
+# Proximity-Action-Buttons (4.10) — Take-Down + Report + Vent. world.gd
+# berechnet pro Frame welche Targets in Reichweite sind und ruft
+# set_proximity_actions(dict) — wir aktualisieren Buttons + visibility.
+
+const COLOR_TAKEDOWN: Color = Color(0.95, 0.40, 0.40)
+const COLOR_REPORT: Color = Color(0.95, 0.70, 0.30)
+const COLOR_VENT: Color = Color(0.50, 0.30, 0.85)
+
+
+func _build_action_buttons_panel() -> void:
+	# Bottom-center, etwas hoeher als der Sabotage-Strip damit beide
+	# nicht ueberlappen.
+	_action_buttons_panel = PanelContainer.new()
+	_action_buttons_panel.anchor_left = 0.5
+	_action_buttons_panel.anchor_right = 0.5
+	_action_buttons_panel.anchor_top = 1.0
+	_action_buttons_panel.anchor_bottom = 1.0
+	_action_buttons_panel.offset_left = -240
+	_action_buttons_panel.offset_right = 240
+	_action_buttons_panel.offset_top = -180
+	_action_buttons_panel.offset_bottom = -110
+	_action_buttons_panel.visible = false
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.05, 0.07, 0.10, 0.92)
+	style.set_corner_radius_all(8)
+	style.set_border_width_all(1)
+	style.border_color = Color(1, 1, 1, 0.10)
+	style.set_content_margin_all(8)
+	_action_buttons_panel.add_theme_stylebox_override("panel", style)
+	add_child(_action_buttons_panel)
+
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 8)
+	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	_action_buttons_panel.add_child(hbox)
+
+	_takedown_btn = Button.new()
+	_takedown_btn.text = "Force-Reboot"
+	_takedown_btn.custom_minimum_size = Vector2(140, 40)
+	_takedown_btn.add_theme_color_override("font_color", COLOR_TAKEDOWN)
+	_takedown_btn.pressed.connect(func(): emit_signal("takedown_pressed", _last_takedown_target))
+	_takedown_btn.visible = false
+	hbox.add_child(_takedown_btn)
+
+	_report_btn = Button.new()
+	_report_btn.text = "Body melden"
+	_report_btn.custom_minimum_size = Vector2(140, 40)
+	_report_btn.add_theme_color_override("font_color", COLOR_REPORT)
+	_report_btn.pressed.connect(func(): emit_signal("report_pressed", _last_report_body))
+	_report_btn.visible = false
+	hbox.add_child(_report_btn)
+
+	_vent_btn = Button.new()
+	_vent_btn.text = "Vent"
+	_vent_btn.custom_minimum_size = Vector2(100, 40)
+	_vent_btn.add_theme_color_override("font_color", COLOR_VENT)
+	_vent_btn.pressed.connect(func(): emit_signal("vent_pressed", _last_vent_id))
+	_vent_btn.visible = false
+	hbox.add_child(_vent_btn)
+
+
+func set_proximity_actions(actions: Dictionary) -> void:
+	# actions = {takedownTargetId, takedownTargetName, reportBodyId, reportBodyName, ventId}
+	if _action_buttons_panel == null:
+		return
+	_last_takedown_target = str(actions.get("takedownTargetId", ""))
+	_last_report_body = str(actions.get("reportBodyId", ""))
+	_last_vent_id = str(actions.get("ventId", ""))
+
+	if _last_takedown_target != "":
+		_takedown_btn.text = "Force-Reboot %s" % str(actions.get("takedownTargetName", "?"))
+		_takedown_btn.visible = true
+	else:
+		_takedown_btn.visible = false
+
+	if _last_report_body != "":
+		_report_btn.text = "Body melden (%s)" % str(actions.get("reportBodyName", "?"))
+		_report_btn.visible = true
+	else:
+		_report_btn.visible = false
+
+	if _last_vent_id != "":
+		_vent_btn.text = "Vent (%s)" % _last_vent_id
+		_vent_btn.visible = true
+	else:
+		_vent_btn.visible = false
+
+	# Panel ganz verstecken wenn nichts in Reichweite ist.
+	_action_buttons_panel.visible = _takedown_btn.visible or _report_btn.visible or _vent_btn.visible
