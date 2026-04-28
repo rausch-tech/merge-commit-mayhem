@@ -2,8 +2,8 @@
 
 > Single source of truth for any AI agent (Claude Code, Cursor, Aider,
 > Codex, Continue, Copilot agents …) working on this repo. Read this first.
-> Claude Code users: see also `CLAUDE.md` for Claude-specific notes; everything
-> here applies regardless of agent.
+> Claude Code users: `CLAUDE.md` ist nur ein Pointer auf diese Datei plus
+> ein paar Claude-spezifische Erinnerungen.
 
 ---
 
@@ -11,8 +11,16 @@
 
 - **Was:** Multiplayer-Social-Deduction-Spiel für Tech-Teams. Among-Us im
   Software-Büro. Release-Team gegen geheime Chaos-Agenten. ~10 Min/Runde.
-- **Stack:** Python 3.12 + FastAPI + Pydantic v2 + WebSockets · Vanilla
-  HTML/CSS/JS + Canvas · keine Build-Pipeline · `uv` als Python-Runner.
+- **Stack (Backend):** Python 3.12 + FastAPI + Pydantic v2 + WebSockets ·
+  `uv` als Python-Runner.
+- **Stack (Browser-Client):** Vanilla HTML/CSS/JS + Canvas · keine Build-
+  Pipeline · vom FastAPI-Server direkt geliefert.
+- **Stack (Godot-Client, Tier 4):** Godot 4.6 in `godot-3d/` · gleiches
+  WebSocket-Protokoll wie der Browser-Client · 3D-Render mit KayKit-Assets ·
+  fetcht Map + Kinds-Registry zur Laufzeit vom Backend.
+- **AI-Layer (Tier 3.9):** `app/game/llm.py` (Anthropic Haiku oder lokales
+  OpenAI-kompatibles), `app/game/bots/` für AI-NPCs als Lobby-Filler,
+  `app/game/ai_flavor.py` für LLM-styled Eventfeed-Texte + Postmortem.
 - **Architektur-Nordstern:** **Python entscheidet, der Client zeigt nur an.**
   Backend ist autoritativ für ALLEN State. Client sendet Inputs, rendert
   Snapshots. Wenn eine Idee Spiellogik in den Client drückt → zurück.
@@ -38,49 +46,71 @@
 │   ├── protocol.py          #   Pydantic-Modelle für Wire-Format
 │   ├── ws.py                #   ConnectionManager
 │   └── game/                #   Game-Logik (server-authoritative)
-│       ├── game_room.py     #     Room-State, Tick, Tasks, Sabotage, Vote
-│       ├── game_map.py      #     Map-Loader + Pydantic-Map-Modelle
-│       ├── models.py        #     Player, Phase, InputState
+│       ├── game_room.py     #     Daten-Halter + Lifecycle, delegiert an Controller
+│       ├── runtime.py       #     Shared Dataclasses (TaskRuntime, Body, …)
+│       ├── controllers/     #     Domain-Logik (1 Controller pro Bereich)
+│       │   ├── tasks.py     #       Hold-E, Per-Tick-Progress, Rewards
+│       │   ├── sabotages.py #       Trigger / Repair / Tick (Tier 2.7 Object-Binding)
+│       │   ├── meeting.py   #       Emergency-Meetings, Voting, Take-Down, Body-Report
+│       │   ├── mini_game.py #       Mini-Game-Sessions + Pending-Events
+│       │   └── movement.py  #       Per-Tick-Schritt + Kollision, Coffee-Decay, Vents
+│       ├── bots/            #     AI-NPCs (Tier 3.9.2)
+│       │   ├── manager.py   #       BotManager, Lifecycle, Tick
+│       │   ├── pathfinding.py #     Room-Graph + BFS über Türen
+│       │   └── decision.py  #       LLM-Intent-Picker + reactive Overrides
+│       ├── llm.py           #     LLMClient Protocol + Anthropic + Local-OpenAI
+│       ├── kinds_registry.py #    maps/kinds.json Single-Source-of-Truth
+│       ├── metrics_export.py + metrics_aggregate.py  # JSONL pro Tag + /api/metrics
+│       ├── models.py        #     Player (mit is_bot), Phase, InputState
 │       ├── roles.py         #     RoleDefinition + assign() + Speed-Multipliers
-│       ├── tasks.py         #     TaskDefinition + Konstanten (Radien)
+│       ├── tasks.py         #     TaskDefinition + Konstanten
 │       ├── sabotages.py     #     SabotageDefinition + Object-Type-Mapping
 │       ├── ai_flavor.py     #     LLM-styled Eventfeed-Texte + Postmortem
 │       ├── voting.py        #     Tally + Skip-Resolution
-│       ├── walls.py         #     Wand-Linien → Rechtecke + Kollision
+│       ├── walls.py         #     Wand-Rechtecke + AABB-Kollision
 │       ├── room_code.py     #     4-Buchstaben-Codes
-│       └── minigames/       #     Plugin-Framework + 5 Mini-Games
-├── static/                  # Frontend (vanilla, served by FastAPI)
+│       └── minigames/       #     Plugin-Framework + 8 Mini-Games (alle Tasks)
+├── static/                  # Browser-Frontend (vanilla, served by FastAPI)
 │   ├── landing.html         #   /
 │   ├── spielprinzip.html    #   /spielprinzip (lange Doku-Subpage)
 │   ├── index.html           #   /play (eigentliches Spiel)
-│   ├── editor/editor.html   #   /editor (Map-Editor)
+│   ├── editor/editor.html   #   /editor (Map-Editor mit 2D-Canvas + Three.js-3D-Vorschau)
 │   ├── main.js              #   Game-Client-Entry
 │   ├── render.js            #   Canvas-Renderer
 │   ├── ws.js                #   WebSocket-Client
-│   ├── hud.js · tasks.js · sabotages.js · meetings.js · endscreen.js · ...
+│   ├── hud.js · tasks.js · sabotages.js · meetings.js · endscreen.js · …
 │   ├── role_intro.js        #   Role-Intro-Modal (Tier 3.5)
+│   ├── kinds.js             #   Holt /api/kinds, Browser-Render-Metadaten pro Kind
 │   ├── minigames/           #   Mini-Game-Plugins (1:1 zu Server-Plugins)
 │   ├── images/screenshots/  #   Doku-Screenshots fuer /spielprinzip
 │   └── styles.css · landing.css · spielprinzip.css
-├── tests/                   # pytest (471 grün)
+├── godot-3d/                # Godot 4.6 Client (Tier 4) — paralleler primary client
+│   ├── project.godot        #   Mobile-Renderer + canvas_items stretch + MSAA 4x
+│   ├── scripts/             #   GDScripts (character, world, hud, map_builder, …)
+│   │   ├── kinds_loader.gd  #     Async HTTP-Fetch für /api/kinds + /api/maps/<id>
+│   │   ├── ws_client.gd     #     WebSocketPeer-Wrapper, leitet HTTP-Base aus WS-URL ab
+│   │   └── minigames/       #     5 Mini-Games portiert
+│   ├── scenes/              #   .tscn-Files
+│   ├── assets/              #   KayKit + Kenney CC0 (siehe ASSET_LICENSE.md)
+│   └── maps/                #   Lokal-Kopien als Offline-Fallback (Server gewinnt)
+├── tests/                   # pytest (~714 grün)
 │   └── conftest.py          #   snap_to_object_for_sabotage Helper
-├── tests-frontend/          # vitest (37 grün, happy-dom)
-├── maps/                    # Map-JSONs (default.json + small.json)
+├── tests-frontend/          # vitest (~109 grün, happy-dom)
+├── maps/                    # Map-JSONs (default + small + office_complex + datacenter)
+│   └── kinds.json           #   Single Source of Truth für 25 MapObject-Kinds
 ├── docs/                    # Doku-Block (Single Source of Truth)
 │   ├── ROADMAP.md           #   Tier 0–7 mit Status (LESEN!)
+│   ├── ARCHITECTURE.md      #   Backend-High-Level + Performance + Frontend-Layout
 │   ├── PROTOCOL.md          #   vollstaendiger WS-Vertrag
-│   ├── ARCHITECTURE.md      #   Backend high-level
-│   ├── GAME_OVERVIEW.md     #   shareable Markdown-Tour
-│   ├── GODOT_HANDOFF.md     #   Onboarding für externe Godot-Devs (Tier-4-Client)
+│   ├── DEV.md               #   Lokale Entwicklung, Worktrees, gh-CLI
+│   ├── DEPLOY.md            #   EC2 + Caddy + systemd + LLM-Secrets
+│   ├── GAME_OVERVIEW.md     #   Shareable Markdown-Tour fürs Spiel
+│   ├── GODOT_HANDOFF.md     #   Onboarding für Godot-Devs am Tier-4-Client
 │   ├── GODOT-DEV-WITH-CLAUDE.md  # Workflow-Quick-Ref für KI-Agenten am Godot-Client
-│   ├── DEPLOY.md · DEV.md · maps.md · README.md
-├── godot-3d/                # Godot 4.6 Client (Tier-4)
-│   ├── project.godot        #   Mobile-Renderer + canvas_items stretch + MSAA 4x
-│   ├── scripts/             #   GDScripts (character, world, hud, …)
-│   ├── scenes/              #   .tscn-Files (mostly Root-Node + Script-Anhang)
-│   ├── assets/              #   KayKit + Kenney CC0 (siehe ASSET_LICENSE.md)
-│   └── maps/                #   Lokal-Kopien für Demo-Szenen ohne Backend
-├── scripts/                 # deploy.sh + perf_baseline.py + godot-check.sh
+│   ├── ASSET_SPEC.md        #   Asset-Pipeline-Konvention (Pivot/Polycount/Kinds)
+│   ├── HOWTO-{ROLE,SABOTAGE,MINIGAME}.md  # Code-Walks für die häufigsten Erweiterungen
+│   ├── maps.md · README.md
+├── scripts/                 # deploy.sh + perf_baseline.py + godot-check.sh + populate_*.py
 ├── .worktrees/              # Git-Worktrees (in .gitignore)
 └── merge_conflict_mayhem_project/  # historisches Design-Paket + externes Feedback
 ```
@@ -96,12 +126,12 @@
 uv run uvicorn app.main:app --reload
 
 # Backend tests
-uv run pytest                             # alle 471
+uv run pytest                             # ~714
 uv run pytest tests/test_sabotages.py     # einzelne Datei
 uv run pytest -k "personal_task"          # by name match
 
 # Frontend tests
-npx vitest run                            # alle 37 (happy-dom)
+npx vitest run                            # ~109 (happy-dom)
 npx vitest                                # watch mode
 
 # Lint + Format (Backend)
@@ -134,18 +164,17 @@ xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
 # Vollständiger Workflow-Guide: docs/GODOT-DEV-WITH-CLAUDE.md
 ```
 
-**Stand der Tests** (2026-04-27): **471 Backend** + **37 Frontend** grün.
+**Stand der Tests** (2026-04-28): **~714 Backend** + **~109 Frontend** grün.
 Wenn dein Patch das ändert, fix die Tests im selben Commit.
 
 ---
 
 ## 3. CI Gates (`.github/workflows/`)
 
-Sechs Jobs laufen parallel auf jedem Push/PR:
+Sieben Jobs laufen parallel auf jedem Push/PR:
 
 1. **`pytest (+ coverage gate)`** — `uv run pytest -q --cov=app/game --cov-fail-under=88`.
-   Muss grün sein. Coverage-Threshold ist Slice 6 von v1-Hardening; aktueller
-   Stand 92 % auf `app/game/`, 88 % als CI-Floor.
+   Muss grün sein. Aktueller Stand ~92 % auf `app/game/`, 88 % als CI-Floor.
 2. **`vitest`** — `npx vitest run`. Muss grün sein.
 3. **`ruff (lint + format)`** — `uv run ruff check .` + `uv run ruff format --check .`.
 4. **`mypy`** — `uv run mypy`. Läuft gegen `app/` (siehe `[tool.mypy]` in
@@ -155,7 +184,10 @@ Sechs Jobs laufen parallel auf jedem Push/PR:
 5. **`prettier`** — `npx --yes prettier@3.3.3 ...`. **Version-Pin ist kritisch** —
    Prettier 3.3 vs 4.0 formatieren Markdown-Tabellen unterschiedlich. Lokal
    wenn du Prettier hast, immer mit `prettier@3.3.3` aufrufen, sonst CI rot.
-6. **`deploy to EC2`** — läuft nur auf `main`-Push, _nachdem_ die anderen
+6. **`godot --check-only`** — `scripts/godot-check.sh`. Headless-Godot parsed
+   alle GDScripts in `godot-3d/scripts/`. Plus **`godot web-export`** baut
+   den Web-Export und mountet ihn im Test-Server.
+7. **`deploy to EC2`** — läuft nur auf `main`-Push, _nachdem_ die anderen
    Gates grün sind. Tarball + scp + ssh-restart auf `t4g.nano` in
    eu-central-1. Braucht GitHub-Secrets `EC2_SSH_KEY` und `EC2_HOST`.
 
@@ -196,17 +228,36 @@ Nach dem Deploy ist der neue Build live unter https://prod-is-lava.dev.
   `objectType` für Tier 2.7) · SabotagePanels · Vents · `warRoomId`.
 - Editor unter `/editor` produziert dasselbe JSON-Schema (siehe `docs/maps.md`).
 
-### Mini-Game-Framework (Tier 3)
+### Mini-Game-Framework (Tier 3 + 3.7)
 
 - Plugin-Pattern: `init_state(seed)` · `handle_input(state, action, params)` ·
   `is_complete(state)` · `public_view(state)`. Server-side
-  `app/game/minigames/`, Client-side `static/minigames/`. **Beide müssen
-  übereinstimmen** — der Server ist Master, Client darf nicht „cheaten".
-- Aktuell 5 Mechanik-Patterns: Sequencing, Pairing, Timing,
-  Filter-by-Criterion, Subset-by-Constraint.
-- 5 von 8 Tasks haben Mini-Games. Die anderen 3 (`review_pr`,
-  `calm_legacy_service`, `write_release_notes`) laufen über Hold-E (Tier 3.7
-  offen).
+  `app/game/minigames/`, Client-side `static/minigames/`, Godot-side
+  `godot-3d/scripts/minigames/`. **Alle drei müssen übereinstimmen** — der
+  Server ist Master, Client darf nicht „cheaten".
+- Mechanik-Patterns: Sequencing, Pairing, Timing, Filter-by-Criterion,
+  Subset-by-Constraint, Spot-the-Bug, Stability-Balance, Click-to-Cycle-Sort.
+- **Alle 8 Tasks haben Mini-Games** seit Tier 3.7.
+
+### AI-NPCs / LLM-Layer (Tier 3.9)
+
+- **`app/game/llm.py`** — `LLMClient` Protocol mit zwei Implementierungen:
+  - `AnthropicClient` (Default, wenn `ANTHROPIC_API_KEY` gesetzt) — Claude Haiku.
+  - `LocalOpenAIClient` (wenn `LLM_LOCAL_BASE_URL` + `LLM_LOCAL_MODEL` gesetzt)
+    — z. B. Ollama/Gemma 4. Auswahl per Env-Vars in dieser Reihenfolge.
+  - 3 s Timeout, urllib statt SDK, alle Exceptions zu `None` geschluckt.
+- **`app/game/bots/`** — AI-NPCs als Lobby-Filler:
+  - `manager.py` BotManager: Lifecycle, Tick, Stuck-Detection, Task-Blacklist.
+  - `pathfinding.py`: Room-Graph-BFS über Türen (kennt keine MapObjects —
+    siehe Stuck-Fix-Gotcha unten).
+  - `decision.py`: LLM-Intent-Picker via ThreadPool + reactive Overrides
+    (Body-Sighting → Report, Meeting → Vote-Heuristik).
+- **WS-Actions:** `add_bot` / `remove_bot` (host-only, lobby-only).
+  Wire-Field `Player.isBot=true` zeigt Bots im Frontend.
+- **Wichtig:** LLM-Call läuft im `ThreadPoolExecutor`, blockiert NIE den
+  asyncio-Tick. `maybe_consult_llm` submitted Future → fällt heuristisch
+  durch → reapt Result beim nächsten Call. Vorher-Bug: 3 s urllib-Timeout
+  fror den Tick für ALLE Räume ein. Siehe Tier 3.9.2.1 in der Roadmap.
 
 ---
 
@@ -393,6 +444,32 @@ Pydantic-Modelle entsprechend. `Player.coffee_energy: float`, room-level
 Owner. Wer ein zweites startet → `MINI_GAME_ALREADY_ACTIVE`-Error. Ist
 Absicht — die Modal-UI wäre sonst overlapped.
 
+### Bot-Pathfinder kennt keine MapObjects
+
+`bots/pathfinding.py` macht BFS über Räume + Türen, nicht über die ~390
+MapObjects pro Map. Wenn der Bot eine Task-Position pickt die hinter einem
+Desk liegt, läuft er auf Direktlinie los und kollidiert mit dem Möbelstück.
+**`_check_stuck` fängt das ab** — nach 1.5 s ohne Bewegung Intent verwerfen,
+Task für 8 s blacklisten. Wer den Bot-Code anfasst: stuck-handling NICHT
+ausbauen, sonst sind Bots wieder im Wand-Push-Loop.
+
+### LLM-Call MUSS im Thread-Pool bleiben
+
+`urllib.urlopen` ist sync — direkter Call aus dem `_tick_loop` blockiert
+ALLE Räume gleichzeitig. Aktuell läuft jeder LLM-Call via
+`BotManager._llm_executor.submit(...)`, das Result wird non-blocking per
+`Future.done()` geholt. Wenn jemand das wieder zurück baut, wiederholt sich
+der Live-Incident vom 2026-04-28: 3 s Anthropic-Timeout = 3 s Tick-Freeze
+für alle Spieler.
+
+### `kinds.json` ist Source of Truth, NICHT die Demo-Kopien
+
+`maps/kinds.json` (Backend) ist autoritativ. Godot-Client zieht via
+`/api/kinds` zur Laufzeit (`KindsLoader`), Browser-Frontend dito via
+`static/kinds.js`. Die Datei `godot-3d/maps/kinds.json` ist nur Offline-
+Fallback (wenn Server nicht erreichbar). **Niemals** Kinds direkt in der
+Demo-Kopie ändern — Drift garantiert.
+
 ---
 
 ## 8. WebSocket-Protocol-Quick-Ref
@@ -406,7 +483,8 @@ Andocken:
 `task_hold_stop` · `trigger_sabotage` · `repair_sabotage` · `use_vent` ·
 `trigger_takedown` · `report_body` · `call_emergency_meeting` · `cast_vote` ·
 `skip_vote` · `select_map` · `return_to_lobby` · `leave_room` · `abort_round` ·
-`mini_game_input` · `set_preferred_role` · `use_ability`
+`mini_game_input` · `set_preferred_role` · `use_ability` ·
+`add_bot` · `remove_bot` (host-only, Tier 3.9.2)
 
 ### Outgoing (Server → Client)
 
@@ -418,11 +496,12 @@ only) · `mini_game_completed` (Owner-only) · `error`
 ### Wichtige Felder im `game_state.payload`
 
 - `phase` (`lobby`/`playing`/`meeting`/`ended`)
-- `players[]` (per-Viewer gefiltert — Geister hidden für Lebende)
+- `players[]` mit `isBot` (per-Viewer gefiltert — Geister hidden für Lebende)
 - `tasks[]` mit `objectType`, `category`
 - `sabotages[]` mit `triggerObjectTypes`, `triggerAnchors`, `objectHint`
 - `meeting.context` (Reporter, Body, Recent-Events) während MEETING
 - `finalSummary` (Per-Player-Stats, Awards, Postmortem) während ENDED
+- `voting_result.lastWords` (AI-flavored Eliminations-Zitat, team-spezifischer Pool)
 
 ### Error-Codes (subset)
 
@@ -454,22 +533,25 @@ only) · `mini_game_completed` (Owner-only) · `error`
 
 ## 10. Doku-Index — wo was steht
 
-| Datei                                                                   | Was drin steht                                            |
-| ----------------------------------------------------------------------- | --------------------------------------------------------- |
-| `AGENTS.md`                                                             | DIESE DATEI — Agent-Onboarding                            |
-| `CLAUDE.md`                                                             | Claude-Code-spezifische Notizen, kürzer                   |
-| `README.md` (root)                                                      | Repo-Quickstart für Menschen                              |
-| `CONTRIBUTING.md` (root)                                                | Wie ein Mensch mitcodet                                   |
-| `docs/ROADMAP.md`                                                       | Tier 0–7 mit Status, Slice-IDs, Stand                     |
-| `docs/PROTOCOL.md`                                                      | Vollständiger WebSocket-Vertrag                           |
-| `docs/ARCHITECTURE.md`                                                  | Backend-High-Level + Performance                          |
-| `docs/GAME_OVERVIEW.md`                                                 | Shareable Markdown-Tour des Spiels                        |
-| `docs/maps.md`                                                          | Map-JSON-Schema                                           |
-| `docs/DEPLOY.md`                                                        | Deploy-Workflow + Secrets                                 |
-| `docs/DEV.md`                                                           | Lokale Entwicklung                                        |
-| `static/spielprinzip.html`                                              | Web-Variante der Game-Tour mit Screenshots                |
-| `merge_conflict_mayhem_project/merge_conflict_mayhem_gesamtfeedback.md` | Externes Brainstorming-Feedback (Tier 3.5/3.6/3.7-Quelle) |
-| `merge_conflict_mayhem_project/`                                        | Historisches Design-Paket — Inspiration, nicht aktuell    |
+| Datei                                    | Was drin steht                                                |
+| ---------------------------------------- | ------------------------------------------------------------- |
+| `AGENTS.md`                              | DIESE DATEI — Agent-Onboarding (Single Source of Truth)       |
+| `CLAUDE.md`                              | Pointer auf AGENTS + Claude-spezifische Erinnerungen          |
+| `README.md` (root)                       | Repo-Quickstart für Menschen                                  |
+| `CONTRIBUTING.md` (root)                 | Wie ein Mensch mitcodet                                       |
+| `docs/ROADMAP.md`                        | Tier 0–7 mit Status, Slice-IDs, Stand                         |
+| `docs/ARCHITECTURE.md`                   | Backend + Frontend-Layout, Tick-Loop, Performance             |
+| `docs/PROTOCOL.md`                       | Vollständiger WebSocket-Vertrag                               |
+| `docs/maps.md`                           | Map-JSON-Schema + MapObject-Kinds                             |
+| `docs/DEV.md`                            | Lokale Entwicklung, Worktrees, gh-CLI                         |
+| `docs/DEPLOY.md`                         | Deploy-Workflow, EC2, Caddy, LLM-Secrets                      |
+| `docs/GAME_OVERVIEW.md`                  | Shareable Markdown-Tour des Spiels                            |
+| `docs/GODOT_HANDOFF.md`                  | Onboarding für Godot-Devs am Tier-4-Client                    |
+| `docs/GODOT-DEV-WITH-CLAUDE.md`          | Workflow-Quick-Ref für KI-Agenten am Godot-Client             |
+| `docs/ASSET_SPEC.md`                     | Asset-Pipeline-Konvention (Pivot/Polycount/Kinds-Workflow)    |
+| `docs/HOWTO-{ROLE,SABOTAGE,MINIGAME}.md` | Code-Walks für die häufigsten Erweiterungen                   |
+| `static/spielprinzip.html`               | Web-Variante der Game-Tour mit Screenshots                    |
+| `merge_conflict_mayhem_project/`         | Historisches Design-Paket + externes Feedback — nicht aktuell |
 
 ---
 
@@ -499,18 +581,20 @@ only) · `mini_game_completed` (Owner-only) · `error`
 Wenn du diesen Repo zum ersten Mal anfasst, lauf:
 
 ```bash
-uv run pytest                # 471 grün?
-npx vitest run               # 37 grün?
+uv run pytest                # ~714 grün?
+npx vitest run               # ~109 grün?
 uv run ruff check .          # All checks passed?
+uv run mypy app/             # Success?
 npx --yes prettier@3.3.3 --check 'static/**/*.{js,css,html}' '*.md' 'docs/**/*.md' 'CONTRIBUTING.md' 'README.md'
                              # All matched files use Prettier code style?
 ```
 
-Wenn alle vier grün sind, bist du synchron. Sonst — _das_ zuerst fixen, nicht
+Wenn alle fünf grün sind, bist du synchron. Sonst — _das_ zuerst fixen, nicht
 einen Patch oben drauf.
 
 ---
 
-**Stand: 2026-04-27 · Tier 0–3.7 deployed · v8 chaos roles (Vibe Coder, Rogue
-Consultant, Shadow Admin) · 5 release roles · 8 Sabotagen object-bound · 5/8
-Tasks mit Mini-Game · Live: https://prod-is-lava.dev**
+**Stand: 2026-04-28 · Tier 0–3.8 deployed + 3.9.1/3.9.2 (LLM-Provider +
+AI-NPCs) live · 3 chaos roles (Vibe Coder, Rogue Consultant, Shadow Admin) ·
+5 release roles · 8 Sabotagen object-bound · 8/8 Tasks mit Mini-Game ·
+Godot-3D-Client (Tier 4) parallel · Live: https://prod-is-lava.dev**

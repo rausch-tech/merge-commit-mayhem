@@ -1302,9 +1302,9 @@ Empfohlene Reihenfolge:
 
 ## Kontakt + Stand
 
-- Sven Rausch ([sr@rausch.se](mailto:sr@rausch.se)) — Product/Architect.
-- Repo: https://github.com/rausch-tech/merge-commit-mayhem
-- Live: https://prod-is-lava.dev
+- **Repo:** https://github.com/rausch-tech/merge-commit-mayhem
+- **Live:** https://prod-is-lava.dev
+- **Fragen / Diskussion:** GitHub Issues mit Label `godot` oder `question`.
 - Stand dieser Doku: 2026-04-27, nach `slice/tier4-3d-demo`-Merge in
   main (Tier-4-Prototyp) und Editor-Slices 1–5 (Wand-Modell C +
   Editor-UX-Redesign abgeschlossen). Diese v2 ersetzt die v1

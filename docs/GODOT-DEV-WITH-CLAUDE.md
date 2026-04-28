@@ -84,7 +84,7 @@ Output landet in `/tmp/godot-shots/frame00000000.png … frameNNNNN.png`.
 ```bash
 rm -rf /tmp/godot-shots && mkdir -p /tmp/godot-shots && \
   timeout 30 xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
-    godot --path /home/sr/se/mcm/godot-3d \
+    godot --path $REPO/godot-3d \
     --rendering-driver opengl3 \
     --scene res://scenes/demo_world_followcam.tscn \
     --write-movie /tmp/godot-shots/frame.png \
@@ -168,7 +168,7 @@ ersten Editor-Start oder über `--import`. Diese Files sind **gitignored**
 **Nach Asset-Add:**
 
 ```bash
-godot --headless --path /home/sr/se/mcm/godot-3d --import
+godot --headless --path $REPO/godot-3d --import
 ```
 
 Erzeugt `.import`-Files + cached die Assets in `.godot/imported/`.

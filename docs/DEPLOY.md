@@ -103,6 +103,41 @@ cd /opt/mcm
 sudo systemctl restart mcm-server.service
 ```
 
+## LLM-Secrets (Tier 3.9)
+
+Die Bot-Manager und der `ai_flavor`-Layer können einen LLM-Provider nutzen
+(`AnthropicClient` oder lokales OpenAI-kompatibel). Die API-Keys liegen NICHT
+im Repo, sondern als systemd-EnvironmentFile auf der Instance:
+
+```
+/etc/mcm-server.env       # root-owned, 0600
+```
+
+Inhalt z. B.:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+# oder alternativ:
+LLM_LOCAL_BASE_URL=http://localhost:11434/v1
+LLM_LOCAL_MODEL=gemma3:4b
+```
+
+Im systemd-Unit (`/etc/systemd/system/mcm-server.service`) referenziert via:
+
+```
+EnvironmentFile=/etc/mcm-server.env
+```
+
+Rotation: Datei editieren + `sudo systemctl restart mcm-server`. Wenn keine
+Provider-Variable gesetzt ist, fallen Bots auf reine Heuristik zurück und
+`ai_flavor.generate_postmortem` nutzt Templates statt LLM. Spielfähig in
+beiden Fällen.
+
+**Recovery-Tip:** Wenn der LLM-Provider Probleme hat (Timeout-Storm, Rate-
+Limit), API-Key in `/etc/mcm-server.env` auskommentieren + Service-Restart.
+Bots sind sofort wieder responsive (heuristic-only mode). Siehe Tier 3.9.2.1
+in der Roadmap für den Live-Incident vom 2026-04-28.
+
 ## Caddyfile
 
 Aktuell:

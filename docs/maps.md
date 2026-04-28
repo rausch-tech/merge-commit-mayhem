@@ -170,15 +170,21 @@ map can use either system or mix them during migration.
 ### Kind catalogue
 
 **Source of truth: [`maps/kinds.json`](../maps/kinds.json).** Beim
-Hinzufuegen eines Kinds nur dort ergaenzen — Godot-Client (
-`godot-3d/scripts/map_builder.gd`) liest die Registry zur Laufzeit.
-Browser-Renderer (`static/render.js:MAP_OBJECT_STYLE`) und Editor-Palette
-(`static/editor/editor-kinds.js`) migrieren in einem Folge-Slice; bis
-dahin pflege diese drei Stellen weiterhin in Lockstep mit kinds.json.
-Auch der Server-side Pydantic-Validator (`app/game/game_map.py`) wird
-in einem Backend-Folge-Slice gegen kinds.json hardenen.
+Hinzufuegen eines Kinds **nur dort ergaenzen** — alle Konsumenten lesen die
+Registry zur Laufzeit:
 
-Die Tabelle unten ist eine human-readable Mirror der JSON-Registry:
+- **Backend-Validator** (`app/game/game_map.py`) — Pydantic `@field_validator`
+  auf `MapObject.kind` rejected unbekannte Kinds beim Map-Load.
+- **Browser-Frontend** (`static/kinds.js` + `static/render.js` via
+  `kindBrowser2d()`) — fetcht `/api/kinds` beim Boot.
+- **Editor-Palette** (`static/editor/editor-kinds.js`) — gleicher Fetch.
+- **3D-Editor-Vorschau** (`static/editor/editor-preview-3d.js`) — gleicher Fetch.
+- **Godot-3D-Client** (`godot-3d/scripts/kinds_loader.gd`) — `KindsLoader`
+  fetcht `/api/kinds`, fällt auf `res://maps/kinds.json` zurück wenn der
+  Backend offline ist.
+
+Drift-frei garantiert. Die Tabelle unten ist eine human-readable Mirror der
+JSON-Registry:
 
 | Kind                  | Default size | Blocks?  | Mockup region              | Browser colour        | KayKit asset (Godot)                        |
 | --------------------- | ------------ | -------- | -------------------------- | --------------------- | ------------------------------------------- |
@@ -208,11 +214,10 @@ Die Tabelle unten ist eine human-readable Mirror der JSON-Registry:
 | `crate`               | 70×70        | yes      | Legacy Basement            | `#78350f` rust        | Space Base/`cargo_A.fbx`                    |
 | `old_workstation`     | 110×60       | optional | Legacy Basement            | `#44403c` stone       | Furniture/`desk_decorated.fbx`              |
 
-Unknown kinds fall through to a neutral grey + the `kind` string itself
-as label. Browser-only smoke tests cover both palette hits and the
-fallback. See [`static/render.js`](../static/render.js) for the palette
-and [`static/editor/editor-tools.js`](../static/editor/editor-tools.js)
-for the placement tool's prompt.
+Unknown kinds **fail loud** — the Pydantic validator rejects them at
+map-load time with a clear error pointing to `maps/kinds.json`. So the
+palette below is exhaustive: every kind that's in a `maps/*.json` is
+listed here.
 
 ## Server behaviour
 
