@@ -1,0 +1,49 @@
+name: Feature Request
+description: Idee für eine neue Mechanik, Task, Sabotage, Rolle, Map oder Verbesserung
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke für die Idee. Größere Features werden meist erst diskutiert,
+        bevor jemand Code schreibt — das vermeidet Aufwand auf beiden Seiten.
+
+        Für Task-/Sabotage-Ideen kannst du auch das passende Label in
+        [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md) nutzen.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Motivation
+      description: Was lässt sich aktuell nicht gut lösen? Was ist die Spielerfahrung, die du dir wünschst?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Vorschlag
+      description: Skizze der Lösung. Welche Mechanik, welcher Trigger, welcher Effekt? Mockups oder Beispiele willkommen.
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - Neue Task (Mini-Game)
+        - Neue Sabotage
+        - Neue Rolle
+        - Neue Map
+        - Frontend (Browser)
+        - Frontend (Godot-3D)
+        - Backend / Spielmechanik
+        - Doku
+        - CI / Tooling
+        - Sonstiges
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativen / Risiken
+      description: Was hast du sonst überlegt? Welche Trade-offs siehst du?

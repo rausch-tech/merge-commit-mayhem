@@ -1,6 +1,11 @@
 # Contributing
 
-Hi — Merge Conflict Mayhem ist ein internes Multiplayer-Game für Tech-Teams, in aktiver Entwicklung. Beiträge sind willkommen.
+Hi — Merge Conflict Mayhem ist ein Multiplayer-Game für Tech-Teams, in aktiver Entwicklung. Beiträge sind willkommen.
+
+Bevor du loslegst:
+
+- Du solltest mit dem [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) einverstanden sein.
+- Sicherheitslücken bitte **nicht** als public Issue, sondern privat über [`SECURITY.md`](SECURITY.md).
 
 ## Vor dem ersten PR
 

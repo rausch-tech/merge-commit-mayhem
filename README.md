@@ -52,6 +52,8 @@ npx vitest run         # ~109 Frontend-Tests
 - [`docs/maps.md`](docs/maps.md) — Map-JSON-Schema + MapObject-Kinds
 - [`docs/GODOT_HANDOFF.md`](docs/GODOT_HANDOFF.md) — Onboarding für Godot-Entwickler:innen
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — wie du beitragen kannst
+- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — Verhaltensregeln im Projekt
+- [`SECURITY.md`](SECURITY.md) — Sicherheitslücken privat melden
 
 ## Lizenz
 
