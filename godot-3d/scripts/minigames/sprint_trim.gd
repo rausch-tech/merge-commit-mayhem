@@ -14,7 +14,7 @@ extends Control
 const COLOR_TEXT: Color = Color(0.95, 0.97, 0.99)
 const COLOR_TEXT_DIM: Color = Color(0.62, 0.70, 0.78)
 const COLOR_ACCENT: Color = Color(0.30, 0.95, 0.55)
-const COLOR_DANGER: Color = Color(0.95, 0.40, 0.40)
+const COLOR_DANGER: Color = Color(0.95, 0.35, 0.35)
 const COLOR_TICKET_BG: Color = Color(0.14, 0.17, 0.22, 1.0)
 const COLOR_TICKET_REMOVED: Color = Color(0.10, 0.12, 0.16, 1.0)
 const COLOR_TICKET_PRIORITY: Color = Color(0.30, 0.10, 0.10, 1.0)

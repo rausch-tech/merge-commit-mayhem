@@ -17,7 +17,7 @@ extends Control
 const COLOR_TEXT: Color = Color(0.95, 0.97, 0.99)
 const COLOR_TEXT_DIM: Color = Color(0.62, 0.70, 0.78)
 const COLOR_ACCENT: Color = Color(0.30, 0.95, 0.55)
-const COLOR_DANGER: Color = Color(0.95, 0.40, 0.40)
+const COLOR_DANGER: Color = Color(0.95, 0.35, 0.35)
 const COLOR_BAR_BG: Color = Color(0.06, 0.08, 0.12)
 const COLOR_GREEN_BAND: Color = Color(0.30, 0.85, 0.45, 0.30)
 const COLOR_FILL: Color = Color(0.45, 0.65, 0.95)

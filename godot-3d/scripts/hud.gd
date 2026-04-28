@@ -122,7 +122,6 @@ var _kill_flash_tween: Tween
 # Phase-Transition-Banner (4.11/Demo) — kurzer Mid-Screen-Text beim Wechsel.
 var _phase_banner_label: Label
 var _phase_banner_tween: Tween
-var _last_phase_for_banner: String = ""
 # Confetti-Particles auf dem Endscreen (4.11/Demo) — CPUParticles2D.
 var _confetti: CPUParticles2D
 
@@ -1337,14 +1336,17 @@ func _update_meeting_modal(meeting_data: Variant, remaining_seconds: int) -> voi
 	var fresh_ids: Array = ["__skip__"]
 	for a in alive:
 		fresh_ids.append(str(a.get("id", "")))
-	if existing_ids != fresh_ids or _voting_already_cast:
+	# Buttons nur rebuilden wenn die alive-Liste sich geaendert hat — sonst
+	# flackert der Modal auf jedem 1 Hz Meeting-Tick. Disabled-State
+	# (nach Vote oder Self-Vote) wird unten via Iteration gesetzt, ohne
+	# Rebuild.
+	if existing_ids != fresh_ids:
 		for c in _meeting_vote_box.get_children():
 			c.queue_free()
 		var skip_btn := Button.new()
 		skip_btn.text = "Skip"
 		skip_btn.set_meta("vote_id", "__skip__")
 		skip_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		skip_btn.disabled = _voting_already_cast
 		skip_btn.pressed.connect(func(): _on_vote_pressed(""))
 		_meeting_vote_box.add_child(skip_btn)
 		for a in alive:
@@ -1354,9 +1356,18 @@ func _update_meeting_modal(meeting_data: Variant, remaining_seconds: int) -> voi
 			btn.text = pname
 			btn.set_meta("vote_id", pid)
 			btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			btn.disabled = _voting_already_cast or pid == _player_id
 			btn.pressed.connect(func(): _on_vote_pressed(pid))
 			_meeting_vote_box.add_child(btn)
+	# Disabled-State pro Tick refreshen — nach _voting_already_cast oder Self.
+	for c in _meeting_vote_box.get_children():
+		if not (c is Button):
+			continue
+		var btn: Button = c
+		var meta_id := str(btn.get_meta("vote_id"))
+		if meta_id == "__skip__":
+			btn.disabled = _voting_already_cast
+		else:
+			btn.disabled = _voting_already_cast or meta_id == _player_id
 
 
 func _on_vote_pressed(target_id: String) -> void:

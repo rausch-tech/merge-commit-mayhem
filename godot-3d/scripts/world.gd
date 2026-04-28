@@ -75,6 +75,12 @@ var _last_state: Dictionary = {}
 var _shake_amount: float = 0.0
 const SHAKE_DECAY: float = 5.0
 const SHAKE_MAX_OFFSET: float = 0.06
+# Tier 4.10: Reichweiten + Detection-Thresholds, alle in world-units.
+const VENT_INTERACTION_RADIUS_PX: float = 50.0
+# Schwelle ab der ein Position-Sprung als Vent-Teleport gewertet wird —
+# bei 20 Hz Tick + 300 px/s Speed bewegen wir uns max ~15 px/Tick, also ist
+# alles ueber ~100 px ein klarer Teleport. 2.0 world-units = 200 server-px.
+const LOCAL_TELEPORT_DISTANCE_WORLD: float = 2.0
 var _sting_player: AudioStreamPlayer
 var _last_phase: String = ""
 var _alive_state: Dictionary = {}  # pid → bool, tracks transitions for kill sting
@@ -451,14 +457,11 @@ func _on_hud_report_pressed(body_id: String) -> void:
 func _on_hud_vent_pressed(vent_id: String) -> void:
 	# Tier 4.10: Chaos teleportiert sich an einen connected Vent. Server
 	# entscheidet welchen aus connectedTo (cycle) — wir senden nur unser
-	# aktuelles Vent.
+	# aktuelles Vent. VFX (Flash + Sting) erst wenn Server-Echo den
+	# Position-Sprung bestaetigt (siehe _detect_local_teleport in
+	# _apply_state). Wir tickern hier nur den Send.
 	if ws_client != null and vent_id != "":
 		ws_client.send(Protocol.TYPE_USE_VENT, {"targetVentId": vent_id})
-		# Lokaler VFX-Trigger — visuelles Feedback dass die Action ankam.
-		# Server-Echo (neuer Position) folgt im naechsten Tick (~50 ms).
-		if _hud != null and _hud.has_method("trigger_vent_flash"):
-			_hud.call("trigger_vent_flash")
-		_play_sting(STING_TASK_COMPLETE)
 
 
 func _update_proximity_actions() -> void:
@@ -482,7 +485,7 @@ func _update_proximity_actions() -> void:
 	var local: Node3D = _players_by_id[player_id]
 	var local_pos: Vector3 = local.global_position
 	var radius_world: float = Protocol.TASK_INTERACTION_RADIUS * Protocol.WORLD_SCALE
-	var vent_radius_world: float = 50.0 * Protocol.WORLD_SCALE
+	var vent_radius_world: float = VENT_INTERACTION_RADIUS_PX * Protocol.WORLD_SCALE
 	var radius_sq: float = radius_world * radius_world
 	var vent_radius_sq: float = vent_radius_world * vent_radius_world
 
@@ -624,6 +627,7 @@ func _local_in_war_room() -> bool:
 
 
 var _reconnect_attempts: int = 0
+var _player_intentionally_left: bool = false
 const MAX_RECONNECT_ATTEMPTS: int = 3
 const RECONNECT_DELAY_SEC: float = 2.0
 
@@ -659,13 +663,14 @@ func _on_disconnected() -> void:
 		_return_to_main()
 		return
 	await get_tree().create_timer(RECONNECT_DELAY_SEC).timeout
+	# Nach dem Sleep nochmal pruefen — Player kann in der Wartezeit Leave
+	# gedrueckt haben. Wenn ja, sauber zur Main wechseln statt im
+	# eingefrorenen World-Screen haengen zu bleiben.
 	if _player_intentionally_left:
+		_return_to_main()
 		return
 	ws_client.connected.connect(_on_reconnected, CONNECT_ONE_SHOT)
 	ws_client.connect_to_server(url)
-
-
-var _player_intentionally_left: bool = false
 
 
 func _on_reconnected() -> void:
@@ -684,14 +689,18 @@ func _apply_state(state: Dictionary) -> void:
 		if phase == Protocol.PHASE_MEETING and _last_phase != "":
 			_play_sting(STING_MEETING)
 		_last_phase = phase
-	if phase == Protocol.PHASE_ENDED:
-		_return_to_main()
-		return
+	# Tier 4.9: phase=ended bleibt in der World-Scene haengen, damit das HUD
+	# `finalSummary` sieht und den Endscreen-Modal zeigen kann. Rueckweg zur
+	# Lobby laeuft ueber TYPE_LOBBY_STATE (vom Server nach Host-Action) oder
+	# den "Zurueck zur Lobby"-Button (return_to_lobby_pressed-Signal). Frueher
+	# rief diese Funktion `_return_to_main()` direkt — dann sah man nie
+	# Awards/Postmortem.
 
 	# Players
 	var seen_ids: Dictionary = {}
 	var players_array: Array = state.get("players", [])
 	var any_kill: bool = false
+	var local_teleport: bool = false
 	for p in players_array:
 		var pid := str(p.get("id", ""))
 		if pid == "":
@@ -706,6 +715,15 @@ func _apply_state(state: Dictionary) -> void:
 		if _alive_state.has(pid) and _alive_state[pid] and not is_alive:
 			any_kill = true
 		_alive_state[pid] = is_alive
+		# Tier 4.10: Vent-Teleport-Detection fuer den lokalen Player. Server-
+		# Position springt > LOCAL_TELEPORT_DISTANCE_PX (server-pixel) wenn ein
+		# Vent akzeptiert wurde. Threshold > max physische Tick-Bewegung
+		# (~15 px), aber unter typischer Vent-Distanz (~1000 px).
+		if pid == player_id and _players_by_id.has(pid):
+			var prev_pos: Vector3 = (_players_by_id[pid] as Node3D).global_position
+			var new_pos: Vector3 = Protocol.server_to_world(x, y)
+			if (new_pos - prev_pos).length() > LOCAL_TELEPORT_DISTANCE_WORLD:
+				local_teleport = true
 		if _players_by_id.has(pid):
 			var existing: Node3D = _players_by_id[pid]
 			existing.call("set_player_data", name_str, color_hex, is_alive)
@@ -733,6 +751,14 @@ func _apply_state(state: Dictionary) -> void:
 		if _hud != null and _hud.has_method("trigger_kill_flash"):
 			_hud.call("trigger_kill_flash")
 		_shake_amount = 1.0
+
+	# Tier 4.10: Vent-VFX wenn Server unsere Position gerade teleportiert hat
+	# (= Use-Vent wurde akzeptiert). Sicherstellen dass wir die VFX nur einmal
+	# pro Teleport zeigen — Position-Sprung ist auf einen einzelnen Tick beschraenkt.
+	if local_teleport:
+		if _hud != null and _hud.has_method("trigger_vent_flash"):
+			_hud.call("trigger_vent_flash")
+		_play_sting(STING_TASK_COMPLETE)
 
 	# Tasks-By-Id refresh (fuer Proximity-Check + Hold-Progress).
 	_tasks_by_id.clear()

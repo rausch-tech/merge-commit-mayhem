@@ -19,7 +19,7 @@ const COLOR_ACCENT: Color = Color(0.30, 0.95, 0.55)
 const COLOR_LINE_BG: Color = Color(0.10, 0.12, 0.16, 1.0)
 const COLOR_CAT_FEATURE: Color = Color(0.30, 0.85, 0.45)
 const COLOR_CAT_BUGFIX: Color = Color(0.45, 0.65, 0.95)
-const COLOR_CAT_BREAKING: Color = Color(0.95, 0.40, 0.40)
+const COLOR_CAT_BREAKING: Color = Color(0.95, 0.35, 0.35)
 const COLOR_CAT_NOPROD: Color = Color(0.95, 0.70, 0.30)
 const COLOR_CAT_UNASSIGNED: Color = Color(0.40, 0.40, 0.45)
 
