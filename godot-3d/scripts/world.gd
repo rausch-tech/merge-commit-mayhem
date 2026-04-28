@@ -72,6 +72,18 @@ func _ready() -> void:
 		return
 
 	print("[world] _ready map=", map_data.get("name", "?"), " rooms=", map_data.get("rooms", []).size())
+	# Tier 3.9 Option C: kinds-Registry vom Backend fetchen bevor wir die Welt
+	# bauen. KindsLoader faellt auf res://maps/kinds.json zurueck wenn der
+	# Server nicht antwortet — Game-Render bleibt funktional, nur Drift-anfaellig.
+	# Ueberspringen wenn Registry schon geladen ist (z. B. von einem frueheren
+	# Lobby-Wechsel oder Demo-Pfad).
+	if not MapBuilder.is_kinds_loaded():
+		var loader := KindsLoader.new()
+		add_child(loader)
+		var http_base: String = ws_client.http_base_url() if ws_client.has_method("http_base_url") else ""
+		var ok: bool = await loader.fetch_kinds(http_base)
+		print("[world] kinds registry loaded (http=%s, source=%s)" % [http_base, "http" if ok and http_base != "" else "fallback"])
+		loader.queue_free()
 	_world_root = MapBuilder.build(map_data)
 	print("[world] map built, child count=", _world_root.get_child_count())
 	add_child(_world_root)

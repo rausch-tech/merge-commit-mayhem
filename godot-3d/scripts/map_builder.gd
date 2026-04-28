@@ -23,20 +23,36 @@ const FLOOR_THICKNESS: float = 0.05
 const WORLD_SCALE: float = Protocol.WORLD_SCALE
 
 # Kind-Registry — single source of truth fuer alle MapObject-Kinds. Wird
-# beim ersten Build-Aufruf einmal aus res://maps/kinds.json geparsed und
-# anschliessend gecached. Konsumenten: KIND_ASSETS (siehe _get_asset_for_kind),
-# kuenftig auch das Browser-Frontend + der Map-Editor (eigene Slices).
+# normalerweise vom Backend ueber /api/kinds gefetcht (KindsLoader im world.gd
+# vor MapBuilder.build) und mit set_kinds_from_dict() injected. Wenn der
+# Server nicht erreichbar ist, faellt _load_kinds_registry als letzter
+# Notnagel auf res://maps/kinds.json zurueck — die Demo-Kopie unter
+# godot-3d/maps/ ist drift-anfaellig aber „besser als nichts".
 #
 # Schema: { "<kind>": { "godot_asset": "res://...gltf" | null, "default_size":
 # [w, h], "blocks_movement": bool, "browser_2d": {...}, "kaykit_source": ... } }
 #
-# Wenn ein neues Asset registriert wird: nur in maps/kinds.json eintragen, und
-# die zwei Demo-Kopien godot-3d/maps/kinds.json + (irgendwann) den Sync-Hook
-# aktualisieren. Hier im GDScript ist nichts mehr zu pflegen.
+# Source of truth lebt in maps/kinds.json (Backend). Drift gefaehrdet jeden
+# Konsumenten — Tier 3.9 Option C macht den Server zur einzigen Wahrheit.
 const KINDS_REGISTRY_PATH: String = "res://maps/kinds.json"
 
 static var _kinds_registry: Dictionary = {}
 static var _kinds_registry_loaded: bool = false
+
+# Public: Kinds-Daten (vom HTTP-Fetch oder Test-Code) reinreichen. Ueberschreibt
+# die Registry komplett und markiert sie als geladen, damit _load_kinds_registry
+# den Filesystem-Pfad ueberspringt.
+static func set_kinds_from_dict(parsed: Dictionary) -> void:
+	_kinds_registry.clear()
+	for key in parsed.keys():
+		# _meta-Block ueberspringen — nur echte Kind-Entries cachen.
+		if str(key).begins_with("_"):
+			continue
+		_kinds_registry[str(key)] = parsed[key]
+	_kinds_registry_loaded = true
+
+static func is_kinds_loaded() -> bool:
+	return _kinds_registry_loaded
 
 # Fallback-Box-Farbe + Höhe für Kinds ohne Asset. Höhe ist absichtlich klein
 # damit er nicht visuell mit Wänden konkurriert.
@@ -596,22 +612,24 @@ static func _get_asset_for_kind(kind: String) -> PackedScene:
 	return null
 
 static func _load_kinds_registry() -> void:
+	# Lazy-Load aus res://maps/kinds.json. Wird nur erreicht wenn KindsLoader
+	# nicht vor MapBuilder.build() gelaufen ist (z. B. Demo-Mode ohne Server)
+	# oder der HTTP-Fetch fehlgeschlagen ist und KindsLoader auch keinen
+	# Filesystem-Fallback gefunden hat. Im echten Game-Flow ist die Registry
+	# beim Build-Aufruf bereits via set_kinds_from_dict() befuellt.
 	if _kinds_registry_loaded:
 		return
-	_kinds_registry_loaded = true
 	if not FileAccess.file_exists(KINDS_REGISTRY_PATH):
 		push_warning("MapBuilder: kinds registry not found at %s — every kind falls back to gray box." % KINDS_REGISTRY_PATH)
+		_kinds_registry_loaded = true
 		return
 	var file := FileAccess.open(KINDS_REGISTRY_PATH, FileAccess.READ)
 	var parsed = JSON.parse_string(file.get_as_text())
 	if typeof(parsed) != TYPE_DICTIONARY:
 		push_warning("MapBuilder: kinds registry parse failed at %s." % KINDS_REGISTRY_PATH)
+		_kinds_registry_loaded = true
 		return
-	# _meta-Block ueberspringen, nur echte Kind-Entries cachen.
-	for key in parsed.keys():
-		if str(key).begins_with("_"):
-			continue
-		_kinds_registry[str(key)] = parsed[key]
+	set_kinds_from_dict(parsed)
 
 # Fallback-Visual für Kinds ohne registriertes Asset: graue Box mit Kind-Label.
 # Bewusst hässlich, damit man auf einen Blick sieht, welche Assets noch

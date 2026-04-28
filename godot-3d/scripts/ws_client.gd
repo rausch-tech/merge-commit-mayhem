@@ -13,7 +13,14 @@ var _socket: WebSocketPeer = WebSocketPeer.new()
 var _state: int = WebSocketPeer.STATE_CLOSED
 var _previous_state: int = WebSocketPeer.STATE_CLOSED
 
+# Letzte URL die wir connect_to_server() uebergeben haben. Wird vom World-Loader
+# gelesen um die HTTP-Base (fuer /api/kinds, /api/maps/<id>) abzuleiten — gleicher
+# Host wie die WS-Verbindung, damit Lokal-Dev und Production beide automatisch
+# stimmen ohne extra Config.
+var connected_url: String = ""
+
 func connect_to_server(url: String) -> void:
+	connected_url = url
 	if _state != WebSocketPeer.STATE_CLOSED:
 		_socket.close()
 		# Force a fresh peer; the old socket might be in a half-open state.
@@ -23,6 +30,27 @@ func connect_to_server(url: String) -> void:
 	var err := _socket.connect_to_url(url)
 	if err != OK:
 		connection_error.emit("connect_to_url returned error %d" % err)
+
+# Convert connected_url ("ws[s]://host[/path]") into the matching HTTP base
+# ("http[s]://host"). Returns "" if we never connected. Used by KindsLoader to
+# fetch /api/kinds + /api/maps/<id> from the same backend the WS talks to.
+func http_base_url() -> String:
+	if connected_url == "":
+		return ""
+	var u := connected_url
+	var scheme := ""
+	if u.begins_with("wss://"):
+		scheme = "https://"
+		u = u.substr(6)
+	elif u.begins_with("ws://"):
+		scheme = "http://"
+		u = u.substr(5)
+	else:
+		return ""
+	var slash := u.find("/")
+	if slash >= 0:
+		u = u.substr(0, slash)
+	return scheme + u
 
 func send(type_: String, payload: Dictionary = {}) -> void:
 	if _state != WebSocketPeer.STATE_OPEN:
