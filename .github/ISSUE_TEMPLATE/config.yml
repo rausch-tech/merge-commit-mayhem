@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Sicherheitslücke melden
+    url: https://github.com/rausch-tech/merge-commit-mayhem/security/advisories/new
+    about: Bitte private Vulnerability-Reports nutzen — siehe SECURITY.md
+  - name: Roadmap
+    url: https://github.com/rausch-tech/merge-commit-mayhem/blob/main/docs/ROADMAP.md
+    about: Was geplant ist und wann
+  - name: Doku & Architektur
+    url: https://github.com/rausch-tech/merge-commit-mayhem/blob/main/AGENTS.md
+    about: Stack, Commands, Conventions, Gotchas

@@ -1,0 +1,59 @@
+name: Bug Report
+description: Etwas funktioniert nicht wie erwartet
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke für den Report. Bitte fülle die Felder aus, damit wir das
+        Problem schnell reproduzieren und einordnen können.
+
+        **Sicherheitsprobleme bitte nicht hier melden** — siehe
+        [SECURITY.md](../blob/main/SECURITY.md).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Was ist passiert?
+      description: Was hast du gesehen, was sollte stattdessen passieren?
+      placeholder: |
+        Erwartet: ...
+        Beobachtet: ...
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduktionsschritte
+      description: So genau wie möglich. Browser/Godot, Map, Spielerzahl, Aktion.
+      placeholder: |
+        1. Lobby mit 4 Spielern + 2 Bots, Map office_complex
+        2. Host startet Runde
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: Client
+      options:
+        - Browser (live, prod-is-lava.dev)
+        - Browser (lokal)
+        - Godot-3D (web export)
+        - Godot-3D (Editor)
+        - Backend / Server
+        - Sonstiges (im Body beschreiben)
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Git-Commit oder Datum
+      description: Wenn lokal — `git rev-parse HEAD`. Sonst Datum/Uhrzeit der Live-Session.
+      placeholder: "z. B. 0c39ecf oder 2026-04-28 19:30 CET"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Screenshots
+      description: Server-Log-Auszug, Browser-Console, Godot-Output. Code in ```Backticks```.
+      render: text
