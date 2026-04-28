@@ -25,6 +25,7 @@ task progress bar runs to full and then resets).
 
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import random
 import uuid
@@ -127,6 +128,16 @@ class BotManager:
         # Optional LLM. When None, the heuristic picker is the only
         # intent source. Wired in by main.py at startup via set_llm().
         self._llm: LLMClient | None = None
+        # Thread pool for the LLM-call offload. Tier 3.9.2.1 fix: the
+        # urllib-based LLMClient is sync, and a 3 s Anthropic timeout
+        # used to freeze the entire async tick loop. Now we submit() the
+        # call to this pool and the per-bot tick polls the Future
+        # without ever blocking. 4 workers is enough headroom for 8
+        # bots × 5 s cooldown on a single room, and the executor is
+        # started lazily on first use so empty rooms cost nothing.
+        self._llm_executor: concurrent.futures.ThreadPoolExecutor = (
+            concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="bot-llm")
+        )
         # Parallel dict for the decision layer's per-bot state. Lazy
         # imported in tick() to avoid the circular import at module load.
         self._decisions: dict[str, DecisionState] = {}

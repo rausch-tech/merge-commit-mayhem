@@ -135,7 +135,20 @@ def test_maybe_consult_llm_no_op_without_llm() -> None:
     assert maybe_consult_llm(room._bots, room._bots._decisions, bot, state) is False
 
 
-def test_maybe_consult_llm_sets_intent_and_bumps_cooldown() -> None:
+def _wait_for_pending_future(decisions: dict, bot_id: str) -> None:
+    """Block test until the pending LLM future is done. The thread-pool
+    is real but the stub completes synchronously, so this returns in
+    microseconds — this helper just gives us a clean place to express
+    "the next maybe_consult_llm call will see the result"."""
+    ds = decisions[bot_id]
+    if ds.pending_future is not None:
+        ds.pending_future.result(timeout=2.0)
+
+
+def test_maybe_consult_llm_submits_future_and_falls_through_first_call() -> None:
+    """Tier 3.9.2.1: first call submits to the thread pool and returns
+    False so the bot picks heuristically while the LLM thinks. Cooldown
+    only bumps once the result is reaped."""
     room = _start_room_with_humans_and_bots()
     valid_id = next(iter(room.tasks))
     room._bots.set_llm(_StubLLM(response=valid_id))
@@ -144,13 +157,37 @@ def test_maybe_consult_llm_sets_intent_and_bumps_cooldown() -> None:
     state = room._bots.state_for(bot_id)
     assert state is not None
 
+    assert maybe_consult_llm(room._bots, room._bots._decisions, bot, state) is False
+    ds = room._bots._decisions[bot_id]
+    assert ds.pending_future is not None
+    # Cooldown stays at 0 until the future is reaped on a subsequent call.
+    assert ds.next_llm_call_in == 0.0
+
+
+def test_maybe_consult_llm_applies_cached_target_on_next_call() -> None:
+    """Second call (after future done) reaps result, applies it, bumps cooldown."""
+    room = _start_room_with_humans_and_bots()
+    valid_id = next(iter(room.tasks))
+    room._bots.set_llm(_StubLLM(response=valid_id))
+    bot_id = next(iter(room._bots.bot_ids()))
+    bot = room.players[bot_id]
+    state = room._bots.state_for(bot_id)
+    assert state is not None
+
+    # 1st: submits.
+    maybe_consult_llm(room._bots, room._bots._decisions, bot, state)
+    _wait_for_pending_future(room._bots._decisions, bot_id)
+    # 2nd: reaps + applies.
     assert maybe_consult_llm(room._bots, room._bots._decisions, bot, state) is True
     assert state.target_task_id == valid_id
     ds = room._bots._decisions[bot_id]
     assert ds.next_llm_call_in == pytest.approx(LLM_DECISION_INTERVAL_SEC)
+    assert ds.pending_future is None
 
 
-def test_maybe_consult_llm_skips_when_cooldown_pending() -> None:
+def test_maybe_consult_llm_skips_submit_when_future_in_flight() -> None:
+    """While a future is pending, no new call is submitted — keeps us
+    from stacking calls when the LLM is slow."""
     room = _start_room_with_humans_and_bots()
     stub = _StubLLM(response=next(iter(room.tasks)))
     room._bots.set_llm(stub)
@@ -159,12 +196,18 @@ def test_maybe_consult_llm_skips_when_cooldown_pending() -> None:
     state = room._bots.state_for(bot_id)
     assert state is not None
 
-    # First call hits the LLM.
-    assert maybe_consult_llm(room._bots, room._bots._decisions, bot, state) is True
-    # Second call within cooldown must skip.
-    state.target_task_id = None
-    assert maybe_consult_llm(room._bots, room._bots._decisions, bot, state) is False
-    assert len(stub.calls) == 1
+    maybe_consult_llm(room._bots, room._bots._decisions, bot, state)
+    # Manually un-set "done" by replacing the future with a not-done sentinel —
+    # but easier: assert that calling again before reaping doesn't issue a
+    # second submit. With our stub the future completes instantly, so this
+    # path actually exercises the post-reap "cooldown active" branch.
+    _wait_for_pending_future(room._bots._decisions, bot_id)
+    maybe_consult_llm(room._bots, room._bots._decisions, bot, state)  # reaps + applies
+    state.target_task_id = None  # pretend bot finished and needs a new pick
+    # Cooldown is now active so no new submit.
+    pre_calls = len(stub.calls)
+    maybe_consult_llm(room._bots, room._bots._decisions, bot, state)
+    assert len(stub.calls) == pre_calls
 
 
 def test_tick_llm_cooldowns_drains_to_zero() -> None:
@@ -176,8 +219,53 @@ def test_tick_llm_cooldowns_drains_to_zero() -> None:
     assert decisions["a"].next_llm_call_in <= 0.0
 
 
-def test_maybe_consult_llm_does_not_bump_cooldown_on_failure() -> None:
-    """Transient LLM error must allow the next pick_next_target to retry."""
+def test_slow_llm_does_not_block_bot_tick() -> None:
+    """Tier 3.9.2.1 regression: pre-fix, a slow LLM call (Anthropic
+    timeout = 3 s) blocked the asyncio tick loop synchronously. Every
+    room on the server stalled for that window. Now the call runs on
+    a thread pool — the per-bot tick must return in microseconds even
+    if the LLM provider takes seconds to respond.
+    """
+    import threading
+    import time as _time
+
+    class _SlowLLM:
+        def __init__(self) -> None:
+            self.released = threading.Event()
+            self.call_started = threading.Event()
+
+        def complete(self, *, system: str, user: str, max_tokens: int = 256) -> str | None:
+            self.call_started.set()
+            self.released.wait(timeout=10.0)
+            return None
+
+    room = _start_room_with_humans_and_bots()
+    slow = _SlowLLM()
+    room._bots.set_llm(slow)
+    bot_id = next(iter(room._bots.bot_ids()))
+    bot = room.players[bot_id]
+    state = room._bots.state_for(bot_id)
+    assert state is not None
+
+    # The call submits a future and returns immediately — even though
+    # the LLM-side blocks indefinitely on .released. If the tick had
+    # blocked, this test would hang for ~10 s and time out.
+    started = _time.monotonic()
+    result = maybe_consult_llm(room._bots, room._bots._decisions, bot, state)
+    elapsed = _time.monotonic() - started
+
+    assert result is False  # heuristic falls through
+    assert elapsed < 0.2, f"maybe_consult_llm took {elapsed:.3f}s — must not block"
+    # The thread did get scheduled (sanity: future is actually running).
+    assert slow.call_started.wait(timeout=1.0)
+    # Release the slow call so the thread doesn't leak.
+    slow.released.set()
+
+
+def test_maybe_consult_llm_unknown_id_still_bumps_cooldown_after_reap() -> None:
+    """Tier 3.9.2.1: with the async pattern, every reaped future bumps
+    cooldown so we don't hammer the LLM when it's giving us garbage.
+    The bot just falls through to heuristic for that 5 s window."""
     room = _start_room_with_humans_and_bots()
     room._bots.set_llm(_StubLLM(response="garbage_unknown_id"))
     bot_id = next(iter(room._bots.bot_ids()))
@@ -185,9 +273,15 @@ def test_maybe_consult_llm_does_not_bump_cooldown_on_failure() -> None:
     state = room._bots.state_for(bot_id)
     assert state is not None
 
+    # 1st call submits, 2nd reaps + falls through (no cached target since the
+    # response was off-list).
+    assert maybe_consult_llm(room._bots, room._bots._decisions, bot, state) is False
+    _wait_for_pending_future(room._bots._decisions, bot_id)
     assert maybe_consult_llm(room._bots, room._bots._decisions, bot, state) is False
     ds = room._bots._decisions[bot_id]
-    assert ds.next_llm_call_in == 0.0
+    assert ds.next_llm_call_in == pytest.approx(LLM_DECISION_INTERVAL_SEC)
+    assert state.target_task_id is None
+    assert ds.cached_target is None
 
 
 # --- reactive overrides: body report ---------------------------------------

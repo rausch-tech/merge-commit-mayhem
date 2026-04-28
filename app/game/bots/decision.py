@@ -24,9 +24,10 @@ The split is deliberate: high-level intent benefits from LLM "vibes"
 
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from app.game.llm import LLMClient
@@ -68,29 +69,35 @@ _SYSTEM_PROMPT: str = (
 @dataclass
 class DecisionState:
     """Per-bot decision-layer scratch state. Held alongside BotState in
-    the manager via a parallel dict keyed by player_id."""
+    the manager via a parallel dict keyed by player_id.
+
+    `pending_future` holds an in-flight LLM call running on the bot
+    manager's thread pool — kept here so the per-bot tick can poll its
+    completion non-blockingly. `cached_target` is the parsed result of
+    the most recent completed call, ready for the next `_tick_one` to
+    apply as the bot's intent.
+    """
 
     next_llm_call_in: float = 0.0
+    pending_future: concurrent.futures.Future[str | None] | None = None
+    pending_task_ids: frozenset[str] = field(default_factory=frozenset)
+    cached_target: str | None = None
     pending_vote_in: float | None = None  # None when not waiting to vote
     voted_for: str | None = None  # so we don't re-vote on phase flicker
 
 
-def llm_pick_target(
-    client: LLMClient,
+def build_llm_prompt(
     room: GameRoom,
     bot: Player,
     blacklist: dict[str, float] | None = None,
-) -> str | None:
-    """Ask the LLM which available task this bot should attempt next.
+) -> tuple[str, frozenset[str]] | None:
+    """Build the user prompt + the snapshot of valid task ids it lists.
 
-    Returns a task_id, or `None` to fall through to the heuristic. The
-    LLM is constrained by the user-prompt to a hard list of available
-    tasks; anything off-list (or a parse failure) returns None.
-
-    `blacklist` (task_id → seconds-remaining) excludes tasks the bot
-    recently abandoned as unreachable. Same idea as in the heuristic
-    picker — without it the LLM would happily re-suggest the desk-
-    blocked task and the bot would loop.
+    Returns `(prompt, valid_ids)` or `None` if there are no available
+    tasks to pick from. Valid-ids snapshot lives alongside the prompt
+    so the parse step (which may run later, after a Future-await)
+    knows exactly which ids the LLM was asked to pick from — even if
+    the room state evolved meanwhile.
     """
     bl = blacklist or {}
     available = [
@@ -110,20 +117,59 @@ def llm_pick_target(
         f"Available tasks:\n{listing}\n\n"
         "Which task id?"
     )
-    raw = client.complete(system=_SYSTEM_PROMPT, user=user_prompt, max_tokens=32)
+    return user_prompt, frozenset(t.definition.id for t in available)
+
+
+def parse_llm_response(raw: str | None, valid_ids: frozenset[str]) -> str | None:
+    """Extract a task id from the LLM's text response, validated against
+    the snapshot of ids that were in the prompt.
+
+    Returns `None` for empty/null responses or off-list picks.
+    """
     if not raw:
         return None
-
-    cleaned = raw.strip().strip("`'\"").split()[0] if raw.strip() else ""
-    valid_ids = {t.definition.id for t in available}
+    stripped = raw.strip()
+    if not stripped:
+        return None
+    cleaned = stripped.strip("`'\"").split()[0]
     if cleaned in valid_ids:
         return cleaned
-    # Sometimes models prefix with "task:" or similar.
+    # Sometimes models prefix with "task:" or similar — scan the body.
     for tid in valid_ids:
         if tid in raw:
             return tid
     logger.info("llm picked unknown task id %r; falling back to heuristic", raw)
     return None
+
+
+def llm_pick_target(
+    client: LLMClient,
+    room: GameRoom,
+    bot: Player,
+    blacklist: dict[str, float] | None = None,
+) -> str | None:
+    """Synchronous LLM-pick. Used by tests and by the (legacy) sync
+    code path. The async / non-blocking flow lives in
+    `maybe_consult_llm` and bypasses this — it submits the LLM call
+    to a thread pool so the tick loop never blocks on urllib.
+    """
+    built = build_llm_prompt(room, bot, blacklist)
+    if built is None:
+        return None
+    user_prompt, valid_ids = built
+    raw = client.complete(system=_SYSTEM_PROMPT, user=user_prompt, max_tokens=32)
+    return parse_llm_response(raw, valid_ids)
+
+
+def _safe_complete(client: LLMClient, system: str, user: str) -> str | None:
+    """Wrapper run from the thread pool — never raises so the Future
+    always returns cleanly. The provider already swallows network /
+    timeout errors, but a defensive wrapper makes the boundary obvious."""
+    try:
+        return client.complete(system=system, user=user, max_tokens=32)
+    except Exception as exc:  # noqa: BLE001 — boundary log
+        logger.warning("llm thread-pool call raised: %s", exc)
+        return None
 
 
 def apply_reactive_overrides(
@@ -258,27 +304,71 @@ def maybe_consult_llm(
     bot: Player,
     state: BotState,
 ) -> bool:
-    """Consult the LLM if its cooldown has expired for this bot.
+    """Try to apply a cached LLM-picked intent; submit a new call when due.
 
-    Returns True if the LLM successfully set an intent. False means
-    `BotManager` should fall through to the random-task heuristic.
-    Cooldown is bumped only on a successful intent set — a failed call
-    (timeout, parse miss) lets the next pick_next_target retry rather
-    than locking the bot to heuristic for 5 s after a transient error.
+    Tier 3.9.2.1 (post-incident fix): the LLM call no longer blocks the
+    server tick. The flow has three independent steps that all run in
+    O(microseconds):
+
+      1. **Reap.** If a previously-submitted Future is now done, parse
+         its result and stash it as `cached_target` for *this or* a
+         later tick. Bumps the per-bot cooldown to space out future
+         calls regardless of success/failure.
+      2. **Apply.** If we have a `cached_target` ready, validate it
+         against the *current* task state (might have gone on cooldown
+         since we asked) and set it as the bot's intent. Returns True
+         so the heuristic doesn't override.
+      3. **Submit.** If no Future is in flight and the cooldown is
+         drained, kick off a new call against the bot manager's thread
+         pool. Returns False so the bot picks heuristically while the
+         LLM thinks — keeps motion smooth even when Anthropic is slow.
+
+    Pre-fix this function called `client.complete()` directly with a
+    3 s urllib timeout — and that 3 s blocked the asyncio tick loop,
+    freezing every room on the server. With the thread-pool offload
+    the worst per-tick LLM cost is a `Future.done()` check.
     """
     if manager._llm is None:
         return False
     ds = decisions.setdefault(bot.id, DecisionState())
-    if ds.next_llm_call_in > 0:
-        return False
 
-    target_id = llm_pick_target(
-        manager._llm, manager._room, bot, blacklist=state.recently_failed_tasks
-    )
-    if target_id is None:
-        return False
-    manager._set_intent(bot, state, target_id)
-    if state.target_task_id is None:
-        return False
-    ds.next_llm_call_in = LLM_DECISION_INTERVAL_SEC
-    return True
+    # 1. Reap any pending future that completed since last tick.
+    if ds.pending_future is not None and ds.pending_future.done():
+        try:
+            raw = ds.pending_future.result(timeout=0)
+        except (concurrent.futures.CancelledError, Exception) as exc:
+            logger.debug("llm future raised at reap: %s", exc)
+            raw = None
+        target_id = parse_llm_response(raw, ds.pending_task_ids)
+        ds.pending_future = None
+        ds.pending_task_ids = frozenset()
+        ds.next_llm_call_in = LLM_DECISION_INTERVAL_SEC
+        if target_id is not None:
+            ds.cached_target = target_id
+
+    # 2. Apply cached pick if we have one and it's still valid.
+    if ds.cached_target is not None:
+        target_id = ds.cached_target
+        ds.cached_target = None
+        room = manager._room
+        task = room.tasks.get(target_id)
+        if (
+            task is not None
+            and task.status == "available"
+            and target_id not in state.recently_failed_tasks
+        ):
+            manager._set_intent(bot, state, target_id)
+            if state.target_task_id is not None:
+                return True
+
+    # 3. Submit a new call if cooldown drained and no Future in flight.
+    if ds.pending_future is None and ds.next_llm_call_in <= 0:
+        built = build_llm_prompt(manager._room, bot, blacklist=state.recently_failed_tasks)
+        if built is not None:
+            user_prompt, valid_ids = built
+            ds.pending_task_ids = valid_ids
+            ds.pending_future = manager._llm_executor.submit(
+                _safe_complete, manager._llm, _SYSTEM_PROMPT, user_prompt
+            )
+
+    return False  # heuristic falls through this tick — bot starts moving immediately
