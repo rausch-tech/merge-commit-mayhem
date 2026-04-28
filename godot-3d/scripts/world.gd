@@ -114,6 +114,12 @@ func _ready() -> void:
 
 	_hud = HUD_SCENE.instantiate() as CanvasLayer
 	add_child(_hud)
+	# HUD-Buttons schicken Signals statt direkt WS — wir routen sie hier zu
+	# den passenden Protocol-Messages. Saubere Trennung HUD/Network.
+	if _hud.has_signal("ability_pressed"):
+		_hud.connect("ability_pressed", _on_hud_ability_pressed)
+	if _hud.has_signal("sabotage_pressed"):
+		_hud.connect("sabotage_pressed", _on_hud_sabotage_pressed)
 
 	_sting_player = AudioStreamPlayer.new()
 	_sting_player.name = "StingPlayer"
@@ -350,6 +356,18 @@ func _on_mini_game_aborted() -> void:
 	# direkt — sonst klemmt das Modal.
 	_close_mini_game_modal()
 	_hold_task_id = ""
+
+func _on_hud_ability_pressed() -> void:
+	# Active-Ability auslösen (Tier 4.5.3) — Server checkt Cooldown/once-per-round.
+	if ws_client != null:
+		ws_client.send(Protocol.TYPE_USE_ABILITY, {})
+
+
+func _on_hud_sabotage_pressed(sabotage_id: String) -> void:
+	# Sabotage triggern (Tier 4.7) — Server prueft Object-Binding-Reichweite.
+	if ws_client != null and sabotage_id != "":
+		ws_client.send(Protocol.TYPE_TRIGGER_SABOTAGE, {"sabotageId": sabotage_id})
+
 
 func _on_disconnected() -> void:
 	push_warning("world: disconnected — returning to main")

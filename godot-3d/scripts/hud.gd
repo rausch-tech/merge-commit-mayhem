@@ -61,16 +61,45 @@ var _eventfeed_last_seq: int = -1
 var _role_intro_panel: PanelContainer
 var _role_intro_dismiss_timer: Timer
 var _role_intro_shown_for: String = ""  # "<role>:<team>" Dedupe-Key
+# Personal-Task-Panel (4.5.1) — links, listet alle Tasks mit Stern fuer eigene.
+var _personal_task_panel: PanelContainer
+var _personal_task_list: VBoxContainer
+# Ability-Button (4.5.3) — sendet use_ability via Signal an world.gd.
+var _ability_btn: Button
+var _ability_hint_label: Label
+var _ability_used: bool = false
+var _phase: String = ""
+# Coffee-Pulse (4.5.2) — Sinus-Modulation der Personal-Coffee-Bar wenn
+# Energie < 15 (Speed-Penalty-Threshold).
+var _coffee_ratio: float = 1.0
+var _pulse_clock: float = 0.0
+const COFFEE_PULSE_THRESHOLD: float = 0.15
 
 func _ready() -> void:
 	_build_top_bar()
 	_build_role_chip()
+	_build_personal_task_panel()
 	_build_roster_panel()
 	_build_eventfeed_panel()
 	_build_role_intro_modal()
 	_build_map_label()
 	_build_task_prompt()
 	apply_game_state({})
+
+
+func _process(delta: float) -> void:
+	# Coffee-Pulse: sinus-moduliert die Helligkeit der Personal-Coffee-Bar
+	# wenn die Energie unter dem Speed-Penalty-Threshold liegt. Zieht
+	# Aufmerksamkeit ohne den Spieler aus dem Game-Flow zu reissen.
+	if _personal_coffee_fill == null:
+		return
+	if _coffee_ratio < COFFEE_PULSE_THRESHOLD:
+		_pulse_clock += delta
+		var pulse: float = 0.6 + 0.4 * sin(_pulse_clock * 6.0)  # 0.2..1.0 hin und her
+		_personal_coffee_fill.modulate = Color(1.0, 0.4, 0.3, pulse)
+	else:
+		_pulse_clock = 0.0
+		_personal_coffee_fill.modulate = Color(1.0, 1.0, 1.0, 1.0)
 
 # Public API ----------------------------------------------------------------
 
@@ -108,6 +137,10 @@ func set_role_info(role_info: Dictionary) -> void:
 	else:
 		_team_chip.text = "—"
 		_team_chip.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+	# Ability-Button-Label aus role_info ableiten + neu evaluieren.
+	_refresh_ability_button()
+	# Personal-Tasks rendern beim naechsten game_state-Tick mit den neuen
+	# assignedTaskIds — Server-Tickrate ist 20 Hz, das ist <50 ms verzoegert.
 
 func set_task_prompt(task_id: String, progress: float, holding: bool) -> void:
 	# task_id == "" = nichts in Reichweite, Prompt verstecken.
@@ -134,11 +167,12 @@ func apply_private_state(state: Dictionary) -> void:
 	if max_e <= 0.0:
 		max_e = 100.0
 	var ratio: float = clampf(energy / max_e, 0.0, 1.0)
+	_coffee_ratio = ratio  # _process liest das fuer den Pulse
 	if _personal_coffee_fill != null:
 		_personal_coffee_fill.size = Vector2(_personal_coffee_max_width * ratio, 8)
-	# ability_used + takedown_cooldown_remaining werden absichtlich noch nicht
-	# visualisiert — kommt in Tier 4.7 (Sabotage-/Ability-Buttons) und Tier 4.10
-	# (Take-Down-UI). Hier nur cachen via state (world.gd haelt es).
+	# Ability-Button: nach jedem private_state-Tick refreshen (used-Flag).
+	_ability_used = bool(state.get("abilityUsed", false))
+	_refresh_ability_button()
 
 func apply_game_state(state: Dictionary) -> void:
 	# Stats
@@ -153,9 +187,9 @@ func apply_game_state(state: Dictionary) -> void:
 		_timer_label.text = _format_timer(seconds)
 
 	# Phase chip
+	_phase = str(state.get("phase", ""))
 	if _phase_label != null:
-		var phase := str(state.get("phase", ""))
-		match phase:
+		match _phase:
 			"playing":
 				_phase_label.text = "PLAYING"
 				_phase_label.add_theme_color_override("font_color", COLOR_ACCENT)
@@ -173,6 +207,12 @@ func apply_game_state(state: Dictionary) -> void:
 
 	# Eventfeed: append nur die neuen Events seit dem letzten Tick.
 	_update_eventfeed(state.get("events", []))
+
+	# Personal-Task-Panel: aktualisieren mit aktuellen Task-Status.
+	_update_personal_tasks(state.get("tasks", []))
+
+	# Ability-Button neu evaluieren (phase wechselt = Sichtbarkeit wechselt).
+	_refresh_ability_button()
 
 # Build helpers --------------------------------------------------------------
 
@@ -738,3 +778,206 @@ func _hide_role_intro() -> void:
 		_role_intro_panel.visible = false
 	if _role_intro_dismiss_timer != null:
 		_role_intro_dismiss_timer.stop()
+
+
+# Personal-Task-Panel (4.5.1) — links, listet alle Tasks aus game_state.tasks.
+# Eigene Tasks (in role_info.assignedTaskIds) bekommen einen gelben Stern und
+# eine accent-coloured Border. Status pro Task: available / in_progress (X%) /
+# cooldown (Ns).
+
+const COLOR_PERSONAL_STAR: Color = Color(1.0, 0.84, 0.22)
+
+
+func _build_personal_task_panel() -> void:
+	var panel := PanelContainer.new()
+	panel.anchor_left = 0.0
+	panel.anchor_right = 0.0
+	panel.anchor_top = 0.0
+	panel.anchor_bottom = 1.0
+	panel.offset_left = 16
+	panel.offset_right = 260
+	panel.offset_top = 110
+	panel.offset_bottom = -110
+	add_child(panel)
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = COLOR_PANEL_BG
+	style.set_corner_radius_all(10)
+	style.set_border_width_all(1)
+	style.border_color = Color(1, 1, 1, 0.08)
+	style.set_content_margin_all(14)
+	panel.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	panel.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "AUFGABEN"
+	title.add_theme_color_override("font_color", COLOR_ACCENT)
+	title.add_theme_font_size_override("font_size", 12)
+	vbox.add_child(title)
+
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(scroll)
+
+	_personal_task_list = VBoxContainer.new()
+	_personal_task_list.add_theme_constant_override("separation", 4)
+	_personal_task_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_personal_task_list)
+
+	_personal_task_panel = panel
+
+
+func _update_personal_tasks(tasks: Array) -> void:
+	if _personal_task_list == null:
+		return
+	for child in _personal_task_list.get_children():
+		child.queue_free()
+	if tasks.is_empty():
+		var empty := Label.new()
+		empty.text = "Keine Tasks aktiv."
+		empty.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+		empty.add_theme_font_size_override("font_size", 12)
+		_personal_task_list.add_child(empty)
+		return
+	var assigned: Array = _role_info.get("assignedTaskIds", [])
+	# Zuerst eigene Tasks (sortiert nach Anchor-Order), dann der Rest.
+	var personal: Array = []
+	var rest: Array = []
+	for t in tasks:
+		if str(t.get("id", "")) in assigned:
+			personal.append(t)
+		else:
+			rest.append(t)
+	for t in personal:
+		_personal_task_list.add_child(_make_task_row(t, true))
+	for t in rest:
+		_personal_task_list.add_child(_make_task_row(t, false))
+
+
+func _make_task_row(task: Dictionary, is_mine: bool) -> Control:
+	var row := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.05, 0.07, 0.10, 0.7)
+	style.set_corner_radius_all(4)
+	style.set_content_margin_all(6)
+	if is_mine:
+		style.set_border_width_all(1)
+		style.border_color = COLOR_PERSONAL_STAR
+	row.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 2)
+	row.add_child(vbox)
+
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 6)
+	vbox.add_child(top)
+
+	if is_mine:
+		var star := Label.new()
+		star.text = "★"
+		star.add_theme_color_override("font_color", COLOR_PERSONAL_STAR)
+		star.add_theme_font_size_override("font_size", 13)
+		top.add_child(star)
+
+	var title := Label.new()
+	title.text = str(task.get("title", task.get("id", "?")))
+	title.add_theme_color_override("font_color", COLOR_TEXT)
+	title.add_theme_font_size_override("font_size", 12)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(title)
+
+	var status_str := str(task.get("status", "available"))
+	var status_label := Label.new()
+	match status_str:
+		"in_progress":
+			var pct: int = int(round(float(task.get("progress", 0.0)) * 100.0))
+			status_label.text = "%d%%" % pct
+			status_label.add_theme_color_override("font_color", COLOR_WARN)
+		"cooldown":
+			var cd: float = float(task.get("cooldownRemaining", 0.0))
+			status_label.text = "%ds" % int(round(cd))
+			status_label.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+		_:
+			status_label.text = "ok"
+			status_label.add_theme_color_override("font_color", COLOR_ACCENT)
+	status_label.add_theme_font_size_override("font_size", 11)
+	top.add_child(status_label)
+
+	var room := str(task.get("room", ""))
+	if room != "":
+		var room_label := Label.new()
+		room_label.text = room.replace("_", " ")
+		room_label.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+		room_label.add_theme_font_size_override("font_size", 10)
+		vbox.add_child(room_label)
+
+	return row
+
+
+# Active-Ability-Button (4.5.3) — sitzt unter dem Role-Chip-Block. Sichtbar
+# nur wenn role_info eine ability_id hat, disabled bei abilityUsed=true oder
+# phase!=playing. Click sendet das ability_pressed-Signal an world.gd, der
+# damit `use_ability` ueber WS rausschickt.
+
+
+func _ensure_ability_button_built() -> void:
+	if _ability_btn != null:
+		return
+	# Wir haengen das Button an das role-chip-Panel — gleicher Footer-Block.
+	# Suche das role-chip-panel ueber _role_chip's Parent.
+	if _role_chip == null:
+		return
+	var role_vbox := _role_chip.get_parent()
+	if role_vbox == null:
+		return
+	_ability_btn = Button.new()
+	_ability_btn.text = "—"
+	_ability_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_ability_btn.pressed.connect(_on_ability_button_pressed)
+	role_vbox.add_child(_ability_btn)
+
+	_ability_hint_label = Label.new()
+	_ability_hint_label.text = ""
+	_ability_hint_label.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+	_ability_hint_label.add_theme_font_size_override("font_size", 10)
+	_ability_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	role_vbox.add_child(_ability_hint_label)
+
+
+func _refresh_ability_button() -> void:
+	var ability_id := str(_role_info.get("abilityId", ""))
+	var label := str(_role_info.get("abilityLabel", ""))
+	var hint := str(_role_info.get("abilityHint", ""))
+	# Kein abilityId = keine Faehigkeit (Chaos-Rollen oder nicht-konfigurierte
+	# Release-Rollen). Button wird gar nicht gebaut.
+	if ability_id == "" or label == "":
+		if _ability_btn != null:
+			_ability_btn.visible = false
+			if _ability_hint_label != null:
+				_ability_hint_label.visible = false
+		return
+	_ensure_ability_button_built()
+	_ability_btn.visible = true
+	if _ability_hint_label != null:
+		_ability_hint_label.visible = true
+		_ability_hint_label.text = hint
+	if _ability_used:
+		_ability_btn.text = "%s (verbraucht)" % label
+		_ability_btn.disabled = true
+	elif _phase != "playing":
+		_ability_btn.text = "%s (warte)" % label
+		_ability_btn.disabled = true
+	else:
+		_ability_btn.text = label
+		_ability_btn.disabled = false
+
+
+func _on_ability_button_pressed() -> void:
+	if _ability_used or _phase != "playing":
+		return
+	emit_signal("ability_pressed")
