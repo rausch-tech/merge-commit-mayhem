@@ -1177,6 +1177,7 @@ Empfohlene Reihenfolge:
 **Neue Slices (von 0):**
 
 1. **Tier 4.6 (2 Tage) — Task-Interaction + Mini-Game-Modals**
+
    - "Halten zum Bearbeiten" (E) am `taskAnchors[]`-Marker → `task_hold_start` /
      `task_hold_stop`.
    - Server sendet `mini_game_started{taskId, miniGameId, view}` →
@@ -1188,6 +1189,7 @@ Empfohlene Reihenfolge:
    - Progress-Ring auf dem Char, Completion-VFX.
 
 2. **Tier 4.7 (1 Tag) — Sabotage-Buttons**
+
    - Aus `private_role.availableSabotages` Liste rendern.
    - Cooldown-Display (Quelle: `private_state.takedownCooldown` /
      analoge Felder).
@@ -1197,12 +1199,14 @@ Empfohlene Reihenfolge:
    - Repair-Panels für Release: `repair_sabotage` mit F-Hold.
 
 3. **Tier 4.8 (1 Tag) — Voting-Overlay**
+
    - `game_state.meeting` enthält Phase + Players.
    - Voting-Liste, Countdown, "Skip" Option.
    - `cast_vote{targetPlayerId}` bzw. `skip_vote`.
    - `voting_result` → Toast mit Slide-In.
 
 4. **Tier 4.9 (1 Tag) — Endscreen**
+
    - `game_ended.players` enthält Per-Player-Stats + Awards (Tier 3.7).
    - `game_ended.aiPostmortem` ist der KI-Text (optional anzeigen).
    - Confetti-Particles wenn Release-Team gewinnt, anders wenn Chaos.
@@ -1210,6 +1214,7 @@ Empfohlene Reihenfolge:
      das ist die zu ersetzende Stelle in `world.gd:_apply_state`.
 
 5. **Tier 4.10 (5–8 Tage) — Among-Us-Features**
+
    - Vents: V cyclet durch verbundene `vents[].connectedTo`, Click TP.
    - Body-Discovery: tote Spieler haben `bodies[]` Eintrag.
    - Report-Button wenn nahe an Body → `report_body{bodyPlayerId}`.
@@ -1220,6 +1225,7 @@ Empfohlene Reihenfolge:
    - `use_ability` für aktive Rollen.
 
 6. **Tier 4.11 (1 Tag) — Sound-Polish**
+
    - Footsteps abhängig von `room.floorMaterial` (aktuell: nur Carpet).
    - UI-SFX-Abdeckung (Toast, Slide-In, Stat-Blink).
    - BGM-Auswahl für Lobby + Match (optional, BGM bewusst aus dem Demo
@@ -1227,6 +1233,7 @@ Empfohlene Reihenfolge:
    - Audio-Bus für Mute/Volume (Tier 1 hatte das schon im Browser).
 
 7. **Tier 4.12 (3–5 Tage) — Polish + Reconnect**
+
    - Settings-UI (Sound, Graphics, Keybinds).
    - Auto-Reconnect via `user://player.json` (siehe §5.3 / §9.5).
    - Edge-Cases: Sabotage während Meeting, Body-Discovery Race-Conditions,
