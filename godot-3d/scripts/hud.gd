@@ -74,6 +74,13 @@ var _phase: String = ""
 var _coffee_ratio: float = 1.0
 var _pulse_clock: float = 0.0
 const COFFEE_PULSE_THRESHOLD: float = 0.15
+# Sabotage-Strip (4.7) — bottom-center, nur sichtbar fuer Chaos-Rollen.
+var _sabotage_strip: PanelContainer
+var _sabotage_buttons_box: HBoxContainer
+var _sabotage_button_nodes: Dictionary = {}  # id -> {btn, cd_label}
+var _sabotage_states: Dictionary = {}        # id -> {cooldown, active}
+var _available_sabotages: Array = []
+var _is_chaos: bool = false
 
 func _ready() -> void:
 	_build_top_bar()
@@ -82,6 +89,7 @@ func _ready() -> void:
 	_build_roster_panel()
 	_build_eventfeed_panel()
 	_build_role_intro_modal()
+	_build_sabotage_strip()
 	_build_map_label()
 	_build_task_prompt()
 	apply_game_state({})
@@ -139,6 +147,12 @@ func set_role_info(role_info: Dictionary) -> void:
 		_team_chip.add_theme_color_override("font_color", COLOR_TEXT_DIM)
 	# Ability-Button-Label aus role_info ableiten + neu evaluieren.
 	_refresh_ability_button()
+	# Sabotage-Strip: Liste der verfuegbaren Sabotagen aus role_info auslesen,
+	# Buttons im Strip rebuilden. Sichtbarkeit (Chaos-only) wird drin
+	# entschieden — set_role_info ist die einzige Quelle fuer "bin ich Chaos".
+	_is_chaos = team == "chaos_agents"
+	_available_sabotages = role_info.get("availableSabotages", [])
+	_rebuild_sabotage_buttons()
 	# Personal-Tasks rendern beim naechsten game_state-Tick mit den neuen
 	# assignedTaskIds — Server-Tickrate ist 20 Hz, das ist <50 ms verzoegert.
 
@@ -213,6 +227,10 @@ func apply_game_state(state: Dictionary) -> void:
 
 	# Ability-Button neu evaluieren (phase wechselt = Sichtbarkeit wechselt).
 	_refresh_ability_button()
+
+	# Sabotage-Strip: Cooldowns aus dem game_state.sabotages cachen.
+	_cache_sabotage_states(state.get("sabotages", []))
+	_refresh_sabotage_buttons()
 
 # Build helpers --------------------------------------------------------------
 
@@ -981,3 +999,137 @@ func _on_ability_button_pressed() -> void:
 	if _ability_used or _phase != "playing":
 		return
 	emit_signal("ability_pressed")
+
+
+# Sabotage-Strip (4.7) — bottom-center, nur fuer Chaos-Rollen sichtbar.
+# Pro verfuegbarer Sabotage ein Button mit Title + Cooldown-Sekunden.
+# Click → emit_signal sabotage_pressed(id) → world.gd sendet trigger_sabotage.
+# Server prueft Object-Binding-Reichweite + ob comms-down die Buttons disabled.
+
+const COLOR_SABOTAGE_BG: Color = Color(0.10, 0.05, 0.05, 0.92)
+
+
+func _build_sabotage_strip() -> void:
+	_sabotage_strip = PanelContainer.new()
+	_sabotage_strip.anchor_left = 0.5
+	_sabotage_strip.anchor_right = 0.5
+	_sabotage_strip.anchor_top = 1.0
+	_sabotage_strip.anchor_bottom = 1.0
+	_sabotage_strip.offset_left = -340
+	_sabotage_strip.offset_right = 340
+	_sabotage_strip.offset_top = -100
+	_sabotage_strip.offset_bottom = -42
+	_sabotage_strip.visible = false  # bis Role bekannt + Chaos
+	add_child(_sabotage_strip)
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = COLOR_SABOTAGE_BG
+	style.set_corner_radius_all(8)
+	style.set_border_width_all(1)
+	style.border_color = Color(0.95, 0.40, 0.40, 0.55)
+	style.set_content_margin_all(8)
+	_sabotage_strip.add_theme_stylebox_override("panel", style)
+
+	_sabotage_buttons_box = HBoxContainer.new()
+	_sabotage_buttons_box.add_theme_constant_override("separation", 6)
+	_sabotage_buttons_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_sabotage_strip.add_child(_sabotage_buttons_box)
+
+
+func _rebuild_sabotage_buttons() -> void:
+	if _sabotage_buttons_box == null:
+		return
+	# Visibility: nur Chaos sieht den Strip ueberhaupt. Bei Role-Reset auf
+	# release_team / leer wird der Strip versteckt + leer gemacht.
+	if not _is_chaos or _available_sabotages.is_empty():
+		_sabotage_strip.visible = false
+		for child in _sabotage_buttons_box.get_children():
+			child.queue_free()
+		_sabotage_button_nodes.clear()
+		return
+	# Wenn die gleiche Sabotage-Liste schon gerendert ist, nicht rebuilden —
+	# sonst flackert der Strip auf jedem Role-Re-Send.
+	var existing_ids: Array = []
+	for c in _sabotage_buttons_box.get_children():
+		if c.has_meta("sab_id"):
+			existing_ids.append(str(c.get_meta("sab_id")))
+	if existing_ids == _available_sabotages:
+		_refresh_sabotage_buttons()
+		return
+	for child in _sabotage_buttons_box.get_children():
+		child.queue_free()
+	_sabotage_button_nodes.clear()
+	_sabotage_strip.visible = true
+	for sab_id in _available_sabotages:
+		var sid := str(sab_id)
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 2)
+		col.set_meta("sab_id", sid)
+		var btn := Button.new()
+		btn.text = _sabotage_label(sid)
+		btn.custom_minimum_size = Vector2(110, 38)
+		btn.pressed.connect(func(): emit_signal("sabotage_pressed", sid))
+		col.add_child(btn)
+		var cd_label := Label.new()
+		cd_label.text = ""
+		cd_label.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+		cd_label.add_theme_font_size_override("font_size", 10)
+		cd_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		col.add_child(cd_label)
+		_sabotage_buttons_box.add_child(col)
+		_sabotage_button_nodes[sid] = {"btn": btn, "cd": cd_label}
+	_refresh_sabotage_buttons()
+
+
+func _cache_sabotage_states(sabotages: Array) -> void:
+	# Wir cachen pro Sabotage-ID den letzten Cooldown + active-Flag aus dem
+	# game_state. Per-Tick aufgerufen in apply_game_state.
+	_sabotage_states.clear()
+	for s in sabotages:
+		var sid := str(s.get("id", ""))
+		if sid == "":
+			continue
+		_sabotage_states[sid] = {
+			"cooldown": float(s.get("cooldownRemaining", 0.0)),
+			"active": bool(s.get("active", false)),
+		}
+
+
+func _refresh_sabotage_buttons() -> void:
+	if not _is_chaos:
+		return
+	for sid_v in _sabotage_button_nodes.keys():
+		var sid := str(sid_v)
+		var nodes: Dictionary = _sabotage_button_nodes[sid]
+		var btn: Button = nodes["btn"]
+		var cd_label: Label = nodes["cd"]
+		var st: Dictionary = _sabotage_states.get(sid, {})
+		var cooldown: float = float(st.get("cooldown", 0.0))
+		var active: bool = bool(st.get("active", false))
+		if _phase != "playing":
+			btn.disabled = true
+			cd_label.text = "off"
+		elif active:
+			btn.disabled = true
+			cd_label.text = "active"
+		elif cooldown > 0.0:
+			btn.disabled = true
+			cd_label.text = "%ds" % int(round(cooldown))
+		else:
+			btn.disabled = false
+			cd_label.text = ""
+
+
+func _sabotage_label(sab_id: String) -> String:
+	# Kurze Labels — Server-Title ist oft zu lang fuer 110px-Buttons.
+	# Mirror der haeufigsten Sabotage-IDs aus app/game/sabotages.py.
+	match sab_id:
+		"ci_cd_red":              return "CI/CD Red"
+		"coffee_outage":          return "Coffee Out"
+		"mandatory_meeting":      return "Forced Meeting"
+		"merge_conflict_storm":   return "Merge Storm"
+		"fake_customer_request":  return "Fake CR"
+		"flaky_tests":            return "Flaky Tests"
+		"lights_out":             return "PagerDuty"
+		"comms_outage":           return "Slack Down"
+	return sab_id.replace("_", " ").capitalize()
