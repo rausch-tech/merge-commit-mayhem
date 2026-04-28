@@ -1062,6 +1062,7 @@ class GameRoom:
                     "isHost": p.is_host,
                     "isAlive": p.is_alive,
                     "isConnected": p.is_connected,
+                    "isBot": p.is_bot,
                 }
                 for p in self.players.values()
                 if p.is_alive
