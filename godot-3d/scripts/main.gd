@@ -142,8 +142,14 @@ func _build_ui() -> void:
 
 	connect_vbox.add_child(_make_section_label("CONNECT"))
 
-	_url_field = _make_line_edit("ws://127.0.0.1:8000/ws")
-	connect_vbox.add_child(_make_field_row("Server", _url_field))
+	# URL-Feld nur im Native-Build (z.B. lokal aus dem Godot-Editor heraus).
+	# Web-Build leitet die URL automatisch aus dem Page-Origin ab — dort
+	# laeuft der Client immer gegen den Server, der ihn ausliefert
+	# (prod-is-lava.dev/godot/ -> wss://prod-is-lava.dev/ws). Kein Feld =
+	# kein „falsche URL eingetippt"-Footgun in Production.
+	if not OS.has_feature("web"):
+		_url_field = _make_line_edit("ws://127.0.0.1:8000/ws")
+		connect_vbox.add_child(_make_field_row("Server", _url_field))
 
 	_room_field = _make_line_edit("DEMO")
 	_room_field.max_length = 8
@@ -370,8 +376,28 @@ func _show_lobby_card() -> void:
 
 # -- Connect flow ------------------------------------------------------------
 
+func _resolve_server_url() -> String:
+	# Native: aus dem URL-Feld lesen (Sven editiert lokal auf seinem Dev-
+	# Setup). Web-Build: Page-Origin in WebSocket-Origin uebersetzen — die
+	# Web-App weiss, von wo sie geladen wurde, also auch wo der Server steht.
+	if _url_field != null:
+		return _url_field.text.strip_edges()
+	if not OS.has_feature("web"):
+		# Defensive — sollte nie passieren (Field nur auf Web weggelassen).
+		return "ws://127.0.0.1:8000/ws"
+	var origin_raw: Variant = JavaScriptBridge.eval("window.location.origin", true)
+	var origin := str(origin_raw)
+	if origin.begins_with("https://"):
+		return "wss://" + origin.substr(8) + "/ws"
+	if origin.begins_with("http://"):
+		return "ws://" + origin.substr(7) + "/ws"
+	# Unerwartetes Schema (file:// in Editor-Preview etc.) — Fallback auf
+	# explizite Apex-Domain damit zumindest die Production-URL versucht wird.
+	return "wss://prod-is-lava.dev/ws"
+
+
 func _on_connect_pressed() -> void:
-	var url := _url_field.text.strip_edges()
+	var url := _resolve_server_url()
 	var room := _room_field.text.strip_edges().to_upper()
 	var name_ := _name_field.text.strip_edges()
 	if url == "" or room == "" or name_ == "":
