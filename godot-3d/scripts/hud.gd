@@ -1,5 +1,11 @@
 extends CanvasLayer
 
+# Signals: HUD-Buttons schicken Signals statt direkt WS — world.gd haengt
+# sich dran und sendet die richtige Message. So bleibt das HUD WS-frei und
+# testbar.
+signal ability_pressed
+signal sabotage_pressed(sabotage_id: String)
+
 # Game HUD — overlays the 3D world with stat bars, timer, role chip, and a
 # right-side player roster. Pure UI; updates come from world.gd via:
 #   - apply_game_state(state)         — team-level stats (release, pipeline,
@@ -47,11 +53,21 @@ var _task_prompt_panel: PanelContainer
 var _task_prompt_label: Label
 var _task_prompt_fill: ColorRect
 var _task_prompt_fill_max_width: float = 220.0
+var _eventfeed: RichTextLabel
+# Hoechste seq die wir schon ausgegeben haben — verhindert doppelte Lines
+# wenn der gleiche game_state mehrfach kommt (Reconnect, Throttling).
+var _eventfeed_last_seq: int = -1
+# Role-Intro-Modal — zeigt sich einmalig pro private_role-Payload.
+var _role_intro_panel: PanelContainer
+var _role_intro_dismiss_timer: Timer
+var _role_intro_shown_for: String = ""  # "<role>:<team>" Dedupe-Key
 
 func _ready() -> void:
 	_build_top_bar()
 	_build_role_chip()
 	_build_roster_panel()
+	_build_eventfeed_panel()
+	_build_role_intro_modal()
 	_build_map_label()
 	_build_task_prompt()
 	apply_game_state({})
@@ -68,11 +84,21 @@ func set_map_name(name: String) -> void:
 
 func set_role_info(role_info: Dictionary) -> void:
 	_role_info = role_info
+	var role_id := str(role_info.get("role", ""))
+	var team := str(role_info.get("team", ""))
+	# Modal nur einmal pro role+team-Kombination zeigen — wenn Server uns
+	# erneut die gleiche Rolle schickt (Reconnect, Round-Restart), nicht
+	# nochmal ueberblenden. Bei Wechsel der Rolle (z.B. neuer Round mit
+	# anderer Verteilung) erneut zeigen.
+	if role_id != "":
+		var key := "%s:%s" % [role_id, team]
+		if key != _role_intro_shown_for:
+			_role_intro_shown_for = key
+			_show_role_intro(role_info)
 	if _role_chip == null:
 		return
-	var role := str(role_info.get("role", "")).replace("_", " ").capitalize()
-	var team := str(role_info.get("team", ""))
-	_role_chip.text = role if role != "" else "—"
+	var role_label := role_id.replace("_", " ").capitalize()
+	_role_chip.text = role_label if role_label != "" else "—"
 	if team == "chaos_agents":
 		_team_chip.text = "CHAOS-AGENT"
 		_team_chip.add_theme_color_override("font_color", COLOR_DANGER)
@@ -144,6 +170,9 @@ func apply_game_state(state: Dictionary) -> void:
 
 	# Roster
 	_update_roster(state.get("players", []))
+
+	# Eventfeed: append nur die neuen Events seit dem letzten Tick.
+	_update_eventfeed(state.get("events", []))
 
 # Build helpers --------------------------------------------------------------
 
@@ -336,11 +365,13 @@ func _build_roster_panel() -> void:
 	panel.anchor_left = 1.0
 	panel.anchor_right = 1.0
 	panel.anchor_top = 0.0
-	panel.anchor_bottom = 1.0
+	# Top-Half der rechten Seite (Roster). Bottom-Half ist der Eventfeed
+	# (siehe _build_eventfeed_panel) — beide teilen sich die ~500 px hoehe.
+	panel.anchor_bottom = 0.0
 	panel.offset_left = -260
 	panel.offset_right = -16
 	panel.offset_top = 110
-	panel.offset_bottom = -110
+	panel.offset_bottom = 320
 	add_child(panel)
 
 	var style := StyleBoxFlat.new()
@@ -383,6 +414,77 @@ func _build_map_label() -> void:
 	_map_label.add_theme_color_override("font_color", COLOR_TEXT_DIM)
 	_map_label.add_theme_font_size_override("font_size", 12)
 	add_child(_map_label)
+
+func _build_eventfeed_panel() -> void:
+	# Rechte Seite, unter dem Roster. Live-Log: Tasks, Sabotagen, Kills,
+	# Phase-Wechsel, AI-Flavor-Texte vom Server. RichTextLabel mit BBCode
+	# fuer Severity-Farben (info/warn/error). Auto-scroll zum neuesten.
+	var panel := PanelContainer.new()
+	panel.anchor_left = 1.0
+	panel.anchor_right = 1.0
+	panel.anchor_top = 0.0
+	panel.anchor_bottom = 1.0
+	panel.offset_left = -260
+	panel.offset_right = -16
+	panel.offset_top = 332
+	panel.offset_bottom = -110
+	add_child(panel)
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = COLOR_PANEL_BG
+	style.set_corner_radius_all(10)
+	style.set_border_width_all(1)
+	style.border_color = Color(1, 1, 1, 0.08)
+	style.set_content_margin_all(14)
+	panel.add_theme_stylebox_override("panel", style)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	panel.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "EVENTS"
+	title.add_theme_color_override("font_color", COLOR_ACCENT)
+	title.add_theme_font_size_override("font_size", 12)
+	vbox.add_child(title)
+
+	_eventfeed = RichTextLabel.new()
+	_eventfeed.bbcode_enabled = true
+	_eventfeed.scroll_following = true  # auto-scroll zur neuesten Zeile
+	_eventfeed.fit_content = false
+	_eventfeed.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_eventfeed.add_theme_color_override("default_color", COLOR_TEXT_DIM)
+	_eventfeed.add_theme_font_size_override("normal_font_size", 12)
+	_eventfeed.text = "[i]Noch nichts passiert.[/i]"
+	vbox.add_child(_eventfeed)
+
+
+func _update_eventfeed(events: Array) -> void:
+	if _eventfeed == null:
+		return
+	var newest_seq := _eventfeed_last_seq
+	for e in events:
+		var seq := int(e.get("seq", 0))
+		if seq <= _eventfeed_last_seq:
+			continue
+		if seq > newest_seq:
+			newest_seq = seq
+		var severity := str(e.get("severity", "info"))
+		var message := str(e.get("message", "?"))
+		var color: String = "888d96"  # default grey
+		match severity:
+			"warn":
+				color = "f5b042"
+			"error":
+				color = "ef6464"
+			"info":
+				color = "9ea4ad"
+		# Bei der allerersten neuen Line den "Noch nichts"-Placeholder ersetzen.
+		if _eventfeed_last_seq < 0 and _eventfeed.text.find("Noch nichts") != -1:
+			_eventfeed.text = ""
+		_eventfeed.append_text("[color=#%s]%s[/color]\n" % [color, message])
+	_eventfeed_last_seq = newest_seq
+
 
 func _update_roster(players: Array) -> void:
 	if _roster == null:
@@ -474,3 +576,165 @@ func _build_task_prompt() -> void:
 	_task_prompt_fill.anchor_left = 0.0
 	_task_prompt_fill.size = Vector2(0, 6)
 	bar_inner.add_child(_task_prompt_fill)
+
+
+# Role-Intro-Modal — beim ersten private_role-Payload pro Round, 30 s Auto-Dismiss
+# oder Click-to-close. Zeigt Rolle + Team + Description + Strengths + Ability +
+# AssignedTasks. Mirror des JS-Clients (static/role_intro.js).
+
+const ROLE_INTRO_AUTO_DISMISS_SECONDS: float = 30.0
+const COLOR_TEAM_RELEASE: Color = Color(0.30, 0.85, 0.45)
+const COLOR_TEAM_CHAOS: Color = Color(0.95, 0.40, 0.40)
+
+
+func _build_role_intro_modal() -> void:
+	# Vollflaechige semi-transparente Overlay — fangs Clicks ab und schliesst
+	# das Modal beim Click anywhere (analog zu JS-Client).
+	_role_intro_panel = PanelContainer.new()
+	_role_intro_panel.anchor_left = 0.5
+	_role_intro_panel.anchor_top = 0.5
+	_role_intro_panel.anchor_right = 0.5
+	_role_intro_panel.anchor_bottom = 0.5
+	_role_intro_panel.offset_left = -260
+	_role_intro_panel.offset_top = -200
+	_role_intro_panel.offset_right = 260
+	_role_intro_panel.offset_bottom = 200
+	_role_intro_panel.visible = false
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.06, 0.09, 0.13, 0.97)
+	style.set_corner_radius_all(14)
+	style.set_border_width_all(2)
+	style.border_color = COLOR_ACCENT
+	style.shadow_color = Color(0, 0, 0, 0.6)
+	style.shadow_size = 32
+	style.set_content_margin_all(28)
+	_role_intro_panel.add_theme_stylebox_override("panel", style)
+	add_child(_role_intro_panel)
+
+	_role_intro_dismiss_timer = Timer.new()
+	_role_intro_dismiss_timer.one_shot = true
+	_role_intro_dismiss_timer.timeout.connect(_hide_role_intro)
+	add_child(_role_intro_dismiss_timer)
+
+	_role_intro_panel.gui_input.connect(_on_role_intro_clicked)
+
+
+func _on_role_intro_clicked(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed:
+		_hide_role_intro()
+
+
+func _show_role_intro(role_info: Dictionary) -> void:
+	if _role_intro_panel == null:
+		return
+	# Children leeren und neu aufbauen — einmaliger Build pro Show-Call.
+	for child in _role_intro_panel.get_children():
+		child.queue_free()
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 14)
+	_role_intro_panel.add_child(vbox)
+
+	# Team-Badge
+	var team := str(role_info.get("team", ""))
+	var team_label := Label.new()
+	if team == "release_team":
+		team_label.text = "RELEASE-TEAM"
+		team_label.add_theme_color_override("font_color", COLOR_TEAM_RELEASE)
+	elif team == "chaos_agents":
+		team_label.text = "CHAOS-AGENT"
+		team_label.add_theme_color_override("font_color", COLOR_TEAM_CHAOS)
+	else:
+		team_label.text = team.to_upper()
+		team_label.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+	team_label.add_theme_font_size_override("font_size", 14)
+	vbox.add_child(team_label)
+
+	# Role title
+	var title_text := str(role_info.get("title", ""))
+	if title_text == "":
+		title_text = str(role_info.get("role", "?")).replace("_", " ").capitalize()
+	var title := Label.new()
+	title.text = title_text
+	title.add_theme_color_override("font_color", COLOR_TEXT)
+	title.add_theme_font_size_override("font_size", 28)
+	vbox.add_child(title)
+
+	# Short blurb (1 line)
+	var blurb := str(role_info.get("shortBlurb", ""))
+	if blurb != "":
+		var blurb_label := Label.new()
+		blurb_label.text = blurb
+		blurb_label.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+		blurb_label.add_theme_font_size_override("font_size", 14)
+		blurb_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		vbox.add_child(blurb_label)
+
+	# Full description (multi-line)
+	var description := str(role_info.get("description", ""))
+	if description != "":
+		var desc_label := Label.new()
+		desc_label.text = description
+		desc_label.add_theme_color_override("font_color", COLOR_TEXT)
+		desc_label.add_theme_font_size_override("font_size", 13)
+		desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		vbox.add_child(desc_label)
+
+	# Strengths — wo die Rolle 1.35x schneller ist
+	var strengths: Array = role_info.get("strengthCategories", [])
+	if strengths.size() > 0:
+		var s_label := Label.new()
+		s_label.text = "Stark in: %s" % ", ".join(strengths)
+		s_label.add_theme_color_override("font_color", COLOR_ACCENT)
+		s_label.add_theme_font_size_override("font_size", 13)
+		s_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		vbox.add_child(s_label)
+
+	# Ability
+	var ability_label_text := str(role_info.get("abilityLabel", ""))
+	var ability_hint := str(role_info.get("abilityHint", ""))
+	if ability_label_text != "":
+		var a_block := VBoxContainer.new()
+		a_block.add_theme_constant_override("separation", 2)
+		var a_title := Label.new()
+		a_title.text = "Faehigkeit: %s" % ability_label_text
+		a_title.add_theme_color_override("font_color", COLOR_STAT_PIPELINE)
+		a_title.add_theme_font_size_override("font_size", 13)
+		a_block.add_child(a_title)
+		if ability_hint != "":
+			var a_hint := Label.new()
+			a_hint.text = ability_hint
+			a_hint.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+			a_hint.add_theme_font_size_override("font_size", 12)
+			a_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			a_block.add_child(a_hint)
+		vbox.add_child(a_block)
+
+	# Assigned tasks
+	var task_ids: Array = role_info.get("assignedTaskIds", [])
+	if task_ids.size() > 0:
+		var t_label := Label.new()
+		t_label.text = "Persoenliche Tasks: %s" % ", ".join(task_ids)
+		t_label.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+		t_label.add_theme_font_size_override("font_size", 12)
+		t_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		vbox.add_child(t_label)
+
+	# Hint: click anywhere
+	var hint := Label.new()
+	hint.text = "Klick irgendwo, um zu schliessen (Auto in 30 s)"
+	hint.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+	hint.add_theme_font_size_override("font_size", 11)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(hint)
+
+	_role_intro_panel.visible = true
+	_role_intro_dismiss_timer.start(ROLE_INTRO_AUTO_DISMISS_SECONDS)
+
+
+func _hide_role_intro() -> void:
+	if _role_intro_panel != null:
+		_role_intro_panel.visible = false
+	if _role_intro_dismiss_timer != null:
+		_role_intro_dismiss_timer.stop()
