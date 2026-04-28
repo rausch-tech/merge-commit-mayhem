@@ -30,7 +30,8 @@
       "y": 0,
       "width": 1600,
       "height": 1600,
-      "color": "#7a5030"
+      "color": "#7a5030",
+      "floorMaterial": "kitchen"
     },
     {
       "id": "server_room",
@@ -39,7 +40,8 @@
       "y": 1600,
       "width": 1600,
       "height": 1600,
-      "color": "#2a4a70"
+      "color": "#2a4a70",
+      "floorMaterial": "server"
     },
     {
       "id": "war_room",
@@ -57,7 +59,8 @@
       "y": 1600,
       "width": 1600,
       "height": 1600,
-      "color": "#3a6a3a"
+      "color": "#3a6a3a",
+      "floorMaterial": "legacy"
     }
   ],
   "doors": [
