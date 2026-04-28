@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Among-Us-artiges Multiplayer-Spiel für Tech-Teams. Release-Team gegen geheime Chaos-Agenten. 8-12 Minuten pro Runde, 4-12 Spieler, läuft im Browser."
+      content="Among-Us-artiges Multiplayer-Spiel für Tech-Teams. Release-Team gegen geheime Chaos-Agenten. 8 Tasks mit Mini-Games, 8 Sabotagen, AI-getriebene Bots. 8-12 Min pro Runde, 4-12 Spieler. Browser oder Godot-3D-Client."
     />
     <link rel="stylesheet" href="/static/landing.css" />
     <link rel="preload" as="image" href="/images/logo.png" />
@@ -22,8 +22,9 @@
         <nav class="topbar-nav">
           <a href="#was-ist-das">Was ist das?</a>
           <a href="/spielprinzip">Spielprinzip</a>
-          <a href="#how-to-play">How to Play</a>
           <a href="#rollen">Rollen</a>
+          <a href="#features">Features</a>
+          <a href="#mini-games">Mini-Games</a>
           <a href="#roadmap">Roadmap</a>
           <a href="#faq">FAQ</a>
           <a class="topbar-cta" href="/play">Spielen &rarr;</a>
@@ -48,7 +49,8 @@
             </h1>
             <p class="hero-sub">
               Ein Among-Us-artiges Multiplayer-Spiel für Tech-Teams. Release-Team gegen geheime
-              Chaos-Agenten. 8&ndash;12 Minuten pro Runde. Direkt im Browser.
+              Chaos-Agenten. 8&ndash;12 Minuten pro Runde, direkt im Browser &mdash; oder im
+              Godot-3D-Client.
             </p>
             <div class="hero-cta">
               <a class="btn btn-primary" href="/play">
@@ -102,7 +104,7 @@
           </p>
           <p>
             Niemand weiß, wer auf welcher Seite steht. Wenn ein Body gefunden wird oder jemand
-            Verdacht schöpft, gibt's ein <strong>Emergency Meeting</strong>: 30 Sekunden
+            Verdacht schöpft, gibt's ein <strong>Emergency Meeting</strong>: 60 Sekunden
             diskutieren, dann abstimmen. Wer fliegt raus, war's wirklich Chaos &mdash; oder hast du
             gerade deinen besten Engineer entfernt?
           </p>
@@ -110,6 +112,16 @@
             <span class="prose-quote-mark">&gt;</span>
             Built als Lunch-Break-Game für Tech-Teams. Insider-Witze inklusive, Kill nicht.
           </p>
+          <figure class="hero-screenshot">
+            <img
+              src="/static/images/godot/aerial-office-complex.png"
+              alt="Godot-3D-Client mit Office-Complex-Map: 9 Räume, ~390 Möbelstücke, 5 Spieler im HUD"
+            />
+            <figcaption>
+              Godot-3D-Client &mdash; Aerial-View der Office-Complex-Map (9 Räume, 390+
+              Möbelstücke).
+            </figcaption>
+          </figure>
         </div>
       </section>
 
@@ -247,18 +259,38 @@
         <div class="feature-grid">
           <div class="feature">
             <span class="feature-glyph">[</span>
-            <h3>8 Tasks</h3>
+            <h3>8 Tasks mit Mini-Games</h3>
             <p>
-              Tests fixen, PRs reviewen, Deployment reparieren, Kaffee nachfüllen, Logs analysieren,
-              Legacy-Service beruhigen, Scope reduzieren, Release Notes schreiben.
+              Jede Task hat ihr eigenes Mechanik-Plugin: Test-Suite-Repair, Cable-Pairing,
+              Coffee-Pour, Log-Filter, Sprint-Trim, Diff-Review, Stability-Balance,
+              Click-to-Cycle-Sort.
             </p>
           </div>
           <div class="feature">
             <span class="feature-glyph">!</span>
-            <h3>6 Sabotagen</h3>
+            <h3>8 Sabotagen</h3>
             <p>
-              CI/CD rot, Kaffee leer, Mandatory Meeting, Merge Conflict Storm, Fake Customer
-              Request, Flaky Tests.
+              CI/CD rot, Flaky Tests, Merge Conflict Storm, Coffee Outage, Mandatory Meeting, Fake
+              Customer Request, PagerDuty-Storm, Slack-Down. Jede an ein passendes Themen-Objekt
+              gebunden &mdash; same Anchor wie eine Release-Task.
+            </p>
+          </div>
+          <div class="feature">
+            <span class="feature-glyph">%</span>
+            <h3>5 + 3 Rollen</h3>
+            <p>
+              Release-Team: Developer, DevOps, QA Lead, Scrum Master, Caffeine Collector. Chaos:
+              Vibe Coder, Rogue Consultant, Shadow Admin. Stärken, Schwächen, Coffee-Profil und
+              meist eine aktive Fähigkeit pro Runde.
+            </p>
+          </div>
+          <div class="feature">
+            <span class="feature-glyph">^</span>
+            <h3>AI-NPCs (Bots)</h3>
+            <p>
+              Nicht genug Menschen? Host lädt KI-Bots in die Lobby. Anthropic Claude Haiku oder
+              lokales Gemma 4 via Ollama &mdash; sie laufen durch die Map, completen Tasks, voten in
+              Meetings.
             </p>
           </div>
           <div class="feature">
@@ -271,18 +303,19 @@
           </div>
           <div class="feature">
             <span class="feature-glyph">#</span>
-            <h3>Mehrere Maps</h3>
+            <h3>Vier Maps + Editor</h3>
             <p>
-              Default-Office plus Small-Map. Host wählt in der Lobby. Eigene Maps via Browser-Editor
-              unter <code>/editor</code> bauen.
+              Default-Office, Office-Complex (390+ Möbelstücke), Datacenter, Small-Arena. Host wählt
+              in der Lobby. Eigene Maps via Browser-Editor unter <code>/editor</code> mit 2D-Canvas
+              und Three.js-3D-Vorschau.
             </p>
           </div>
           <div class="feature">
             <span class="feature-glyph">&gt;</span>
             <h3>Force-Reboot &amp; Body-Report</h3>
             <p>
-              Chaos kann Developer in der Nähe ausschalten. Lebende finden Bodies und triggern
-              Emergency Meetings.
+              Chaos kann Release-Spieler in der Nähe ausschalten (außerhalb des War-Rooms). Lebende
+              finden Bodies und triggern Emergency Meetings.
             </p>
           </div>
           <div class="feature">
@@ -295,10 +328,19 @@
           </div>
           <div class="feature">
             <span class="feature-glyph">*</span>
-            <h3>Live-Eventfeed</h3>
+            <h3>AI-Postmortem &amp; Last Words</h3>
             <p>
-              Server-authoritativer Feed: &bdquo;Pipeline ist rot&ldquo;, &bdquo;Carol wurde
-              entfernt &mdash; war Chaos-Agent&ldquo;. Du verpasst nichts.
+              Endscreen mit Awards (Pipeline Whisperer, Vibe of the Round, …), Per-Player-Stats und
+              einem AI-styled Postmortem-Text. Plus team-spezifisches „Last-Words"-Zitat für jeden
+              eliminierten Spieler.
+            </p>
+          </div>
+          <div class="feature">
+            <span class="feature-glyph">3</span>
+            <h3>Godot-3D-Client</h3>
+            <p>
+              Parallel zum Browser läuft ein Godot-4.6-Client mit echten KayKit-3D-Assets. Gleiches
+              WebSocket-Protokoll, gleicher Server &mdash; ein Client je nach Geschmack.
             </p>
           </div>
           <div class="feature">
@@ -309,7 +351,39 @@
               läuft weiter.
             </p>
           </div>
+          <div class="feature">
+            <span class="feature-glyph">$</span>
+            <h3>Mobile-tauglich</h3>
+            <p>
+              Touch-Controls auf Phone und Tablet: virtueller Joystick + Action-Buttons. Edge-Tabs
+              für Tasks und Sabotagen. Spielbar auch unterwegs in der Slack-Huddle.
+            </p>
+          </div>
         </div>
+      </section>
+
+      <!-- Mini-Game Showcase -->
+      <section id="mini-games" class="section">
+        <div class="section-head">
+          <span class="section-tag">// section_04b</span>
+          <h2>Mini-Games &mdash; jede Task ein eigenes Mechanik-Spiel</h2>
+        </div>
+        <figure class="screenshot-wide">
+          <img
+            src="/static/images/godot/minigame-sprint-trim.png"
+            alt="Sprint-Trim Mini-Game im Godot-Client: 6 Tickets mit Story-Points und Priority-Tags, Restpunkte 39 / Sprint-Budget 18"
+          />
+          <figcaption>
+            <strong>Scope reduzieren</strong> &mdash; Click-Tickets aus dem Sprint
+            (Subset-by-Constraint-Mechanik). Rote Priority-Tickets sind tabu.
+          </figcaption>
+        </figure>
+        <p class="prose">
+          Server-authoritative Plugin-Architektur: Server kennt den Wahrheitszustand jedes
+          Mini-Games, Browser- und Godot-Client mirror'n die View. Acht Mechanik-Patterns insgesamt
+          &mdash; sequencing, pairing, timing, filter, subset, spot-the-bug, stability-balance,
+          click-to-cycle-sort.
+        </p>
       </section>
 
       <!-- Roadmap-Status -->
@@ -322,46 +396,55 @@
           <div class="pipeline-stage stage-done">
             <div class="stage-head">
               <span class="stage-icon">[OK]</span>
-              <span class="stage-name">Tier 0 &mdash; Foundation</span>
+              <span class="stage-name"
+                >Tier 0&ndash;3 &mdash; Foundation + Among-Us-Features + Mini-Games</span
+              >
             </div>
-            <p class="stage-desc">Lint, CI, Docs, Deploy-Script, Reconnect, Edge-Cases.</p>
+            <p class="stage-desc">
+              CI, Reconnect, Vollbild-Map, alle 8 Tasks mit Mini-Games, alle 8 Sabotagen mit
+              Object-Binding, Force-Reboot, Vents, Spectator-Mode, Lights/Comms-Sabotage.
+            </p>
           </div>
           <div class="pipeline-arrow">&rarr;</div>
           <div class="pipeline-stage stage-done">
             <div class="stage-head">
               <span class="stage-icon">[OK]</span>
-              <span class="stage-name">Tier 1 &mdash; Core-Mechaniken</span>
+              <span class="stage-name"
+                >Tier 3.5&ndash;3.8 &mdash; Persona, Meeting-Kontext, Map-Editor</span
+              >
             </div>
             <p class="stage-desc">
-              Vollbild-Map, Eventfeed, Incidents, mehr Tasks &amp; Sabotagen, 4&ndash;12 Spieler,
-              Audio, Map-Editor, Multi-Map.
+              5+3 Rollen mit Stärken, persönliche Tasks, Coffee-Energy, Sabotage-Object-Binding,
+              AI-Postmortem, Endscreen mit Awards, Map-Editor mit 3D-Vorschau, kinds.json als Single
+              Source of Truth.
             </p>
           </div>
           <div class="pipeline-arrow">&rarr;</div>
           <div class="pipeline-stage stage-running">
             <div class="stage-head">
               <span class="stage-icon">[..]</span>
-              <span class="stage-name">Tier 2 &mdash; Among-Us-Features</span>
+              <span class="stage-name">Tier 3.9 &mdash; AI-Integration</span>
             </div>
             <p class="stage-desc">
-              Force-Reboot &amp; Spectator-Mode shipped. Vents, Lights- &amp; Comms-Sabotage als
-              nächstes.
+              LLM-Provider-Abstraction (Anthropic/Local) live. AI-NPCs als Lobby-Filler live. Offen:
+              AI-Postmortem mit echtem LLM, AI-Game-Master/Live-Commentary, AI-Meeting-Summary,
+              Chaos-Bots.
             </p>
           </div>
           <div class="pipeline-arrow">&rarr;</div>
-          <div class="pipeline-stage stage-pending">
+          <div class="pipeline-stage stage-running">
             <div class="stage-head">
-              <span class="stage-icon">[ &nbsp;]</span>
-              <span class="stage-name">Tier 3 &mdash; Godot-Migration</span>
+              <span class="stage-icon">[..]</span>
+              <span class="stage-name">Tier 4 &mdash; Godot-3D-Client</span>
             </div>
             <p class="stage-desc">
-              Polished Primary-Client mit Animationen, Tilemaps, Sound-Mixing. Browser bleibt als
-              Fallback.
+              Godot 4.6 mit KayKit-Assets parallel auf main. Lobby, World, Mini-Games, Take-Down,
+              Body-Report, Vents, Endscreen schon drin. Restliche Feature-Parität in Arbeit.
             </p>
           </div>
         </div>
         <p class="roadmap-link">
-          Volle Roadmap inkl. Tier 4&ndash;6 (Polish, Mod-Support, Live-Service):
+          Volle Roadmap inkl. Tier 5&ndash;7 (Polish, Mod-Support, Live-Service):
           <a
             href="https://github.com/rausch-tech/merge-commit-mayhem/blob/main/docs/ROADMAP.md"
             target="_blank"
@@ -411,7 +494,28 @@
             <summary>Allein testen?</summary>
             <p>
               Ja &mdash; in der Lobby gibt's einen Demo-Mode-Toggle. Damit startest du allein, wirst
-              automatisch Chaos und kannst die Mechaniken durchklicken.
+              automatisch Chaos und kannst die Mechaniken durchklicken. Alternativ kannst du als
+              Host KI-Bots in die Lobby einladen (&bdquo;+ Bot hinzufügen&ldquo;), dann hast du
+              Mitspieler ohne Menschen.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Was machen die KI-Bots?</summary>
+            <p>
+              Sie laufen LLM-getrieben oder heuristisch durch die Map, completen Tasks, melden
+              Bodies wenn sie welche sehen, voten in Meetings. Phase 1: nur Release-Team-Bots
+              &mdash; Chaos-Bots brauchen Game-Sense (Timing, Alibi-Building) und sind eigener
+              Slice. Provider: Anthropic Claude Haiku als Default, optional lokales Gemma 4 via
+              Ollama.
+            </p>
+          </details>
+          <details class="faq-item">
+            <summary>Browser oder Godot-Client?</summary>
+            <p>
+              Beide auf demselben Server. Browser ist zero-install und mobile-tauglich, der
+              Godot-3D-Client zeigt echte 3D-Assets mit Animationen. Beide laufen gegen
+              <code>wss://prod-is-lava.dev/ws</code>, der Server kennt den Unterschied nicht. Du
+              kannst sogar gemischt spielen (eine Person Browser, andere Godot).
             </p>
           </details>
           <details class="faq-item">
@@ -445,7 +549,7 @@
                 rel="noopener"
                 >GitHub</a
               >
-              aufmachen oder einfach Sven anpingen.
+              aufmachen, kurze Repro-Schritte dazu schreiben.
             </p>
           </details>
         </div>

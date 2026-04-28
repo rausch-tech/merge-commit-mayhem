@@ -47,8 +47,9 @@
             Meeting-Screen, der euch Diskussionsstoff liefert &mdash; aber niemals Beweise.
           </p>
           <div class="sub-hero-meta">
-            <span class="sub-meta-pill">Stand 2026-04-27</span>
-            <span class="sub-meta-pill">Tier 0&ndash;3.7 live</span>
+            <span class="sub-meta-pill">Stand 2026-04-28</span>
+            <span class="sub-meta-pill">Tier 0&ndash;3.9.2 live</span>
+            <span class="sub-meta-pill">Browser + Godot-3D</span>
             <span class="sub-meta-pill">~10&nbsp;min&nbsp;/&nbsp;Runde</span>
             <span class="sub-meta-pill">4&ndash;12 Spieler</span>
           </div>
@@ -57,10 +58,14 @@
             <a href="#runde">// rundenablauf</a>
             <a href="#rollen-detail">// rollen</a>
             <a href="#tasks">// tasks &amp; coffee</a>
+            <a href="#mini-games">// mini-games</a>
             <a href="#sabotagen">// sabotagen</a>
             <a href="#meetings">// meetings</a>
+            <a href="#bots">// ai-npcs</a>
             <a href="#endscreen">// endscreen</a>
             <a href="#ai">// ai-flavor</a>
+            <a href="#maps">// maps</a>
+            <a href="#godot">// godot</a>
             <a href="#tech">// tech</a>
           </nav>
         </div>
@@ -378,8 +383,59 @@
         </div>
       </section>
 
+      <!-- Mini-Games -->
+      <section id="mini-games" class="section">
+        <div class="section-head">
+          <span class="section-tag">// section_04b</span>
+          <h2>Mini-Games &mdash; jede Task ein Mechanik-Spiel</h2>
+        </div>
+        <div class="prose">
+          <p>
+            <strong>Alle 8 Tasks haben Mini-Games.</strong> Server-authoritative Plugin-
+            Architektur: der Server kennt den Wahrheitszustand jeder Mini-Game-Session, Browser- und
+            Godot-Client mirror'n die View. Acht verschiedene Mechanik-Patterns, damit kein Task
+            sich anfühlt wie der andere.
+          </p>
+          <figure class="screenshot">
+            <img
+              src="/static/images/godot/minigame-sprint-trim.png"
+              alt="Sprint-Trim Mini-Game im Godot-Client: 6 Tickets mit Story-Points, Restpunkte 39 / Sprint-Budget 18"
+            />
+            <figcaption>
+              &bdquo;Scope reduzieren&ldquo; im Godot-3D-Client &mdash; Tickets aus dem Sprint
+              picken (Subset-by-Constraint).
+            </figcaption>
+          </figure>
+          <ul class="prose-list">
+            <li>
+              <code>fix_unit_tests</code> &mdash; <strong>Test-Suite-Repair</strong> (Sequencing)
+            </li>
+            <li>
+              <code>analyze_logs</code> &mdash; <strong>Log-Filter</strong> (Filter-by-Criterion)
+            </li>
+            <li><code>repair_deployment</code> &mdash; <strong>Cable-Pairing</strong> (Pairing)</li>
+            <li><code>refill_coffee</code> &mdash; <strong>Coffee-Pour</strong> (Timing)</li>
+            <li>
+              <code>reduce_scope</code> &mdash; <strong>Sprint-Trim</strong> (Subset-by-Constraint)
+            </li>
+            <li>
+              <code>review_pr</code> &mdash; <strong>Diff-Review</strong> (Multi-Select-by-
+              Criterion / Spot-the-Bug)
+            </li>
+            <li>
+              <code>calm_legacy_service</code> &mdash; <strong>Stability-Balance</strong> (alle drei
+              Metriken im grünen Band halten)
+            </li>
+            <li>
+              <code>write_release_notes</code> &mdash; <strong>Release-Notes</strong> (Click-to-
+              Cycle-Sort)
+            </li>
+          </ul>
+        </div>
+      </section>
+
       <!-- Sabotagen -->
-      <section id="sabotagen" class="section">
+      <section id="sabotagen" class="section section-alt">
         <div class="section-head">
           <span class="section-tag">// section_05</span>
           <h2>Sabotagen &mdash; an Themen-Objekte gebunden</h2>
@@ -476,7 +532,7 @@
       </section>
 
       <!-- Meetings -->
-      <section id="meetings" class="section section-alt">
+      <section id="meetings" class="section">
         <div class="section-head">
           <span class="section-tag">// section_06</span>
           <h2>Meetings &mdash; Hinweise statt Beweise</h2>
@@ -501,6 +557,52 @@
             Geister dürfen nicht voten oder reporten &mdash; sie können aber weiter Tasks erledigen
             und damit dem Release-Team auch nach dem Tod helfen.
           </p>
+        </div>
+      </section>
+
+      <!-- AI-NPCs / Bots -->
+      <section id="bots" class="section section-alt">
+        <div class="section-head">
+          <span class="section-tag">// section_06b</span>
+          <h2>AI-NPCs &mdash; Lobby-Filler statt Wartepausen</h2>
+        </div>
+        <div class="prose">
+          <p>
+            Wenn weniger als sechs Menschen da sind, kann der Host <strong>KI-Bots</strong> in die
+            Lobby einladen. &bdquo;+ Bot hinzufügen&ldquo; in der Lobby &mdash; ein neuer Spieler
+            mit Namen wie <em>Bot-Promptly</em>, <em>Bot-Cursor-Sr.</em>,
+            <em>Bot-StackOverflow</em> oder <em>Bot-Junior</em> taucht auf. Im Spiel mit einem
+            <code>[BOT]</code>-Tag über dem Sprite, in der Lobby mit Kick-Button.
+          </p>
+          <p>
+            Die Bots laufen LLM-getrieben durch die Map: alle 5&nbsp;s pro Bot fragt der Server das
+            LLM nach dem nächsten Intent (&bdquo;welche Task soll der Bot als Nächstes
+            machen?&ldquo;). Pathfinding, Movement, Voting und Body-Report sind deterministisch im
+            Server &mdash; das LLM darf nur das &bdquo;Was&ldquo;, nicht das &bdquo;Wie&ldquo;
+            entscheiden. Reactive Overrides reagieren sofort wenn ein Bot einen Body in Sichtweite
+            hat.
+          </p>
+          <ul class="prose-list">
+            <li>
+              <strong>Provider:</strong> Anthropic Claude Haiku (Default) oder lokales
+              OpenAI-kompatibles (z.&nbsp;B. Ollama mit Gemma&nbsp;4). Auswahl per Env-Vars,
+              Fallback auf Heuristik wenn nichts gesetzt ist.
+            </li>
+            <li>
+              <strong>Phase 1: nur Release-Team-Bots.</strong> Chaos-Bots brauchen Game-Sense
+              (Timing, Alibi-Building) und sind eigener Slice.
+            </li>
+            <li>
+              <strong>Bots skippen Mini-Games.</strong> Sie halten den Task einfach 4&ndash;6 s und
+              das gibt den Reward &mdash; bewusste Design-Entscheidung, damit Bots Räume füllen
+              statt DOM-Klicks zu spielen.
+            </li>
+            <li>
+              <strong>LLM-Calls non-blocking.</strong> Jeder Call läuft im ThreadPool, der
+              20-Hz-Tick blockiert nie. Wenn Anthropic mal langsam ist, fällt der Bot kurz auf
+              Heuristik zurück und nimmt das LLM-Result beim nächsten Pick.
+            </li>
+          </ul>
         </div>
       </section>
 
@@ -567,6 +669,88 @@
               (procedural mit reichen Templates, später optional via echter LLM-Call).
             </li>
           </ul>
+        </div>
+      </section>
+
+      <!-- Maps -->
+      <section id="maps" class="section">
+        <div class="section-head">
+          <span class="section-tag">// section_08b</span>
+          <h2>Maps &mdash; vier Karten + Editor</h2>
+        </div>
+        <div class="prose">
+          <p>
+            Aktuell vier Maps, in der Lobby per Dropdown wählbar. Pydantic-validiert beim
+            Server-Start, an den Client per <code>room_joined</code> mitgegeben.
+          </p>
+          <ul class="prose-list">
+            <li>
+              <strong>default-office</strong> &mdash; 4800&times;3200&nbsp;px, 6 Räume, 44
+              Möbelstücke. Showcase-Map, balanciert.
+            </li>
+            <li>
+              <strong>office-complex</strong> &mdash; 4800&times;3200&nbsp;px, 9 Räume,
+              <em>390+ Möbelstücke</em>. Wow-Effekt-Map mit echten KayKit-Möbeln.
+            </li>
+            <li>
+              <strong>datacenter</strong> &mdash; 4800&times;3200&nbsp;px, 10 Räume, 147 Möbelstücke
+              (Server-Racks dominieren).
+            </li>
+            <li>
+              <strong>small-arena</strong> &mdash; 1600&times;1200&nbsp;px, 3 Räume. Schnelle
+              Test-Runden.
+            </li>
+          </ul>
+          <p>
+            <code>maps/kinds.json</code> ist die <strong>Single Source of Truth</strong> für
+            MapObject-Kinds (25 Möbel-Typen wie <code>desk</code>, <code>server_rack</code>,
+            <code>coffee_machine</code>). Server validiert Maps gegen die Registry. Browser-
+            Frontend, Editor-3D-Vorschau und Godot-Client lesen alle dynamisch via
+            <code>GET /api/kinds</code> &mdash; ein neues Möbelstück wird einmal in
+            <code>kinds.json</code> ergänzt und ist überall verfügbar.
+          </p>
+          <p>
+            Der <strong>Map-Editor</strong> unter <a href="/editor">/editor</a> hat 2D-Canvas plus
+            Three.js-3D-Vorschau Side-by-Side, Save direkt zum Server, Undo/Redo, Validation-Strip.
+            Designer können ohne Code-Touch Maps komponieren und sofort live testen.
+          </p>
+        </div>
+      </section>
+
+      <!-- Godot-3D-Client -->
+      <section id="godot" class="section section-alt">
+        <div class="section-head">
+          <span class="section-tag">// section_08c</span>
+          <h2>Godot-3D-Client &mdash; parallel zum Browser</h2>
+        </div>
+        <figure class="screenshot">
+          <img
+            src="/static/images/godot/aerial-office-complex.png"
+            alt="Godot-3D-Client mit Office-Complex-Map: 9 Räume, ~390 Möbelstücke, 5 Spieler im HUD"
+          />
+          <figcaption>
+            Godot-3D-Client &mdash; Aerial-View der Office-Complex-Map (9 Räume, 390+ Möbelstücke).
+          </figcaption>
+        </figure>
+        <div class="prose">
+          <p>
+            Seit Tier 4 läuft <strong>Godot 4.6</strong> als paralleler Client neben dem
+            Browser-Frontend. Echte 3D-Assets aus dem KayKit-Bundle (Möbel, Charaktere,
+            Server-Racks), Mobile-Renderer, MSAA 4&times;. Gleiches WebSocket-Protokoll, gleicher
+            Server &mdash; ein Server bedient beide.
+          </p>
+          <p>
+            Der Godot-Client zieht Map und Kinds-Registry zur Laufzeit per HTTP vom Backend
+            (<code>/api/maps/&lt;id&gt;</code>, <code>/api/kinds</code>). Keine Drift zwischen den
+            Welten, keine manuellen Sync-Hooks. Wenn das Backend kurz offline ist, fällt der Client
+            auf lokale Demo-Kopien zurück.
+          </p>
+          <p>
+            Status: Lobby, World, Mini-Games (5/5 portiert), Take-Down, Body-Report, Vents,
+            Endscreen mit Awards, Personal-Tasks, Coffee-Pulse, Ability-Btn, Sabotage-Strip,
+            Eventfeed, Role-Intro-Modal &mdash; alles drin. Restliche Feature-Parität in Arbeit
+            (Tier 4.x).
+          </p>
         </div>
       </section>
 

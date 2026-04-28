@@ -1032,3 +1032,34 @@ code {
     padding: 10px 16px;
   }
 }
+
+/* Screenshots ------------------------------------------------------------ */
+
+.hero-screenshot {
+  margin: 28px 0 8px;
+  max-width: 720px;
+}
+
+.hero-screenshot img,
+.screenshot-wide img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-soft);
+}
+
+.hero-screenshot figcaption,
+.screenshot-wide figcaption {
+  margin-top: 10px;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.screenshot-wide {
+  margin: 24px auto 16px;
+  max-width: 920px;
+}
