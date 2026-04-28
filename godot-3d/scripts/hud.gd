@@ -116,6 +116,9 @@ var _comms_down: bool = false
 # Ghost-Banner (4.10.z) — sichtbar wenn local player isAlive=false.
 var _ghost_banner: Label
 var _is_ghost: bool = false
+# Kill-Flash (4.10 Polish) — voller Screen-Edge-Tint beim Kill-Event.
+var _kill_flash: ColorRect
+var _kill_flash_tween: Tween
 
 func _ready() -> void:
 	_build_top_bar()
@@ -130,6 +133,7 @@ func _ready() -> void:
 	_build_action_buttons_panel()
 	_build_lights_overlay()
 	_build_ghost_banner()
+	_build_kill_flash()
 	_build_map_label()
 	_build_task_prompt()
 	apply_game_state({})
@@ -1739,3 +1743,34 @@ func _apply_ghost_banner(players: Array) -> void:
 			break
 	_is_ghost = not alive
 	_ghost_banner.visible = _is_ghost
+
+
+# Kill-Flash (4.10 Polish) — wenn ein Spieler stirbt, blitzt der Bildschirm
+# kurz rot (alpha 0.45 -> 0 ueber 0.6 s). Wird von world.gd via
+# trigger_kill_flash() aufgerufen.
+
+func _build_kill_flash() -> void:
+	_kill_flash = ColorRect.new()
+	_kill_flash.color = Color(0.95, 0.1, 0.1, 0.0)
+	_kill_flash.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_kill_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_kill_flash)
+
+
+func trigger_kill_flash() -> void:
+	_play_full_screen_flash(Color(0.95, 0.10, 0.10), 0.45, 0.6)
+
+
+func trigger_vent_flash() -> void:
+	# Lila-Flash beim Vent-Use — visuelle Markierung "ich teleportiere".
+	_play_full_screen_flash(Color(0.50, 0.30, 0.85), 0.55, 0.45)
+
+
+func _play_full_screen_flash(color: Color, peak_alpha: float, fade_seconds: float) -> void:
+	if _kill_flash == null:
+		return
+	if _kill_flash_tween != null and _kill_flash_tween.is_valid():
+		_kill_flash_tween.kill()
+	_kill_flash.color = Color(color.r, color.g, color.b, peak_alpha)
+	_kill_flash_tween = create_tween()
+	_kill_flash_tween.tween_property(_kill_flash, "color:a", 0.0, fade_seconds)

@@ -49,6 +49,8 @@ var _tasks_by_id: Dictionary = {}              # taskId → task dict from game_
 # Tier 4.10: Bodies + Vents fuer Proximity-Actions.
 var _bodies: Array = []                          # [{id, victimName, x, y, room}]
 var _vents: Array = []                           # [{id, x, y, connectedTo}]
+# Tier 4.10 polish: 3D-Body-Markers im _world_root, lifecycle in _refresh_body_markers.
+var _body_nodes: Dictionary = {}                 # body_id -> Node3D (red disc + floating "?"-marker)
 # Cooldown-Snapshot fuer Take-Down (private_state.takedownCooldownRemaining).
 var _takedown_cooldown: float = 0.0
 # Letzter "in war_room"-Flag des lokalen Spielers (kommt aus players[].inWarRoom
@@ -442,6 +444,11 @@ func _on_hud_vent_pressed(vent_id: String) -> void:
 	# aktuelles Vent.
 	if ws_client != null and vent_id != "":
 		ws_client.send(Protocol.TYPE_USE_VENT, {"targetVentId": vent_id})
+		# Lokaler VFX-Trigger — visuelles Feedback dass die Action ankam.
+		# Server-Echo (neuer Position) folgt im naechsten Tick (~50 ms).
+		if _hud != null and _hud.has_method("trigger_vent_flash"):
+			_hud.call("trigger_vent_flash")
+		_play_sting(STING_TASK_COMPLETE)
 
 
 func _update_proximity_actions() -> void:
@@ -531,6 +538,67 @@ func _update_proximity_actions() -> void:
 
 	if _hud.has_method("set_proximity_actions"):
 		_hud.call("set_proximity_actions", actions)
+
+
+func _refresh_body_markers() -> void:
+	# Tier 4.10 Polish: jeder Body in game_state.bodies bekommt ein rotes
+	# Floor-Disc + ein floating "?"-Label. Lifecycle: bei jedem game_state-
+	# Tick aktualisieren — neue Bodies erstellen, gemeldete aufraeumen.
+	if _world_root == null:
+		return
+	var seen: Dictionary = {}
+	for b in _bodies:
+		var bid := str(b.get("id", ""))
+		seen[bid] = true
+		var bx: float = float(b.get("x", 0))
+		var by: float = float(b.get("y", 0))
+		var pos: Vector3 = Protocol.server_to_world(bx, by)
+		if _body_nodes.has(bid):
+			var existing: Node3D = _body_nodes[bid]
+			existing.position = pos
+			continue
+		var node := _make_body_marker(str(b.get("victimName", "?")))
+		node.position = pos
+		_world_root.add_child(node)
+		_body_nodes[bid] = node
+	# Bodies entfernen die nicht mehr im Snapshot sind (gemeldet → Server
+	# clearer den Body, naechster Tick hat ihn nicht mehr).
+	for old_id in _body_nodes.keys():
+		if not seen.has(old_id):
+			var n: Node3D = _body_nodes[old_id]
+			n.queue_free()
+			_body_nodes.erase(old_id)
+
+
+func _make_body_marker(victim_name: String) -> Node3D:
+	var root := Node3D.new()
+	# Floor-Disc — flache rote Cylinder (radius ~0.4 world-units, height tiny).
+	var disc := MeshInstance3D.new()
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = 0.45
+	mesh.bottom_radius = 0.45
+	mesh.height = 0.04
+	mesh.radial_segments = 24
+	disc.mesh = mesh
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.95, 0.20, 0.25, 0.85)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.emission_enabled = true
+	mat.emission = Color(0.6, 0.05, 0.05)
+	mat.emission_energy = 1.5
+	disc.material_override = mat
+	disc.position.y = 0.02
+	root.add_child(disc)
+	# Floating label "?" damit Spieler aus der Distanz sieht "da ist was".
+	var lbl := Label3D.new()
+	lbl.text = "? %s" % victim_name
+	lbl.modulate = Color(1.0, 0.5, 0.5)
+	lbl.outline_size = 6
+	lbl.font_size = 28
+	lbl.position.y = 1.4
+	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	root.add_child(lbl)
+	return root
 
 
 func _local_in_war_room() -> bool:
@@ -651,6 +719,9 @@ func _apply_state(state: Dictionary) -> void:
 
 	if any_kill:
 		_play_sting(STING_KILL)
+		# Tier 4.10 Polish: HUD blitzt kurz rot.
+		if _hud != null and _hud.has_method("trigger_kill_flash"):
+			_hud.call("trigger_kill_flash")
 
 	# Tasks-By-Id refresh (fuer Proximity-Check + Hold-Progress).
 	_tasks_by_id.clear()
@@ -659,8 +730,9 @@ func _apply_state(state: Dictionary) -> void:
 		if tid != "":
 			_tasks_by_id[tid] = t
 
-	# Tier 4.10: Bodies-Snapshot fuer Report-Proximity.
+	# Tier 4.10: Bodies-Snapshot fuer Report-Proximity + 3D-Marker.
 	_bodies = state.get("bodies", [])
+	_refresh_body_markers()
 
 	# HUD update
 	if _hud and _hud.has_method("apply_game_state"):
