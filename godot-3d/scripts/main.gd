@@ -52,6 +52,27 @@ var _demo_check: CheckBox
 var _start_btn: Button
 var _leave_btn: Button
 var _lobby_status: Label
+var _map_select: OptionButton
+var _role_select: OptionButton
+var _add_bot_btn: Button
+var _remove_bot_btn: Button
+# Cache der availableMaps + bot-Liste, damit Re-Populate idempotent ist und
+# wir bot_ids fuer remove_bot kennen.
+var _available_maps: Array = []
+var _selected_map_id: String = ""
+var _bot_ids: Array = []
+# Keine Signal-Loop wenn wir den Dropdown selber programmatisch setzen.
+var _suppress_dropdown_signals: bool = false
+
+# 5 Release-Rollen + "Egal" als Default. Order matched JS-Client-Lobby.
+const ROLE_OPTIONS: Array = [
+	{"id": "", "label": "Egal (zufaellig)"},
+	{"id": "developer", "label": "Developer"},
+	{"id": "devops_engineer", "label": "DevOps Engineer"},
+	{"id": "qa_lead", "label": "QA Lead"},
+	{"id": "scrum_master", "label": "Scrum Master"},
+	{"id": "caffeine_collector", "label": "Caffeine Collector"},
+]
 
 var _log_area: TextEdit
 var _click_player: AudioStreamPlayer
@@ -193,6 +214,21 @@ func _build_ui() -> void:
 	_lobby_room_label.add_theme_font_size_override("font_size", 22)
 	lobby_vbox.add_child(_lobby_room_label)
 
+	# Map-Auswahl (Host-only, populiert sich aus lobby_state.availableMaps).
+	_map_select = OptionButton.new()
+	_map_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_map_select.item_selected.connect(_on_map_selected)
+	lobby_vbox.add_child(_make_dropdown_row("Map", _map_select))
+
+	# Rollen-Praeferenz (jeder Spieler kann seinen Wunsch setzen).
+	_role_select = OptionButton.new()
+	_role_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for opt in ROLE_OPTIONS:
+		_role_select.add_item(opt["label"])
+	_role_select.selected = 0
+	_role_select.item_selected.connect(_on_role_selected)
+	lobby_vbox.add_child(_make_dropdown_row("Rolle (Wunsch)", _role_select))
+
 	var players_label := Label.new()
 	players_label.text = "Spieler"
 	players_label.add_theme_color_override("font_color", COLOR_TEXT_DIM)
@@ -200,7 +236,7 @@ func _build_ui() -> void:
 	lobby_vbox.add_child(players_label)
 
 	var player_scroll := ScrollContainer.new()
-	player_scroll.custom_minimum_size = Vector2(0, 180)
+	player_scroll.custom_minimum_size = Vector2(0, 140)
 	player_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	lobby_vbox.add_child(player_scroll)
 
@@ -208,6 +244,26 @@ func _build_ui() -> void:
 	_player_list.add_theme_constant_override("separation", 6)
 	_player_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	player_scroll.add_child(_player_list)
+
+	# AI-Bot-Buttons (host-only). Add fuegt einen kuratierten Bot hinzu,
+	# Remove kickt den letzten in der Liste — Server entscheidet welche Namen.
+	var bot_row := HBoxContainer.new()
+	bot_row.add_theme_constant_override("separation", 8)
+	lobby_vbox.add_child(bot_row)
+
+	_add_bot_btn = _make_secondary_button("+ Bot")
+	_add_bot_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_add_bot_btn.pressed.connect(_on_add_bot_pressed)
+	_add_bot_btn.pressed.connect(_play_click)
+	_add_bot_btn.visible = false
+	bot_row.add_child(_add_bot_btn)
+
+	_remove_bot_btn = _make_secondary_button("- Bot")
+	_remove_bot_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_remove_bot_btn.pressed.connect(_on_remove_bot_pressed)
+	_remove_bot_btn.pressed.connect(_play_click)
+	_remove_bot_btn.visible = false
+	bot_row.add_child(_remove_bot_btn)
 
 	_demo_check = CheckBox.new()
 	_demo_check.text = "Demo-Mode (1 Spieler erlaubt, du bist Chaos)"
@@ -305,6 +361,18 @@ func _make_field_row(label_text: String, edit: LineEdit) -> VBoxContainer:
 	lbl.add_theme_font_size_override("font_size", 12)
 	row.add_child(lbl)
 	row.add_child(edit)
+	return row
+
+
+func _make_dropdown_row(label_text: String, dropdown: OptionButton) -> VBoxContainer:
+	var row := VBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	var lbl := Label.new()
+	lbl.text = label_text
+	lbl.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+	lbl.add_theme_font_size_override("font_size", 12)
+	row.add_child(lbl)
+	row.add_child(dropdown)
 	return row
 
 func _make_line_edit(default_text: String) -> LineEdit:
@@ -442,9 +510,17 @@ func _on_message(type_: String, payload: Dictionary) -> void:
 			_set_lobby_status("In der Lobby — warte auf Spielstart.", false)
 			_demo_check.visible = _is_host
 			_start_btn.visible = _is_host
+			# Map-Auswahl + Bot-Buttons sind Host-only — Client-Spieler sehen sie nicht.
+			_map_select.disabled = not _is_host
+			_add_bot_btn.visible = _is_host
+			_remove_bot_btn.visible = _is_host
 			_show_lobby_card()
 		Protocol.TYPE_LOBBY_STATE:
 			_update_player_list(payload.get("players", []))
+			_update_map_select(
+				payload.get("availableMaps", []),
+				str(payload.get("selectedMapId", "")),
+			)
 		Protocol.TYPE_PRIVATE_ROLE:
 			_role_info = payload.duplicate()
 			_append_log("[private_role] role=%s team=%s" % [
@@ -469,9 +545,77 @@ func _on_message(type_: String, payload: Dictionary) -> void:
 func _update_player_list(players: Array) -> void:
 	for child in _player_list.get_children():
 		child.queue_free()
+	_bot_ids.clear()
 	for p in players:
 		var entry := _make_player_row(p)
 		_player_list.add_child(entry)
+		if bool(p.get("isBot", false)):
+			_bot_ids.append(str(p.get("id", "")))
+	# Remove-Bot nur sinnvoll wenn ueberhaupt Bots da sind.
+	if _is_host:
+		_remove_bot_btn.disabled = _bot_ids.is_empty()
+
+
+func _update_map_select(available: Array, selected_id: String) -> void:
+	# Vergleichshash: wenn die Map-Liste unveraendert ist, lassen wir den
+	# Dropdown in Ruhe — sonst "klingelt" jeder 1 Hz LobbyState das Selection.
+	var sig := []
+	for m in available:
+		sig.append({"id": str(m.get("id", "")), "name": str(m.get("name", ""))})
+	if sig == _available_maps and selected_id == _selected_map_id:
+		return
+	_available_maps = sig
+	_selected_map_id = selected_id
+	_suppress_dropdown_signals = true
+	_map_select.clear()
+	var sel_idx := 0
+	for i in available.size():
+		var m: Dictionary = available[i]
+		_map_select.add_item(str(m.get("name", "?")))
+		_map_select.set_item_metadata(i, str(m.get("id", "")))
+		if str(m.get("id", "")) == selected_id:
+			sel_idx = i
+	if available.size() > 0:
+		_map_select.selected = sel_idx
+	_suppress_dropdown_signals = false
+
+
+func _on_map_selected(idx: int) -> void:
+	if _suppress_dropdown_signals or not _is_host:
+		return
+	if idx < 0 or idx >= _map_select.item_count:
+		return
+	var map_id := str(_map_select.get_item_metadata(idx))
+	if map_id == "":
+		return
+	_ws.send(Protocol.TYPE_SELECT_MAP, {"mapId": map_id})
+	_append_log("[ws] sent select_map mapId=%s" % map_id)
+
+
+func _on_role_selected(idx: int) -> void:
+	if _suppress_dropdown_signals:
+		return
+	if idx < 0 or idx >= ROLE_OPTIONS.size():
+		return
+	var role_id: String = ROLE_OPTIONS[idx]["id"]
+	# Empty string -> null im JSON-Payload (Server akzeptiert beides).
+	var payload := {"role": role_id if role_id != "" else null}
+	_ws.send(Protocol.TYPE_SET_PREFERRED_ROLE, payload)
+	_append_log("[ws] sent set_preferred_role role=%s" % role_id)
+
+
+func _on_add_bot_pressed() -> void:
+	if not _is_host:
+		return
+	_ws.send(Protocol.TYPE_ADD_BOT, {})
+
+
+func _on_remove_bot_pressed() -> void:
+	if not _is_host or _bot_ids.is_empty():
+		return
+	# Letzten Bot kicken — JS-Client macht es genauso.
+	var bot_id: String = _bot_ids[-1]
+	_ws.send(Protocol.TYPE_REMOVE_BOT, {"botId": bot_id})
 
 func _make_player_row(player: Dictionary) -> Control:
 	var row := HBoxContainer.new()
@@ -492,6 +636,12 @@ func _make_player_row(player: Dictionary) -> Control:
 		host_tag.add_theme_color_override("font_color", COLOR_ACCENT)
 		host_tag.add_theme_font_size_override("font_size", 11)
 		row.add_child(host_tag)
+	if bool(player.get("isBot", false)):
+		var bot_tag := Label.new()
+		bot_tag.text = "BOT"
+		bot_tag.add_theme_color_override("font_color", COLOR_TEXT_DIM)
+		bot_tag.add_theme_font_size_override("font_size", 11)
+		row.add_child(bot_tag)
 	return row
 
 func _on_start_pressed() -> void:
