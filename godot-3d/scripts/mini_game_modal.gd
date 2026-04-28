@@ -32,6 +32,8 @@ const MINI_GAME_SCRIPTS: Dictionary = {
 	"test_suite_repair": preload("res://scripts/minigames/test_suite_repair.gd"),
 	"release_notes": preload("res://scripts/minigames/release_notes.gd"),
 	"coffee_pour": preload("res://scripts/minigames/coffee_pour.gd"),
+	"cable_pairing": preload("res://scripts/minigames/cable_pairing.gd"),
+	"stability_balance": preload("res://scripts/minigames/stability_balance.gd"),
 }
 
 var _task_id: String = ""
