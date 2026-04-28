@@ -73,6 +73,18 @@ _BOT_WORK_MAX_SEC: Final[float] = 6.0
 # bot doesn't get stuck oscillating around a door center.
 _WAYPOINT_REACH_PX: Final[float] = 24.0
 
+# How long a bot may stand-still-with-input before we abandon the intent.
+# Triggers when the pathfinder picked a target it can't reach with its
+# room+door-only view (e. g. a desk blocks the in-room straight line).
+# 1.5 s is well past anything a moving bot ever spends in one spot.
+_BOT_STUCK_TIMEOUT_SEC: Final[float] = 1.5
+
+# After abandoning a task as unreachable, blacklist it for this long so
+# pick_next_target doesn't immediately pick it again. Long enough that
+# the bot will probably have walked far enough to retry from a new angle,
+# short enough that the task isn't permanently dead to this bot.
+_BOT_FAILED_TASK_BLACKLIST_SEC: Final[float] = 8.0
+
 
 @dataclass
 class BotState:
@@ -82,11 +94,19 @@ class BotState:
     is the high-level intent (the "what" the bot is trying to do); the
     path is the "how". When `work_remaining_sec > 0` the bot is at the
     target and hold-E-ing for the remaining duration.
+
+    `stuck_seconds` and `recently_failed_tasks` together implement the
+    unstuck-after-collision behavior: when the pathfinder leads the bot
+    into a wall it can't navigate around (room+door pathfinder doesn't
+    see MapObjects), the bot abandons the intent and avoids re-picking
+    the same task for a cool-down window.
     """
 
     target_task_id: str | None = None
     path: list[Point] = field(default_factory=list)
     work_remaining_sec: float = 0.0
+    stuck_seconds: float = 0.0
+    recently_failed_tasks: dict[str, float] = field(default_factory=dict)
 
 
 class BotManager:
@@ -191,6 +211,13 @@ class BotManager:
             if not player.is_alive:
                 player.input_state = InputState()
                 continue
+            # Decay any per-bot task-blacklist entries (added when the bot
+            # gave up on an unreachable target).
+            if state.recently_failed_tasks:
+                for tid in list(state.recently_failed_tasks):
+                    state.recently_failed_tasks[tid] -= dt
+                    if state.recently_failed_tasks[tid] <= 0:
+                        state.recently_failed_tasks.pop(tid)
             self._tick_one(player, state, dt)
 
     # --- per-bot logic -------------------------------------------------------
@@ -212,14 +239,62 @@ class BotManager:
                 player.input_state = InputState()
                 return
 
+        # Snapshot pre-move position so the post-action stuck-check can
+        # tell whether the bot actually progressed this tick.
+        pre_x, pre_y = player.x, player.y
+
         # Have intent + path → drive toward next waypoint.
         if not state.path:
             # Already at target room (path was empty) but not yet within
             # interaction radius? Steer straight to task position.
             self._maybe_start_work(player, state)
-            return
+        else:
+            self._step_along_path(player, state)
 
-        self._step_along_path(player, state)
+        self._check_stuck(player, state, dt, pre_x, pre_y)
+
+    def _check_stuck(
+        self,
+        player: Player,
+        state: BotState,
+        dt: float,
+        pre_x: float,
+        pre_y: float,
+    ) -> None:
+        """If the bot wanted to move but didn't actually move for a
+        while, drop the intent so pick_next_target tries something else.
+
+        Stuck means: input_state has any direction set AND the position
+        didn't change since pre-move (movement controller refused the
+        step due to a wall/MapObject collision the pathfinder couldn't
+        see). The pathfinder is room+door-aware but NOT MapObject-aware,
+        so a desk between the bot and an in-room task anchor traps it
+        in a perpetual push-against-wall loop. This unstucks it.
+
+        Counter is in seconds, not ticks, so the threshold is tick-rate
+        independent. ~1.5 s of fruitless input is plenty: a bot that's
+        actually walking moves >100 px in that time.
+        """
+        i = player.input_state
+        wants_to_move = i.up or i.down or i.left or i.right
+        if not wants_to_move:
+            state.stuck_seconds = 0.0
+            return
+        moved = (player.x - pre_x) ** 2 + (player.y - pre_y) ** 2 > 1.0
+        if moved:
+            state.stuck_seconds = 0.0
+            return
+        state.stuck_seconds += dt
+        if state.stuck_seconds < _BOT_STUCK_TIMEOUT_SEC:
+            return
+        # Stuck too long — abandon the current intent. Brief mark on the
+        # task so pick_next_target avoids re-picking it for a few seconds
+        # (gives the bot a chance to actually leave its current spot
+        # before re-evaluating reachability).
+        if state.target_task_id is not None:
+            state.recently_failed_tasks[state.target_task_id] = _BOT_FAILED_TASK_BLACKLIST_SEC
+        self._reset_intent(player, state)
+        state.stuck_seconds = 0.0
 
     def _step_along_path(self, player: Player, state: BotState) -> None:
         if not state.path:
@@ -339,12 +414,26 @@ class BotManager:
             return
 
         room = self._room
+        in_progress = self._tasks_in_progress_by_other_bots(player.id)
+        # Skip tasks the bot recently abandoned as unreachable; if every
+        # task is in that bucket we relax the filter so the bot at least
+        # tries something rather than going idle (worst case it gets
+        # stuck again, blacklist refreshes, eventually the cooldown
+        # decay opens up other tasks).
+        blacklist = state.recently_failed_tasks
         candidates = [
             t
             for t in room.tasks.values()
             if t.status == "available"
-            and t.definition.id not in self._tasks_in_progress_by_other_bots(player.id)
+            and t.definition.id not in in_progress
+            and t.definition.id not in blacklist
         ]
+        if not candidates:
+            candidates = [
+                t
+                for t in room.tasks.values()
+                if t.status == "available" and t.definition.id not in in_progress
+            ]
         if not candidates:
             return
         choice = self._rng.choice(candidates)

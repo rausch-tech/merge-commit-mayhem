@@ -314,6 +314,109 @@ def test_bot_advances_waypoint_when_within_reach() -> None:
     assert state.path == [(500.0, 100.0)]
 
 
+# --- stuck-detection (regression for the desk-blocked-spawn bug) -----------
+
+
+def test_bot_abandons_intent_when_stuck_against_wall() -> None:
+    """If the bot wants to move but isn't actually moving (movement
+    refused by collision), it must drop its target after the timeout
+    so pick_next_target can try a different task. Regression for the
+    spawn-on-blocked-desk bug observed live on default-office."""
+    from app.game.bots.manager import _BOT_STUCK_TIMEOUT_SEC
+    from app.game.models import InputState
+
+    room = _start_room_with_humans(4)
+    room._bots.add_bot()
+    host_id = next(p.id for p in room.players.values() if p.is_host)
+    room.start(host_id)
+
+    bot_id = next(iter(room._bots.bot_ids()))
+    bot = room.players[bot_id]
+    state = room._bots.state_for(bot_id)
+    assert state is not None
+
+    # Force the bot into the "stuck against something" shape: input set,
+    # path empty, target set, but pre→post position unchanged.
+    state.target_task_id = "fix_unit_tests"
+    state.path = []
+    bot.input_state = InputState(left=True)
+    pre_x, pre_y = bot.x, bot.y
+
+    # Push past the timeout in one synthetic call.
+    room._bots._check_stuck(bot, state, dt=_BOT_STUCK_TIMEOUT_SEC + 0.1, pre_x=pre_x, pre_y=pre_y)
+
+    assert state.target_task_id is None
+    assert "fix_unit_tests" in state.recently_failed_tasks
+
+
+def test_bot_stuck_counter_resets_when_it_moves() -> None:
+    from app.game.models import InputState
+
+    room = _start_room_with_humans(4)
+    room._bots.add_bot()
+    host_id = next(p.id for p in room.players.values() if p.is_host)
+    room.start(host_id)
+
+    bot_id = next(iter(room._bots.bot_ids()))
+    bot = room.players[bot_id]
+    state = room._bots.state_for(bot_id)
+    assert state is not None
+
+    state.target_task_id = "x"
+    state.stuck_seconds = 1.2  # close to limit
+    bot.input_state = InputState(left=True)
+    # Pretend the bot moved 50px.
+    pre_x, pre_y = bot.x + 50.0, bot.y
+    room._bots._check_stuck(bot, state, dt=0.5, pre_x=pre_x, pre_y=pre_y)
+
+    assert state.stuck_seconds == 0.0
+    assert state.target_task_id == "x"
+
+
+def test_blacklisted_task_skipped_by_heuristic_picker() -> None:
+    """Once a task is in `recently_failed_tasks`, the heuristic must
+    pick a different one — even if it's the only available task we
+    relax the filter so the bot never goes idle."""
+    room = _start_room_with_humans(4)
+    room._bots.add_bot()
+    host_id = next(p.id for p in room.players.values() if p.is_host)
+    room.start(host_id)
+    room._bots._rng.seed(0)
+
+    bot_id = next(iter(room._bots.bot_ids()))
+    bot = room.players[bot_id]
+    state = room._bots.state_for(bot_id)
+    assert state is not None
+
+    # Mark all tasks except one as blacklisted; bot must pick the leftover.
+    only_id = next(iter(room.tasks))
+    for t in room.tasks.values():
+        if t.definition.id != only_id:
+            state.recently_failed_tasks[t.definition.id] = 5.0
+
+    room._bots.pick_next_target(bot, state)
+    assert state.target_task_id == only_id
+
+
+def test_blacklist_decays_via_tick() -> None:
+    """Per-tick decay must drain stale blacklist entries."""
+    room = _start_room_with_humans(4)
+    room._bots.add_bot()
+    host_id = next(p.id for p in room.players.values() if p.is_host)
+    room.start(host_id)
+
+    bot_id = next(iter(room._bots.bot_ids()))
+    state = room._bots.state_for(bot_id)
+    assert state is not None
+    state.recently_failed_tasks["t1"] = 0.4
+    state.recently_failed_tasks["t2"] = 5.0
+
+    room._bots.tick(dt=0.5)
+
+    assert "t1" not in state.recently_failed_tasks
+    assert state.recently_failed_tasks["t2"] == pytest.approx(4.5)
+
+
 # --- map invalidation ------------------------------------------------------
 
 

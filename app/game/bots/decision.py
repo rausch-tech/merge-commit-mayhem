@@ -79,14 +79,26 @@ def llm_pick_target(
     client: LLMClient,
     room: GameRoom,
     bot: Player,
+    blacklist: dict[str, float] | None = None,
 ) -> str | None:
     """Ask the LLM which available task this bot should attempt next.
 
     Returns a task_id, or `None` to fall through to the heuristic. The
     LLM is constrained by the user-prompt to a hard list of available
     tasks; anything off-list (or a parse failure) returns None.
+
+    `blacklist` (task_id → seconds-remaining) excludes tasks the bot
+    recently abandoned as unreachable. Same idea as in the heuristic
+    picker — without it the LLM would happily re-suggest the desk-
+    blocked task and the bot would loop.
     """
-    available = [t for t in room.tasks.values() if t.status == "available"]
+    bl = blacklist or {}
+    available = [
+        t for t in room.tasks.values() if t.status == "available" and t.definition.id not in bl
+    ]
+    if not available:
+        # Relax the blacklist if it would leave the bot with nothing.
+        available = [t for t in room.tasks.values() if t.status == "available"]
     if not available:
         return None
 
@@ -260,7 +272,9 @@ def maybe_consult_llm(
     if ds.next_llm_call_in > 0:
         return False
 
-    target_id = llm_pick_target(manager._llm, manager._room, bot)
+    target_id = llm_pick_target(
+        manager._llm, manager._room, bot, blacklist=state.recently_failed_tasks
+    )
     if target_id is None:
         return False
     manager._set_intent(bot, state, target_id)
