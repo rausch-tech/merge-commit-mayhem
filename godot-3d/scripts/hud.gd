@@ -110,6 +110,9 @@ var _vent_btn: Button
 var _last_takedown_target: String = ""
 var _last_report_body: String = ""
 var _last_vent_id: String = ""
+# Sabotage-VFX (4.10.y) — Lights-Out-Vignette + Comms-Down-State.
+var _lights_overlay: ColorRect
+var _comms_down: bool = false
 
 func _ready() -> void:
 	_build_top_bar()
@@ -122,6 +125,7 @@ func _ready() -> void:
 	_build_meeting_modal()
 	_build_voting_toast()
 	_build_action_buttons_panel()
+	_build_lights_overlay()
 	_build_map_label()
 	_build_task_prompt()
 	apply_game_state({})
@@ -263,6 +267,8 @@ func apply_game_state(state: Dictionary) -> void:
 	# Sabotage-Strip: Cooldowns aus dem game_state.sabotages cachen.
 	_cache_sabotage_states(state.get("sabotages", []))
 	_refresh_sabotage_buttons()
+	# Sabotage-VFX (Tier 4.10.y): lights_out -> Vignette, comms_outage -> tasks-blank.
+	_apply_sabotage_vfx(state.get("sabotages", []))
 
 	# Meeting-Modal: zeigt sich nur waehrend phase=meeting, schliesst sich beim
 	# naechsten phase=playing/ended automatisch.
@@ -900,6 +906,16 @@ func _update_personal_tasks(tasks: Array) -> void:
 		return
 	for child in _personal_task_list.get_children():
 		child.queue_free()
+	# Comms-Outage Sabotage (4.10.y) — Release-Team kann keine Tasks mehr
+	# sehen. Chaos sieht weiter (sie haben Fake-Tasks, die ueberhaupt nicht
+	# entry).
+	if _comms_down and not _is_chaos:
+		var blocked := Label.new()
+		blocked.text = "[ COMMS DOWN — Tasks gesperrt ]"
+		blocked.add_theme_color_override("font_color", COLOR_DANGER)
+		blocked.add_theme_font_size_override("font_size", 12)
+		_personal_task_list.add_child(blocked)
+		return
 	if tasks.is_empty():
 		var empty := Label.new()
 		empty.text = "Keine Tasks aktiv."
@@ -1638,3 +1654,44 @@ func set_proximity_actions(actions: Dictionary) -> void:
 
 	# Panel ganz verstecken wenn nichts in Reichweite ist.
 	_action_buttons_panel.visible = _takedown_btn.visible or _report_btn.visible or _vent_btn.visible
+
+
+# Sabotage-VFX (4.10.y) — Lights-Out-Vignette + Comms-Down. Beide werden vom
+# game_state.sabotages getrieben (active flag pro Sabotage-ID).
+
+func _build_lights_overlay() -> void:
+	# Vollflaechiger semi-transparenter dunkler Layer auf Layer-Top — wenn
+	# active, blockiert er sicht aufs Spiel mit ~70 % Schwarz. Nicht-radial
+	# (Godot-CanvasLayer ohne Shader = kein einfacher Radial-Cutout); JS-
+	# Client hat einen Cutout-Vignette, hier reicht die flat-darken-Variante
+	# fuer den ersten Wurf.
+	_lights_overlay = ColorRect.new()
+	_lights_overlay.color = Color(0, 0, 0, 0.72)
+	_lights_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_lights_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_lights_overlay.visible = false
+	add_child(_lights_overlay)
+
+
+func _apply_sabotage_vfx(sabotages: Array) -> void:
+	var lights_active: bool = false
+	var comms_active: bool = false
+	for s in sabotages:
+		var sid := str(s.get("id", ""))
+		var active: bool = bool(s.get("active", false))
+		if sid == "lights_out":
+			lights_active = active
+		elif sid == "comms_outage":
+			comms_active = active
+	if _lights_overlay != null:
+		_lights_overlay.visible = lights_active
+	# Comms-Down state ist persistent waehrend Sabotage aktiv ist.
+	if _comms_down != comms_active:
+		_comms_down = comms_active
+		# Re-render Tasks weil die Sicht sich gerade geaendert hat. (Wir
+		# haben kein cached _last_tasks-Feld; die naechste game_state-Tick
+		# wird sowieso neu rendern. Aber fuer den Wechsel-Moment ohne neuen
+		# Tick: wir koennen das Personal-Task-Panel manuell leeren.)
+		if _personal_task_list != null:
+			for child in _personal_task_list.get_children():
+				child.queue_free()
