@@ -27,6 +27,11 @@ const COLOR_DANGER: Color = Color(0.95, 0.40, 0.40)
 # Placeholder mit "UI folgt".
 const MINI_GAME_SCRIPTS: Dictionary = {
 	"sprint_trim": preload("res://scripts/minigames/sprint_trim.gd"),
+	"log_filter": preload("res://scripts/minigames/log_filter.gd"),
+	"diff_review": preload("res://scripts/minigames/diff_review.gd"),
+	"test_suite_repair": preload("res://scripts/minigames/test_suite_repair.gd"),
+	"release_notes": preload("res://scripts/minigames/release_notes.gd"),
+	"coffee_pour": preload("res://scripts/minigames/coffee_pour.gd"),
 }
 
 var _task_id: String = ""
