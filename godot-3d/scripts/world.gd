@@ -71,6 +71,10 @@ var _pause_menu: CanvasLayer
 var _players_by_id: Dictionary = {}
 var _world_initialized: bool = false
 var _last_state: Dictionary = {}
+# Screen-shake (4.11/Demo) — kurzer Camera-Wackel beim Kill-Event.
+var _shake_amount: float = 0.0
+const SHAKE_DECAY: float = 5.0
+const SHAKE_MAX_OFFSET: float = 0.06
 var _sting_player: AudioStreamPlayer
 var _last_phase: String = ""
 var _alive_state: Dictionary = {}  # pid → bool, tracks transitions for kill sting
@@ -202,7 +206,13 @@ func _process(delta: float) -> void:
 	var anchor: Vector3 = ch_anchor.global_position
 	var current := _camera_rig.position
 	var t = clamp(CAMERA_LERP_SPEED * delta, 0.0, 1.0)
-	_camera_rig.position = current.lerp(anchor, t)
+	var lerped := current.lerp(anchor, t)
+	# Screen-shake bei Kill-Events: random offset addieren, decay pro Frame.
+	if _shake_amount > 0.0:
+		_shake_amount = max(0.0, _shake_amount - SHAKE_DECAY * delta)
+		var off := SHAKE_MAX_OFFSET * _shake_amount
+		lerped += Vector3(randf_range(-off, off), 0.0, randf_range(-off, off))
+	_camera_rig.position = lerped
 
 func _input(event: InputEvent) -> void:
 	if not (event is InputEventKey):
@@ -719,9 +729,10 @@ func _apply_state(state: Dictionary) -> void:
 
 	if any_kill:
 		_play_sting(STING_KILL)
-		# Tier 4.10 Polish: HUD blitzt kurz rot.
+		# Tier 4.10 Polish: HUD blitzt kurz rot + Camera-Shake.
 		if _hud != null and _hud.has_method("trigger_kill_flash"):
 			_hud.call("trigger_kill_flash")
+		_shake_amount = 1.0
 
 	# Tasks-By-Id refresh (fuer Proximity-Check + Hold-Progress).
 	_tasks_by_id.clear()

@@ -251,6 +251,12 @@ func apply_game_state(state: Dictionary) -> void:
 	var seconds: int = int(state.get("remainingSeconds", 0))
 	if _timer_label != null:
 		_timer_label.text = _format_timer(seconds)
+		var phase_now: String = str(state.get("phase", ""))
+		# 4.11/Demo: Timer rot wenn unter 60 s waehrend playing.
+		if seconds <= 60 and phase_now == "playing":
+			_timer_label.add_theme_color_override("font_color", COLOR_DANGER)
+		else:
+			_timer_label.add_theme_color_override("font_color", COLOR_TEXT)
 
 	# Phase chip + transition banner
 	var prev_phase: String = _phase
