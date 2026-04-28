@@ -16,6 +16,10 @@ const WORLD_SCENE: String = "res://scenes/world.tscn"
 const UI_CLICK_STREAM: AudioStream = preload("res://assets/audio/ui/click.ogg")
 const UI_CLICK_VOLUME_DB: float = -16.0
 
+# Branding-Logo (Tier 4.x Lobby-Polish). Wird oben im Connect-/Lobby-Screen
+# als TextureRect gezeigt; ersetzt das frueher fett-grosse Text-Title.
+const LOGO_TEXTURE: Texture2D = preload("res://assets/branding/logo.png")
+
 # UI colors (cyber/dev-themed, dark + green-cyan accent)
 const COLOR_BG_TOP: Color = Color(0.05, 0.07, 0.12)
 const COLOR_BG_BOTTOM: Color = Color(0.02, 0.03, 0.06)
@@ -116,51 +120,41 @@ func _build_ui() -> void:
 	bg_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg_overlay)
 
-	# Title block (top-center) — click-through so it never sits on a button.
-	var title_container := VBoxContainer.new()
-	title_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	title_container.anchor_left = 0.5
-	title_container.anchor_right = 0.5
-	title_container.anchor_top = 0.0
-	title_container.offset_left = -300
-	title_container.offset_right = 300
-	title_container.offset_top = 60
-	title_container.offset_bottom = 200
-	title_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(title_container)
+	# Title block (top-center) — Logo-TextureRect, click-through.
+	# Logo ist 1536x1024 (~3:2). Bei 240 px Hoehe wird's ~360 px breit;
+	# expand_mode=KEEP_ASPECT_CENTERED haelt die Proportionen, expand=true
+	# erlaubt das skalieren auf den Container-Rect.
+	var logo := TextureRect.new()
+	logo.texture = LOGO_TEXTURE
+	logo.expand_mode = TextureRect.EXPAND_FIT_HEIGHT_PROPORTIONAL
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.anchor_left = 0.5
+	logo.anchor_right = 0.5
+	logo.anchor_top = 0.0
+	logo.anchor_bottom = 0.0
+	logo.offset_left = -210
+	logo.offset_right = 210
+	logo.offset_top = 24
+	logo.offset_bottom = 224
+	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(logo)
 
-	var title := Label.new()
-	title.text = "MERGE CONFLICT MAYHEM"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_color_override("font_color", COLOR_ACCENT)
-	title.add_theme_font_size_override("font_size", 56)
-	title.add_theme_constant_override("outline_size", 4)
-	title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-	title_container.add_child(title)
-
-	var subtitle := Label.new()
-	subtitle.text = "Release-Team vs. Chaos-Agenten · Tier 4 · 3D Demo"
-	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle.add_theme_color_override("font_color", COLOR_TEXT_DIM)
-	subtitle.add_theme_font_size_override("font_size", 18)
-	title_container.add_child(subtitle)
-
-	# Connect card (centered)
+	# Connect card (centered) — etwas filigraner als vorher.
 	_connect_card = _make_card()
 	_connect_card.anchor_left = 0.5
 	_connect_card.anchor_top = 0.5
 	_connect_card.anchor_right = 0.5
 	_connect_card.anchor_bottom = 0.5
-	_connect_card.offset_left = -240
-	_connect_card.offset_top = -180
-	_connect_card.offset_right = 240
-	_connect_card.offset_bottom = 220
+	_connect_card.offset_left = -220
+	_connect_card.offset_top = -150
+	_connect_card.offset_right = 220
+	_connect_card.offset_bottom = 180
 	add_child(_connect_card)
 
 	var connect_vbox := VBoxContainer.new()
-	connect_vbox.add_theme_constant_override("separation", 14)
+	connect_vbox.add_theme_constant_override("separation", 12)
 	_connect_card.add_child(connect_vbox)
-	_pad_container(connect_vbox, 32)
+	_pad_container(connect_vbox, 24)
 
 	connect_vbox.add_child(_make_section_label("CONNECT"))
 
@@ -189,30 +183,31 @@ func _build_ui() -> void:
 	_connect_status = _make_status_label("")
 	connect_vbox.add_child(_connect_status)
 
-	# Lobby card (centered, bigger; hidden initially)
+	# Lobby card (centered, slim — 460x440 statt 600x500; mehr Whitespace
+	# am Bildschirm-Rand und keine Ueberlappung mit dem Log unten).
 	_lobby_card = _make_card()
 	_lobby_card.anchor_left = 0.5
 	_lobby_card.anchor_top = 0.5
 	_lobby_card.anchor_right = 0.5
 	_lobby_card.anchor_bottom = 0.5
-	_lobby_card.offset_left = -300
-	_lobby_card.offset_top = -240
-	_lobby_card.offset_right = 300
-	_lobby_card.offset_bottom = 260
+	_lobby_card.offset_left = -230
+	_lobby_card.offset_top = -210
+	_lobby_card.offset_right = 230
+	_lobby_card.offset_bottom = 230
 	_lobby_card.visible = false
 	add_child(_lobby_card)
 
 	var lobby_vbox := VBoxContainer.new()
-	lobby_vbox.add_theme_constant_override("separation", 14)
+	lobby_vbox.add_theme_constant_override("separation", 10)
 	_lobby_card.add_child(lobby_vbox)
-	_pad_container(lobby_vbox, 28)
+	_pad_container(lobby_vbox, 22)
 
 	lobby_vbox.add_child(_make_section_label("LOBBY"))
 
 	_lobby_room_label = Label.new()
 	_lobby_room_label.text = "Raum: ?"
 	_lobby_room_label.add_theme_color_override("font_color", COLOR_TEXT)
-	_lobby_room_label.add_theme_font_size_override("font_size", 22)
+	_lobby_room_label.add_theme_font_size_override("font_size", 18)
 	lobby_vbox.add_child(_lobby_room_label)
 
 	# Map-Auswahl (Host-only, populiert sich aus lobby_state.availableMaps).
@@ -237,7 +232,7 @@ func _build_ui() -> void:
 	lobby_vbox.add_child(players_label)
 
 	var player_scroll := ScrollContainer.new()
-	player_scroll.custom_minimum_size = Vector2(0, 140)
+	player_scroll.custom_minimum_size = Vector2(0, 100)
 	player_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	lobby_vbox.add_child(player_scroll)
 
@@ -293,23 +288,26 @@ func _build_ui() -> void:
 	_lobby_status = _make_status_label("")
 	lobby_vbox.add_child(_lobby_status)
 
-	# Log area (bottom)
+	# Log area — schmale Statuszeile am unteren linken Rand. Vorher
+	# blockierte das volle Log die Connect-Buttons (Mouse-Events fielen ins
+	# TextEdit statt durchzudringen). Jetzt: schmal (60 px), nur ueber
+	# linken Drittel, alle Mouse-Events pass-through bis zur Card hindurch.
 	var log_panel := PanelContainer.new()
 	log_panel.anchor_left = 0.0
-	log_panel.anchor_right = 1.0
+	log_panel.anchor_right = 0.0
 	log_panel.anchor_top = 1.0
 	log_panel.anchor_bottom = 1.0
 	log_panel.offset_left = 16
-	log_panel.offset_right = -16
-	log_panel.offset_top = -120
+	log_panel.offset_right = 380
+	log_panel.offset_top = -76
 	log_panel.offset_bottom = -16
 	log_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var log_style := StyleBoxFlat.new()
-	log_style.bg_color = Color(0.04, 0.05, 0.08, 0.85)
-	log_style.set_corner_radius_all(8)
+	log_style.bg_color = Color(0.04, 0.05, 0.08, 0.7)
+	log_style.set_corner_radius_all(6)
 	log_style.set_border_width_all(1)
-	log_style.border_color = COLOR_INPUT_BORDER
-	log_style.set_content_margin_all(8)
+	log_style.border_color = Color(0.20, 0.30, 0.40, 0.6)
+	log_style.set_content_margin_all(6)
 	log_panel.add_theme_stylebox_override("panel", log_style)
 	add_child(log_panel)
 
@@ -318,19 +316,21 @@ func _build_ui() -> void:
 	_log_area.scroll_smooth = true
 	_log_area.add_theme_color_override("font_color", COLOR_ACCENT)
 	_log_area.add_theme_color_override("background_color", Color(0, 0, 0, 0))
-	_log_area.add_theme_font_size_override("font_size", 12)
-	_log_area.mouse_filter = Control.MOUSE_FILTER_PASS
+	_log_area.add_theme_font_size_override("font_size", 11)
+	# Wichtig: IGNORE statt PASS — sonst frisst der TextEdit auch durch das
+	# IGNORE-Panel hindurch Mouse-Events und blockiert die Connect-Card.
+	_log_area.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	log_panel.add_child(_log_area)
 
 func _make_card() -> PanelContainer:
 	var card := PanelContainer.new()
 	var style := StyleBoxFlat.new()
 	style.bg_color = COLOR_PANEL_BG
-	style.set_corner_radius_all(12)
-	style.set_border_width_all(2)
+	style.set_corner_radius_all(10)
+	style.set_border_width_all(1)
 	style.border_color = COLOR_ACCENT_DIM
-	style.shadow_size = 24
-	style.shadow_color = Color(0, 0, 0, 0.5)
+	style.shadow_size = 18
+	style.shadow_color = Color(0, 0, 0, 0.45)
 	card.add_theme_stylebox_override("panel", style)
 	return card
 
@@ -350,7 +350,7 @@ func _make_section_label(text: String) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.add_theme_color_override("font_color", COLOR_ACCENT)
-	label.add_theme_font_size_override("font_size", 18)
+	label.add_theme_font_size_override("font_size", 13)
 	return label
 
 func _make_field_row(label_text: String, edit: LineEdit) -> VBoxContainer:
@@ -381,7 +381,7 @@ func _make_line_edit(default_text: String) -> LineEdit:
 	edit.text = default_text
 	edit.placeholder_text = default_text
 	edit.add_theme_color_override("font_color", COLOR_TEXT)
-	edit.add_theme_font_size_override("font_size", 16)
+	edit.add_theme_font_size_override("font_size", 13)
 	var style := StyleBoxFlat.new()
 	style.bg_color = COLOR_INPUT_BG
 	style.set_corner_radius_all(6)
@@ -399,8 +399,8 @@ func _make_primary_button(text: String) -> Button:
 	btn.text = text
 	btn.add_theme_color_override("font_color", Color(0.04, 0.06, 0.10))
 	btn.add_theme_color_override("font_hover_color", Color(0.04, 0.06, 0.10))
-	btn.add_theme_font_size_override("font_size", 18)
-	btn.custom_minimum_size = Vector2(0, 44)
+	btn.add_theme_font_size_override("font_size", 15)
+	btn.custom_minimum_size = Vector2(0, 38)
 	for state in ["normal", "hover", "pressed"]:
 		var style := StyleBoxFlat.new()
 		style.bg_color = COLOR_ACCENT if state == "normal" else COLOR_ACCENT.lightened(0.1)
@@ -415,8 +415,8 @@ func _make_secondary_button(text: String) -> Button:
 	var btn := Button.new()
 	btn.text = text
 	btn.add_theme_color_override("font_color", COLOR_TEXT_DIM)
-	btn.add_theme_font_size_override("font_size", 14)
-	btn.custom_minimum_size = Vector2(0, 44)
+	btn.add_theme_font_size_override("font_size", 13)
+	btn.custom_minimum_size = Vector2(0, 32)
 	for state in ["normal", "hover", "pressed"]:
 		var style := StyleBoxFlat.new()
 		style.bg_color = COLOR_INPUT_BG if state == "normal" else COLOR_INPUT_BG.lightened(0.05)
