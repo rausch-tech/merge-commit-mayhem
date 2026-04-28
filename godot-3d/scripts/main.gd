@@ -139,22 +139,22 @@ func _build_ui() -> void:
 	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(logo)
 
-	# Connect card (centered) — etwas filigraner als vorher.
+	# Connect card (centered) — etwas filigraner als vorher; 22 px content_margin
+	# vom Card-StyleBox liefert das Innenpadding zur Border.
 	_connect_card = _make_card()
 	_connect_card.anchor_left = 0.5
 	_connect_card.anchor_top = 0.5
 	_connect_card.anchor_right = 0.5
 	_connect_card.anchor_bottom = 0.5
-	_connect_card.offset_left = -220
-	_connect_card.offset_top = -150
-	_connect_card.offset_right = 220
-	_connect_card.offset_bottom = 180
+	_connect_card.offset_left = -240
+	_connect_card.offset_top = -160
+	_connect_card.offset_right = 240
+	_connect_card.offset_bottom = 200
 	add_child(_connect_card)
 
 	var connect_vbox := VBoxContainer.new()
 	connect_vbox.add_theme_constant_override("separation", 12)
 	_connect_card.add_child(connect_vbox)
-	_pad_container(connect_vbox, 24)
 
 	connect_vbox.add_child(_make_section_label("CONNECT"))
 
@@ -183,24 +183,24 @@ func _build_ui() -> void:
 	_connect_status = _make_status_label("")
 	connect_vbox.add_child(_connect_status)
 
-	# Lobby card (centered, slim — 460x440 statt 600x500; mehr Whitespace
-	# am Bildschirm-Rand und keine Ueberlappung mit dem Log unten).
+	# Lobby card (centered, slim — 500x460; 22 px content_margin im Card-Style
+	# sorgt fuer Innenpadding, vorher klebten Buttons direkt an der Border weil
+	# der alte _pad_container-Helper auf VBoxContainer keine Wirkung hatte.
 	_lobby_card = _make_card()
 	_lobby_card.anchor_left = 0.5
 	_lobby_card.anchor_top = 0.5
 	_lobby_card.anchor_right = 0.5
 	_lobby_card.anchor_bottom = 0.5
-	_lobby_card.offset_left = -230
-	_lobby_card.offset_top = -210
-	_lobby_card.offset_right = 230
-	_lobby_card.offset_bottom = 230
+	_lobby_card.offset_left = -250
+	_lobby_card.offset_top = -220
+	_lobby_card.offset_right = 250
+	_lobby_card.offset_bottom = 240
 	_lobby_card.visible = false
 	add_child(_lobby_card)
 
 	var lobby_vbox := VBoxContainer.new()
 	lobby_vbox.add_theme_constant_override("separation", 10)
 	_lobby_card.add_child(lobby_vbox)
-	_pad_container(lobby_vbox, 22)
 
 	lobby_vbox.add_child(_make_section_label("LOBBY"))
 
@@ -331,6 +331,11 @@ func _make_card() -> PanelContainer:
 	style.border_color = COLOR_ACCENT_DIM
 	style.shadow_size = 18
 	style.shadow_color = Color(0, 0, 0, 0.45)
+	# Content-Margin sorgt fuer Innenabstand zur Border. PanelContainer ehrt
+	# StyleBox-content_margin, anders als VBoxContainer das `margin_*`
+	# theme-constants ignoriert (siehe alter `_pad_container`-Helper, der
+	# faktisch ein No-Op war auf VBoxContainer).
+	style.set_content_margin_all(22)
 	card.add_theme_stylebox_override("panel", style)
 	return card
 
@@ -339,12 +344,6 @@ func _make_gradient_panel() -> Control:
 	rect.color = COLOR_BG_TOP
 	rect.modulate.a = 0.6
 	return rect
-
-func _pad_container(node: Container, padding: int) -> void:
-	node.add_theme_constant_override("margin_left", padding)
-	node.add_theme_constant_override("margin_right", padding)
-	node.add_theme_constant_override("margin_top", padding)
-	node.add_theme_constant_override("margin_bottom", padding)
 
 func _make_section_label(text: String) -> Label:
 	var label := Label.new()
