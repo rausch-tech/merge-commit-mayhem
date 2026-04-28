@@ -113,6 +113,9 @@ var _last_vent_id: String = ""
 # Sabotage-VFX (4.10.y) — Lights-Out-Vignette + Comms-Down-State.
 var _lights_overlay: ColorRect
 var _comms_down: bool = false
+# Ghost-Banner (4.10.z) — sichtbar wenn local player isAlive=false.
+var _ghost_banner: Label
+var _is_ghost: bool = false
 
 func _ready() -> void:
 	_build_top_bar()
@@ -126,6 +129,7 @@ func _ready() -> void:
 	_build_voting_toast()
 	_build_action_buttons_panel()
 	_build_lights_overlay()
+	_build_ghost_banner()
 	_build_map_label()
 	_build_task_prompt()
 	apply_game_state({})
@@ -254,6 +258,9 @@ func apply_game_state(state: Dictionary) -> void:
 
 	# Roster
 	_update_roster(state.get("players", []))
+
+	# Ghost-Banner: lokaler Spieler in players[]-Liste suchen.
+	_apply_ghost_banner(state.get("players", []))
 
 	# Eventfeed: append nur die neuen Events seit dem letzten Tick.
 	_update_eventfeed(state.get("events", []))
@@ -1695,3 +1702,40 @@ func _apply_sabotage_vfx(sabotages: Array) -> void:
 		if _personal_task_list != null:
 			for child in _personal_task_list.get_children():
 				child.queue_free()
+
+
+# Ghost-Banner (4.10.z) — visuelle Indikation wenn der lokale Spieler tot
+# ist. Take-Down/Report/Sabotage-Buttons sind via die Alive-Gates schon
+# aus, aber ohne Banner sehe ich als Geist nicht warum nichts mehr geht.
+
+const COLOR_GHOST: Color = Color(0.65, 0.55, 0.85)
+
+
+func _build_ghost_banner() -> void:
+	_ghost_banner = Label.new()
+	_ghost_banner.text = "★ Du bist coredumped — Spectator-Mode ★"
+	_ghost_banner.anchor_left = 0.5
+	_ghost_banner.anchor_right = 0.5
+	_ghost_banner.anchor_top = 0.0
+	_ghost_banner.anchor_bottom = 0.0
+	_ghost_banner.offset_left = -200
+	_ghost_banner.offset_right = 200
+	_ghost_banner.offset_top = 92
+	_ghost_banner.offset_bottom = 116
+	_ghost_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ghost_banner.add_theme_color_override("font_color", COLOR_GHOST)
+	_ghost_banner.add_theme_font_size_override("font_size", 14)
+	_ghost_banner.visible = false
+	add_child(_ghost_banner)
+
+
+func _apply_ghost_banner(players: Array) -> void:
+	if _ghost_banner == null or _player_id == "":
+		return
+	var alive: bool = true
+	for p in players:
+		if str(p.get("id", "")) == _player_id:
+			alive = bool(p.get("isAlive", true))
+			break
+	_is_ghost = not alive
+	_ghost_banner.visible = _is_ghost
