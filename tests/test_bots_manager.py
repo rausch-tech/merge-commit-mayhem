@@ -102,6 +102,27 @@ def test_player_serialized_carries_is_bot_flag() -> None:
     assert by_id[bot.id]["isBot"] is True
 
 
+def test_alive_viewer_sees_is_bot_in_public_state_for() -> None:
+    """Regression: pre-fix `public_state_for` strippte das isBot-Field für
+    alive viewers. Nur Geister sahen es. Heißt: im Spiel selbst hat man
+    keinen Bot-Tag im HUD/Renderer gesehen, in der Lobby aber schon.
+    """
+    room = _start_room_with_humans(4)
+    room._bots.add_bot()
+    host_id = next(p.id for p in room.players.values() if p.is_host)
+    room.start(host_id)
+
+    viewer = room.players[host_id]
+    assert viewer.is_alive is True
+
+    state = room.public_state_for(host_id)
+    by_id = {p["id"]: p for p in state["players"]}
+    bot_id = next(iter(room._bots.bot_ids()))
+    assert "isBot" in by_id[bot_id]
+    assert by_id[bot_id]["isBot"] is True
+    assert by_id[host_id]["isBot"] is False
+
+
 # --- tick: skips when not playing ------------------------------------------
 
 

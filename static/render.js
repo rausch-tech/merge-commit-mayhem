@@ -608,7 +608,8 @@ export class Renderer {
       ctx.font = "13px system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "bottom";
-      const displayName = player.name + (isDisconnected ? " (off)" : "");
+      const botSuffix = player.isBot ? " [BOT]" : "";
+      const displayName = player.name + botSuffix + (isDisconnected ? " (off)" : "");
       ctx.fillText(displayName, player.x, player.y - half - 6);
 
       ctx.restore();

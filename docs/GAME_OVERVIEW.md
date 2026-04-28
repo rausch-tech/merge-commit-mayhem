@@ -7,6 +7,8 @@ auf Live deployt, parallel Godot-3D-Client (Tier 4) in aktiver Entwicklung.
 **Live-Server:** https://prod-is-lava.dev
 **Repo:** https://github.com/rausch-tech/merge-commit-mayhem
 
+![Godot-3D-Client — Aerial-View Office-Complex (5 Spieler, 9 Räume, ~390 Möbelstücke)](screenshots/godot-3d-aerial-office-complex.png)
+
 ---
 
 ## Was ist das?
@@ -33,22 +35,28 @@ wo, wer behauptet was, wer hat eine plausible Story. Die DevOps-Thematik
 liefert die Witze und den diegetischen Vorwand dafür, dass man „mal eben in
 den Server-Raum musste".
 
+Wir sind eine KI-Firma, deshalb ist **AI durchgehend Teil der Erfahrung**:
+Vibe Coder als Chaos-Rolle, AI-flavored Eventfeed-Texte, AI-Postmortem im
+Endscreen, und seit Tier 3.9 echte LLM-getriebene KI-Mitspieler (Bots), die
+die Lobby füllen wenn weniger als sechs Menschen da sind.
+
 ---
 
 ## Wie läuft eine Runde ab?
 
 1. **Lobby**: Alle joinen mit einem 4-stelligen Raumcode, der Host startet.
    Server verteilt geheim Rollen — die Mehrheit ist Release-Team, 1 Chaos bei
-   ≤6 Spielern, 2 Chaos ab 7, 3 ab 10.
+   ≤6 Spielern, 2 Chaos ab 7, 3 ab 10. Host kann **AI-NPCs** in die Lobby
+   einladen (Bot-Promptly, Bot-Cursor-Sr., …) wenn weniger Menschen da sind.
 2. **Role-Intro**: Jeder bekommt ein Modal mit seiner Rolle, Stärken/Schwächen,
    aktiver Fähigkeit und drei persönlichen Aufgaben. Release-Team sieht echte
    Tasks, Chaos sieht plausible Tarn-Aufgaben.
 3. **Spiel läuft** (15 Minuten Default): Jeder bewegt sich frei durch die
-   4800×3200-Map, sieht alle anderen Spieler in Echtzeit, aber **nicht** ihre
-   Rolle.
+   Map, sieht alle anderen Spieler in Echtzeit, aber **nicht** ihre Rolle.
 4. **Release-Team** erledigt persönliche Tasks (PRs reviewen, Tests fixen,
    Logs analysieren, Kaffee holen, …) — jede erfüllte Task pusht den
-   **Release-Progress-Balken** Richtung 100 %.
+   **Release-Progress-Balken** Richtung 100 %. Jede Task hat ein eigenes
+   **Mini-Game** (alle 8 Tasks haben Mechanik-Plugins, siehe unten).
 5. **Chaos-Agenten** triggern Sabotagen — aber nur **am passenden
    Themen-Objekt**: ci_cd_red am CI-Terminal, merge_conflict_storm am
    Git-Terminal, coffee_outage an der Kaffeemaschine usw. Same Anchor wie
@@ -63,8 +71,9 @@ den Server-Raum musste".
    - Release-Progress erreicht 100 % → **Release-Team gewinnt**
    - 15 Minuten Timer abgelaufen → **Chaos gewinnt**
 8. **Endscreen** mit Rollen-Reveal, Per-Player-Stats, Awards (Pipeline
-   Whisperer, Vibe of the Round, Held der Kaffeemaschine, …) und einem
-   AI-styled Postmortem-Text.
+   Whisperer, Vibe of the Round, Held der Kaffeemaschine, …), einem
+   AI-styled Postmortem-Text und einem **„Last-Words"-Zitat** des
+   eliminierten Spielers (team-spezifischer Pool).
 
 ---
 
@@ -129,6 +138,32 @@ Jeder Spieler bekommt zu Rundenbeginn **3 persönliche Aufgaben**:
 
 ---
 
+## Mini-Games
+
+**Alle 8 Tasks haben Mini-Games.** Jeweils kleines Modal-Spiel mit klarem
+Mechanik-Pattern, server-authoritativ implementiert (Plugin-Framework,
+Server ist Master, Client mirror'd):
+
+| Task                  | Mini-Game-Mechanik                                               |
+| --------------------- | ---------------------------------------------------------------- |
+| `fix_unit_tests`      | **Test-Suite-Repair** — sequencing                               |
+| `analyze_logs`        | **Log-Filter** — filter-by-criterion                             |
+| `repair_deployment`   | **Cable-Pairing** — pairing                                      |
+| `refill_coffee`       | **Coffee-Pour** — timing                                         |
+| `reduce_scope`        | **Sprint-Trim** — subset-by-constraint                           |
+| `review_pr`           | **Diff-Review** — multi-select-by-criterion (Spot-the-Bug)       |
+| `calm_legacy_service` | **Stability-Balance** — alle drei Metriken im grünen Band halten |
+| `write_release_notes` | **Release-Notes** — click-to-cycle-sort                          |
+
+![Godot-3D-Client — Sprint-Trim Mini-Game („Scope reduzieren")](screenshots/godot-3d-minigame-sprint-trim.png)
+
+Bots **skippen** Mini-Games — sie haben das Mechanik-Spiel nicht zu spielen,
+sondern halten den Task einfach 4–6 s und das gibt den Reward. Das ist eine
+bewusste Design-Entscheidung: Bots sollen Räume füllen, nicht Mini-Games
+durch DOM-Klicks gewinnen.
+
+---
+
 ## Coffee-Energy als Ressource
 
 Jeder Spieler hat **eigene Coffee-Energy** (0..max). Decay 1.4/s × Rolle-Modifier.
@@ -168,9 +203,9 @@ zugehörige Release-Task.
 | PagerDuty-Storm       | Vignette: Sicht reduziert auf 150 px      | `monitoring_panel`                 | Server Room (an `analyze_logs`)      |
 | Slack-Down            | Tasks + andere Sabotagen blockiert        | `monitoring_panel`/`ci_console`    | Server Room                          |
 
-**Why same anchor:** Wenn der Trigger-Spot ein eigenes "Sabotage-Terminal"
+**Why same anchor:** Wenn der Trigger-Spot ein eigenes „Sabotage-Terminal"
 wäre, wäre jeder, der dort steht, sofort verdächtig. Same Anchor → Beobachter
-sehen "X arbeitet am CI-Terminal" und müssen raten, ob das eine Repair, eine
+sehen „X arbeitet am CI-Terminal" und müssen raten, ob das eine Repair, eine
 echte Task oder eine Sabotage ist.
 
 PagerDuty-Storm und Slack-Down haben zusätzlich **Repair-Panels** (50-px-
@@ -191,20 +226,17 @@ hinter eine plausible Alibi-Position.
 
 ---
 
-## Take-Down (Chaos)
+## Take-Down + Body-Discovery
 
-Chaos in 40-px-Nähe eines lebenden Mitspielers → Button **„Force-Reboot"** →
-Target wird `isAlive=false`, ein Body bleibt liegen, Cooldown 25 s. Server
-validiert alles authoritativ. Im War-Room (Sicherheitszone) ist Force-Reboot
-gesperrt.
+**Take-Down (Chaos):** Chaos in 40-px-Nähe eines lebenden Mitspielers →
+Button **„Force-Reboot"** → Target wird `isAlive=false`, ein Body bleibt
+liegen, Cooldown 25 s. Server validiert alles authoritativ. Im War-Room
+(Sicherheitszone) ist Force-Reboot gesperrt.
 
----
-
-## Body-Discovery + Report
-
-Sobald ein Body von einem **lebenden** Spieler entdeckt wird (in Reichweite),
-kann er ihn reporten → Meeting wird ausgelöst. Wenn niemand reportet, bleibt
-der Body liegen — taktisch interessant für Chaos.
+**Body-Discovery + Report:** Sobald ein Body von einem **lebenden** Spieler
+entdeckt wird (in Reichweite), kann er ihn reporten → Meeting wird
+ausgelöst. Wenn niemand reportet, bleibt der Body liegen — taktisch
+interessant für Chaos.
 
 ---
 
@@ -241,6 +273,8 @@ zeigt:
   - Vibe of the Round — meiste Sabotagen
   - Held der Kaffeemaschine — höchste End-Coffee-Energy
   - Most Suspicious Innocent — Release-Spieler, der ausgevoted wurde
+- **Last-Words-Zitat** unter dem Verdict-Toast — team-spezifischer
+  Flavor-Pool, gibt dem eliminierten Spieler einen letzten Satz
 - **AI-Postmortem** — mehrzeiliger LLM-styled Text, generiert aus dem
   Round-Summary. Liest sich wie _„Generated by Claude (vibes-only mode). Das
   Release-Team hat es über die Linie gebracht. Knapp, mit viel Kaffee und
@@ -250,24 +284,41 @@ Das ist der Moment, in dem Leute lachen und „noch eine Runde" sagen.
 
 ---
 
-## AI-Flavor durchgehend
+## AI-NPCs (Bots) als Lobby-Filler
 
-Wir sind eine KI-Firma — entsprechend zieht sich AI-Theming durch:
+Seit Tier 3.9.2 kann der Host **AI-NPCs** in die Lobby einladen, wenn nicht
+genug Menschen da sind. Sie laufen LLM-getrieben durch die Map, completen
+Tasks, melden Bodies wenn sie welche sehen, voten in Meetings.
 
-- **Vibe Coder** als prominente Chaos-Rolle (AI-Pair-Programmer-Karikatur)
-- **Sabotage-Eventfeed-Texte** mit LLM-Vibes:
-  _„CI hatte einen Hallucinations-Anfall."_
-  _„main ist rot. Vermutlich ein 'kleiner Refactor'."_
-  _„Kaffeemaschine meldet 418: I'm a teapot."_
-- **Postmortem-Generator** spuckt Incident-Reports im AI-Stil aus
-- Im MVP läuft der Output procedural aus reichen Templates; später ist ein
-  echter LLM-Call als optionales Feature denkbar
+- **Curated Names:** Bot-Promptly, Bot-Cursor-Sr., Bot-StackOverflow,
+  Bot-Junior, Bot-Copilot, Bot-Linter, Bot-Pager, Bot-Standup. Im Spiel mit
+  `[BOT]`-Tag über dem Sprite, in der Lobby mit Kick-Button.
+- **LLM-Layer:** `LLMClient` Protocol mit zwei Providern — Anthropic Claude
+  Haiku als Default, oder lokales OpenAI-kompatibles (z. B. Ollama mit
+  Gemma 4). Auswahl per Env-Vars. Ohne Provider laufen Bots heuristisch
+  (random Task-Pick), das Spiel funktioniert auch komplett ohne LLM.
+- **Was geht ans LLM:** nur high-level Intent („welche Task als nächstes")
+  alle 5 s pro Bot. Pathfinding, Movement, Voting, Body-Report sind alle
+  deterministisch im Server. LLM-Call läuft im ThreadPool — der Tick-Loop
+  blockiert nicht, auch wenn Anthropic mal langsam ist.
+- **Phase 1: nur Release-Team-Bots.** Chaos-Bots (Phase 2) brauchen
+  Game-Sense (Timing, Alibi-Building) und sind eigener Slice.
 
 ---
 
 ## Map
 
-**Default-Map**: 4800×3200 px, sechs Räume mit klarer Identität:
+Aktuell **vier Maps** wählbar in der Lobby (Pydantic-validiert beim
+Server-Start, an den Client per `room_joined` geliefert):
+
+| Map              | Größe     | MapObjects | Räume | Stand                    |
+| ---------------- | --------- | ---------- | ----- | ------------------------ |
+| `default-office` | 4800×3200 | 44         | 6     | Showcase, balanciert     |
+| `office-complex` | 4800×3200 | **390**    | 9     | Wow-Effekt, KayKit-Möbel |
+| `datacenter`     | 4800×3200 | 147        | 10    | Server-Racks dominieren  |
+| `small-arena`    | 1600×1200 | 14         | 3     | Schnelle Test-Runden     |
+
+Die Default-Map hat sechs Räume mit klarer Identität:
 
 | Raum            | Funktion                                                    |
 | --------------- | ----------------------------------------------------------- |
@@ -278,26 +329,34 @@ Wir sind eine KI-Firma — entsprechend zieht sich AI-Theming durch:
 | Legacy Basement | Legacy-Service, riskanter isolierter Raum                   |
 | War Room        | Slack-Down-Repair, einziger Spawn-Ort für Emergency-Meeting |
 
-Alles als JSON in `maps/default.json` — Geometrien, Wand-Linien, Türen,
-Spawn-Punkte, Task-Anker (mit `objectType`), Sabotage-Panels, Vents.
+`maps/kinds.json` ist die **Single Source of Truth** für MapObject-Kinds
+(25 Kinds wie `desk`, `server_rack`, `coffee_machine`, …) — Server validiert
+Maps dagegen, Browser-Frontend / Editor-3D-Vorschau / Godot-Client lesen
+alle dynamisch via `GET /api/kinds`. Ein neues Möbelstück wird einmal in
+`kinds.json` ergänzt und ist überall verfügbar.
 
-Ein **Map-Editor** unter `/editor` erlaubt nicht-coderischen Map-Bau. Multi-
-Map-Support: Host wählt aus Lobby-Dropdown.
+Ein **Map-Editor** unter `/editor` erlaubt nicht-coderischen Map-Bau —
+2D-Canvas + Three.js-3D-Vorschau Side-by-Side, Save direkt zum Server,
+Undo/Redo, Validation-Strip.
 
 ---
 
 ## Tech-Stack
 
-- **Backend**: Python 3.12 + FastAPI + Pydantic v2 + asyncio. 20-Hz-Tick-Loop.
+- **Backend:** Python 3.12 + FastAPI + Pydantic v2 + asyncio. 20-Hz-Tick-Loop.
   WebSocket-Endpoint `/ws`. Authoritativ für **allen** State.
-- **Frontend** (aktueller Web-Client): Vanilla HTML/CSS/JS + `<canvas>`-Renderer.
-  Keine Build-Pipeline, keine Frameworks.
-- **Nächste Stufe**: Godot 4 als polished Primary-Client (Tier 4) — Browser-
-  Client bleibt als Web-Fallback und Reference-Implementation.
-- **Hosting**: AWS EC2 t4g.nano in eu-central-1, Caddy als HTTPS-Reverse-
+- **Browser-Client:** Vanilla HTML/CSS/JS + `<canvas>`-Renderer. Keine
+  Build-Pipeline, keine Frameworks. Spielbar auf Phone, Tablet, Desktop.
+- **Godot-3D-Client (Tier 4):** Godot 4.6 mit echten KayKit-Assets. Gleiches
+  WebSocket-Protokoll, fetcht Map + Kinds-Registry zur Laufzeit vom Backend
+  (keine Drift). Web-Export läuft als CI-Gate.
+- **AI-Layer:** `LLMClient` Protocol + Anthropic Haiku oder lokales
+  OpenAI-kompatibles (Ollama). LLM-Calls non-blocking im ThreadPool.
+- **Hosting:** AWS EC2 t4g.nano in eu-central-1, Caddy als HTTPS-Reverse-
   Proxy, GitHub-Actions-Auto-Deploy auf jedem `main`-Push.
-- **Tests**: 471 Backend (pytest), 37 Frontend (vitest).
-- **Performance**: Tick-Compute p99 = 0.6 ms bei 12 Spielern (~84× Headroom
+- **Tests:** ~714 Backend (pytest) + ~109 Frontend (vitest) + Godot-Parse-
+  Check als CI-Gate. Coverage-Floor 88 % auf `app/game/`, aktuell ~92 %.
+- **Performance:** Tick-Compute p99 = 0.6 ms bei 12 Spielern (~84× Headroom
   auf das 50-ms-Tick-Budget). Server-CPU ist nicht der Bottleneck.
 
 **Architektur-Nordstern: Python entscheidet, der Client zeigt nur an.** Nichts
@@ -306,7 +365,7 @@ geht sie zurück.
 
 ---
 
-## Aktueller Stand (2026-04-27)
+## Aktueller Stand (2026-04-28)
 
 **Was funktioniert auf Live:**
 
@@ -318,38 +377,45 @@ geht sie zurück.
   Fake-Tasks für Chaos
 - **Coffee-Energy pro Spieler** mit Decay, Refill, Splash, Speed-Effekten
 - **Sabotage-Object-Binding** — jede Sabotage am themen-passenden Anchor
+- **Alle 8 Tasks haben Mini-Games** (Sequencing, Pairing, Timing,
+  Filter-by-Criterion, Subset-by-Constraint, Spot-the-Bug,
+  Stability-Balance, Click-to-Cycle-Sort)
+- **AI-NPCs (Bots)** als Lobby-Filler, Anthropic-LLM-getrieben oder lokal
+  via Ollama
+- **AI-Flavor + AI-Postmortem + AI-Last-Words** per LLM-styled Pools
 - Komplettes Among-Us-Feature-Set: Movement, Tasks, Sabotagen, Vents,
   Take-Down, Body-Discovery, Report, Voting, Spectator-Mode
 - **Role-Intro-Modal**, **Personal-Task-Panel**, **Coffee-Meter-Pille**,
-  **Ability-Button**, **Meeting-Kontext**, **Endscreen mit Awards +
-  AI-Postmortem**
-- 5 von 8 Tasks haben Mini-Games (Sequencing, Pairing, Timing,
-  Filter-by-Criterion, Subset-by-Constraint)
-- Mobile-Touch-Controls (Quick-Hack, spielbar)
+  **Ability-Button**, **Meeting-Kontext**, **Endscreen mit Awards**
+- Mobile-Touch-Controls (spielbar auf Phone)
 - Reconnect (30 s Grace nach Disconnect)
-- Map-Editor unter `/editor`
-- AI-Flavor in Eventfeed + Postmortem
+- Map-Editor unter `/editor` mit 3D-Vorschau (Three.js)
+- **Vier Maps** wählbar (default, office_complex mit 390 Möbeln, datacenter,
+  small-arena), kinds.json als Single Source of Truth
+- Metrik-Export (JSONL pro Tag) für Balancing, lesbar via `GET /api/metrics`
+- **Godot-3D-Client** parallel auf gleichem WS-Protokoll (Tier 4 in Arbeit)
 
 **Was offen ist:**
 
-- 3 Mini-Games (review_pr → Diff-Review, calm_legacy_service →
-  Stabilitäts-Balancing, write_release_notes → Drag-Reorder)
-- Accusation-Tags / Voting-Polish
-- Metrik-Export für Balancing
-- Heatmaps
-- Asset-Pack-Entscheidung für Godot
-- Godot-Migration als nächster großer Brocken (5–7 Wochen)
+- **Tier 3.9.3** AI-Postmortem mit echtem LLM (statt Templates)
+- **Tier 3.9.4** AI-Game-Master / Live-Commentary
+- **Tier 3.9.5** AI-Meeting-Summary
+- **Tier 3.9.6** Chaos-Bots (Phase 2 — schwierig wegen Game-Sense)
+- **Tier 4.x** Godot-Client Feature-Parität (Persona-Layer, einzelne
+  Polish-Slices)
+- **Pathfinder MapObject-aware** für Bots (heute room+door-only)
 
 ---
 
 ## Wo Brainstorming-Input besonders hilft
 
-1. **Neue Mini-Games** für die 3 verbleibenden Hold-E-Tasks
-2. **Neue Sabotagen** im DevOps-Themenbereich (Hotfix-on-main, Zoom-Anrufer,
-   Legal-Review, Dependency-Hell, …)
+1. **AI-Features auf der Roadmap** — was wäre der spannendste nächste
+   AI-Touch? Live-Commentary? Per-Player-Prompts? In-Round LLM-NPC-Dialoge?
+2. **Game-Modes neben Among-Us-Klon** — z. B. Bot-Arena (siehe
+   `BOT_ARENA_VISION.md` als Brainstorm-Skizze), Coop-Modi ohne Chaos?
 3. **Erweiterte Rollen** (Bug Squasher, Data Wizard, Legacy Oracle, Incident
    Commander)
-4. **Map-Themen** (Hackathon-Garage, Datacenter, Konferenz, …)
+4. **Map-Themen** (Hackathon-Garage, Konferenz-Lounge, Open-Office-Hellscape, …)
 5. **Insider-Gags + Eventtexte** — der Pool ist erweiterbar ohne Code
 6. **Voting-Polish** — Accusation-Tags („sus", „war mit mir", „hat Body
    reported")
@@ -361,7 +427,8 @@ geht sie zurück.
 1. https://prod-is-lava.dev öffnen (Phone, Tablet, Desktop)
 2. Raumcode ausdenken (4 Buchstaben), Namen eintragen, optional Wunschrolle
    wählen, **Join**
-3. Andere joinen mit gleichem Code
+3. Andere joinen mit gleichem Code — alternativ Host-Knopf **„+ Bot
+   hinzufügen"** für AI-Mitspieler
 4. Host (= erster im Raum) startet die Runde
 5. **WASD/Arrows** zum Bewegen, **E** für Tasks, **F** für Sabotage-Repair,
    **V** für Vent (nur Chaos), **Klick** auf Sabotage-Buttons (nur Chaos),
@@ -369,7 +436,8 @@ geht sie zurück.
 6. Bei Body-Fund: Report-Button. Bei Verdacht ohne Body: ins War-Room laufen
    und Emergency-Meeting
 
-Mindestens 4 Spieler für eine sinnvolle Runde, Sweet-Spot 6–10.
+Mindestens 4 Spieler (oder Spieler+Bots) für eine sinnvolle Runde,
+Sweet-Spot 6–10.
 
 ---
 
@@ -394,5 +462,6 @@ brechen sind nicht falsch, aber wären ein Pivot.
   Clients)
 - `docs/ARCHITECTURE.md` — Backend-Organisation + Performance-Numbers
 - `docs/maps.md` — Map-JSON-Schema (für Map-Bauer)
+- `docs/GODOT_HANDOFF.md` — Onboarding für den Godot-3D-Client
 - `merge_conflict_mayhem_project/merge_conflict_mayhem_gesamtfeedback.md` —
   externes Brainstorming-Feedback, das Tier 3.5/3.6/3.7 begründet hat
