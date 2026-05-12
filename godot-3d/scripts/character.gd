@@ -33,22 +33,26 @@ const COLOR_TO_INDEX: Dictionary = {
 }
 
 # Movement smoothing — target is updated at 20 Hz, we lerp every frame.
-# 22.0 ergibt ~45 ms zum Erreichen von 50 % Distanz — sichtbar straffer als
-# 14.0, ohne den smoothen "schweben"-Eindruck zu verlieren. Plus
-# snap-on-pushback unten faengt den "ich laufe durch den Tisch"-Effekt ab.
-const POSITION_LERP_SPEED: float = 22.0
+# 35.0 ergibt ~20 ms zum Erreichen von 50 % Distanz. Hoeher als 22.0 weil
+# Lerp-Oszillation zwischen Server-Ticks (50 ms Spacing) sonst als
+# "hakelig" sichtbar wird — bei niedrigerem Lerp-Speed schwankt die
+# Render-Velocity stark zwischen Ticks (schneller direkt nach Tick,
+# asymptotisch langsam vor naechstem Tick). 35.0 schliesst die meiste
+# Distanz innerhalb eines Tick-Intervalls und stabilisiert die Geschwindigkeit.
+const POSITION_LERP_SPEED: float = 35.0
 const ROTATION_LERP_SPEED: float = 10.0
 const MOVE_DEADZONE: float = 0.04
-# Wenn Server uns plotzlich in die entgegengesetzte Bewegungsrichtung
-# zurueckschiebt (= wir sind gegen einen Tisch gerannt, Server hat uns
-# rausgeclamped), snappen wir sofort statt durch das Hindernis zu gleiten.
-# Schwellwert: Pushback-Distanz > 0.06 World-Units (= 6 Server-Pixel)
-# UND wir hatten gerade Bewegung in die entgegengesetzte Richtung.
-const SNAP_PUSHBACK_DISTANCE: float = 0.06
+# Wenn der Server-Snapshot weit weg vom gerenderten Char ist UND ein echter
+# Pushback (oder Idle-Stuck) vorliegt, snappen wir hart statt zu lerpen.
+# Schwellwert: 0.12 World-Units (= 12 Server-Pixel) — knapp ueber dem max
+# Lerp-Lag bei Speed-35 (~10 px) und unter typischen Wall-Pushbacks (>= 20 px),
+# damit Snap nur bei echten Server-Korrekturen feuert, nicht bei normalen
+# Tick-Sprueengen.
+const SNAP_PUSHBACK_DISTANCE: float = 0.12
 const NAMEPLATE_HEIGHT: float = 2.4
 const CHARACTER_SCALE: float = 2.2  # Kenney Mini chars are tiny raw, scale up
 
-const COLOR_SELF_RING: Color = Color(0.30, 0.95, 0.50)
+const COLOR_SELF_RING: Color = Color(0.30, 0.95, 0.30)
 const DISC_OUTER_RADIUS: float = 0.42
 const DISC_INNER_RADIUS: float = 0.28
 
@@ -76,6 +80,10 @@ var _color_hex: String = "#888888"
 var _is_alive: bool = true
 var _target_pos: Vector3 = Vector3.ZERO
 var _last_pos: Vector3 = Vector3.ZERO
+# Pre-lerp Position vom letzten Frame — fuer korrektes "moved_last_frame".
+# `_last_pos` wird am Frame-Ende post-lerp gesetzt, also waere im naechsten
+# Frame `current - _last_pos` immer 0. `_pre_lerp_pos` schliesst diese Luecke.
+var _pre_lerp_pos: Vector3 = Vector3.ZERO
 
 var _dummy: Node3D
 var _anim_player: AnimationPlayer
@@ -125,6 +133,7 @@ func _ready() -> void:
 	_rng.randomize()
 	_dummy.position = Vector3.ZERO
 	_last_pos = global_position
+	_pre_lerp_pos = global_position
 
 func push_target(server_x: float, server_y: float) -> void:
 	_target_pos = Protocol.server_to_world(server_x, server_y)
@@ -149,15 +158,24 @@ func _process(delta: float) -> void:
 	# Position lerp
 	var current := global_position
 	var to_target := _target_pos - current
-	var moved_last_frame := current - _last_pos
-	# Snap-on-pushback: wenn der naechste Server-Snapshot uns gegen die
-	# Richtung schubst in die wir gerade gelaufen sind (= Server hat uns aus
-	# einem Tisch geclamped), nicht erst lerpen, sondern hart snappen. Sonst
-	# rendert man visuell noch ~100 ms im Tisch drin.
+	# moved_last_frame = Lerp-Delta des LETZTEN Frames (post_N-1 - pre_N-1).
+	# Dafuer brauchen wir die pre-lerp-pos von letztem Frame separat —
+	# `_last_pos` wird unten post-lerp gesetzt und waere hier identisch zu
+	# `current`, also Diff = 0 (latenter Bug aus Tier 4.3.1).
+	var moved_last_frame := current - _pre_lerp_pos
+	_pre_lerp_pos = current
+	# Snap-Trigger in zwei Faellen:
+	#  1. Aktiver Pushback: wir laufen, Server schiebt uns entgegen (Wall-Clamp).
+	#  2. Idle-Stuck: wir stehen visuell still, der Server-Target ist aber weit
+	#     weg. Tritt auf wenn man in einen Tisch reingerannt ist und gestoppt
+	#     hat — Lerp braucht sonst ~500 ms zum asymptotischen Aufholen, und
+	#     der Char rendert solange visuell im Tisch.
 	var pushback := (
 		to_target.length() > SNAP_PUSHBACK_DISTANCE
-		and moved_last_frame.length_squared() > 0.0
-		and to_target.dot(moved_last_frame) < 0.0
+		and (
+			moved_last_frame.length_squared() <= 0.0001
+			or to_target.dot(moved_last_frame) < 0.0
+		)
 	)
 	if pushback:
 		global_position = _target_pos
