@@ -1879,8 +1879,7 @@ func _build_confetti() -> void:
 	_confetti.scale_amount_min = 0.6
 	_confetti.scale_amount_max = 1.4
 	_confetti.color_ramp = _make_confetti_ramp()
-	_confetti.position = Vector2(640, 0)  # mittig oben — wird via anchors gerueckt
-	_confetti.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_confetti.position = Vector2(640, 0)  # mittig oben (CanvasLayer-Koordinaten)
 	_confetti.emitting = false
 	add_child(_confetti)
 

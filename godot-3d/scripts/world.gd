@@ -360,6 +360,11 @@ func _on_e_pressed() -> void:
 	ws_client.send(Protocol.TYPE_TASK_HOLD_START, {"taskId": _hold_task_id})
 
 func _on_e_released() -> void:
+	# Wenn das Mini-Game-Modal bereits offen ist, ist der Server-side Hold in
+	# eine Mini-Game-Session uebergegangen. E loszulassen darf die Session
+	# nicht abbrechen — das Modal laeuft autonom (Abort via ESC im Modal).
+	if _mini_game_modal != null:
+		return
 	if _hold_task_id == "":
 		return
 	if ws_client != null:
