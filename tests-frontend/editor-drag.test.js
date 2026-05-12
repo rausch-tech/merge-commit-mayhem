@@ -178,10 +178,14 @@ describe("ObjectTool uses pending kind from context", () => {
     map.mapObjects = [];
     const ctx = makeCtx(map);
     const tool = new ObjectTool();
-    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+    // vitest 4 / happy-dom 20: window.alert ist nicht mehr default-definiert,
+    // vi.spyOn(window, "alert") wirft "can only spy on a function".
+    // vi.stubGlobal arbeitet auf undefined-Globals und ist forward-compatible.
+    const alertFn = vi.fn();
+    vi.stubGlobal("alert", alertFn);
     tool.onDown(ctx, 600, 600);
     expect(map.mapObjects).toHaveLength(0);
-    expect(alertSpy).toHaveBeenCalled();
-    alertSpy.mockRestore();
+    expect(alertFn).toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });

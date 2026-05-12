@@ -140,12 +140,16 @@ describe("DoorTool", () => {
   it("alerts and places nothing when no shared edge is near the click", () => {
     const m = makeMap();
     const ctx = makeCtx(m);
-    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+    // vitest 4 / happy-dom 20: window.alert ist nicht mehr default-definiert,
+    // vi.spyOn(window, "alert") wirft "can only spy on a function".
+    // vi.stubGlobal arbeitet auf undefined-Globals und ist forward-compatible.
+    const alertFn = vi.fn();
+    vi.stubGlobal("alert", alertFn);
     const tool = new DoorTool();
     tool.onDown(ctx, 800, 50);
     expect(m.doors).toHaveLength(0);
-    expect(alertSpy).toHaveBeenCalled();
-    alertSpy.mockRestore();
+    expect(alertFn).toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });
 
