@@ -7,12 +7,15 @@ einen konkreten Slice-Plan ab dem Punkt, an dem die Demo aufhört.
 
 - **Live-Backend:** https://prod-is-lava.dev (auto-deploy von `main`)
 - **Repo:** https://github.com/rausch-tech/merge-commit-mayhem
-- **Stand 2026-04-27:** Tier 0–3.7 ist live; 3D-Demo (Tier-4-Prototyp) liegt
-  unter `godot-3d/` direkt in `main`. Sie deckt die Architektur (Lobby,
-  World-Stream, Character, HUD, Pause-Menü) ab und validiert Protokoll +
-  Snapshot-Pipeline. Die Demo ist explizit **Spike-Qualität, kein finales
-  Tier-4-Release** — Map-Wände rendern z.B. nicht gegen den aktuellen Server
-  (siehe §3.6).
+- **Stand 2026-05-12:** Tier 0–3.7 ist live; **Tier-4-Godot-Sprint ist durch**
+  (alle 8 Mini-Games, Sabotage-Buttons, Meeting/Voting, Endscreen,
+  Among-Us-Features, Auto-Reconnect, Polish). Web-Export läuft auf
+  https://prod-is-lava.dev/godot/. Die Slice-Tabelle in §2.2 sowie die
+  TODO-Markierungen in §5.3, §9.5 spiegeln den **historischen Spike-Stand
+  (2026-04-15)** wider, an dem dieses Doc geschrieben wurde — der
+  Live-Status steht in [`docs/ROADMAP.md`](ROADMAP.md). Die §3-§9-Sektionen
+  (Architektur, Protokoll, Stolperfallen) bleiben als technische Referenz
+  weiterhin valide.
 
 ---
 
@@ -122,29 +125,25 @@ für die finalen Slices ggf. ersetzt wird; siehe §6.6 + `ASSET_LICENSE.md`.
 
 ### 2.2 Godot-Sprint (~4–6 Wochen)
 
-| #    | Slice                                                                                 | Effort | Demo-Stand                                                                                                 |
-| ---- | ------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------- |
-| 4.1  | Godot-4-Setup, Web-Export-Config, WebSocketPeer-Binding                               | 1 Tag  | OK in `godot-3d/`                                                                                          |
-| 4.2  | Lobby-Scene (UI, Room-Code-Input, Player-Liste, Map-Selection, Start)                 | 1–2 Tg | OK `main.gd`                                                                                               |
-| 4.3  | Map-Loader: JSON → 3D-Geometrie (Floors, Walls, Doors, Spawns, TaskAnchors)           | 2 Tage | TEILWEISE — §3.6 Schema-Drift                                                                              |
-| 4.4  | Character-Scene: Mesh + Idle/Walk-Anim + Movement-Interpolation                       | 2–3 Tg | OK `character.gd`                                                                                          |
-| 4.5  | HUD + Stat-Pills + Role + Timer (Tween-Animationen)                                   | 1 Tag  | OK `hud.gd`                                                                                                |
-| 4.6  | Task-Interaction (Mini-Game-Modals via Tier-3-API + Progress-Ring + Completion-VFX)   | 2 Tage | TODO                                                                                                       |
-| 4.7  | Sabotage-Buttons mit Cooldown-Display                                                 | 1 Tag  | TODO                                                                                                       |
-| 4.8  | Voting-Overlay + Result-Toast (Slide-Animationen)                                     | 1 Tag  | TODO                                                                                                       |
-| 4.9  | Endscreen mit Role-Reveal + Stats + Confetti-Particles                                | 1 Tag  | TODO                                                                                                       |
-| 4.10 | Among-Us-Features: Vents (anim+sfx), Body+Report, Take-Down, Lights/Comms-VFX, Ghosts | 5–8 Tg | nur Ghost-Alpha vorhanden                                                                                  |
-| 4.11 | Sound-Integration (Footsteps, UI-SFX, BGM)                                            | 1 Tag  | TEILWEISE (siehe §3)                                                                                       |
-| 4.12 | Polish + Bugfixes                                                                     | 3–5 Tg | TODO                                                                                                       |
-| 4.13 | Web-Export-Deploy zur selben EC2                                                      | 0.5 Tg | 🟡 lokal builbar via `scripts/godot-web-export.sh`, FastAPI mountet `/godot/`, EC2-Tarball-Inclusion offen |
+| #    | Slice                                                                                 | Effort | Demo-Stand                                                                                                |
+| ---- | ------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------- |
+| 4.1  | Godot-4-Setup, Web-Export-Config, WebSocketPeer-Binding                               | 1 Tag  | OK in `godot-3d/`                                                                                         |
+| 4.2  | Lobby-Scene (UI, Room-Code-Input, Player-Liste, Map-Selection, Start)                 | 1–2 Tg | OK `main.gd`                                                                                              |
+| 4.3  | Map-Loader: JSON → 3D-Geometrie (Floors, Walls, Doors, Spawns, TaskAnchors)           | 2 Tage | TEILWEISE — §3.6 Schema-Drift                                                                             |
+| 4.4  | Character-Scene: Mesh + Idle/Walk-Anim + Movement-Interpolation                       | 2–3 Tg | OK `character.gd`                                                                                         |
+| 4.5  | HUD + Stat-Pills + Role + Timer (Tween-Animationen)                                   | 1 Tag  | OK `hud.gd`                                                                                               |
+| 4.6  | Task-Interaction (Mini-Game-Modals via Tier-3-API + Progress-Ring + Completion-VFX)   | 2 Tage | ✅ done (2cd619c + 170daf0 + a4a8b88, 8/8 Mini-Games)                                                     |
+| 4.7  | Sabotage-Buttons mit Cooldown-Display                                                 | 1 Tag  | ✅ done (5d13462)                                                                                         |
+| 4.8  | Voting-Overlay + Result-Toast (Slide-Animationen)                                     | 1 Tag  | ✅ done (b324722)                                                                                         |
+| 4.9  | Endscreen mit Role-Reveal + Stats + Confetti-Particles                                | 1 Tag  | ✅ done (72f279d)                                                                                         |
+| 4.10 | Among-Us-Features: Vents (anim+sfx), Body+Report, Take-Down, Lights/Comms-VFX, Ghosts | 5–8 Tg | ✅ done (8a8c078 + 8a0f6b4 + 8ab8591)                                                                     |
+| 4.11 | Sound-Integration (Footsteps, UI-SFX, BGM)                                            | 1 Tag  | ✅ Polish-Layer done (f9fbe1a + f68a6bc — Camera-Shake, Phase-Banner, Confetti); BGM auf Tier 5.1 vertagt |
+| 4.12 | Polish + Bugfixes                                                                     | 3–5 Tg | ✅ done (71ab9c4 — Auto-Reconnect; Touch-Controls auf Tier 5.2 vertagt)                                   |
+| 4.13 | Web-Export-Deploy zur selben EC2                                                      | 0.5 Tg | ✅ done — Live auf https://prod-is-lava.dev/godot/                                                        |
 
-Die Demo-Stand-Spalte ist **als Architektur-Referenz** gemeint, nicht als
-"Slice-merged-DoD". Die Demo kompiliert und läuft lokal gegen Backend, ist
-aber Spike-Qualität: keine Tests, kein Web-Export, ein Schema-Drift in §3.6,
-und nicht alle Tier-4.4-Animationen sind durchgespielt.
-
-**Tier 4 ist erst "done" wenn ein Live-Test mit echten Spielern erfolgreich
-ist.** Live-Tests sind in MCM die Tier-Übergangs-Validierung.
+**Update 2026-05-12:** Sprint durchgezogen — alle Tier-4-Slices sind merged.
+Die Tabelle oben ist jetzt der finale Stand, kein Plan mehr. Live-Test-Sweep
+mit echten Spielern ist die noch offene Übergangs-Validierung.
 
 ---
 
@@ -628,16 +627,17 @@ nur die Demo-Felder konsumierst.
 - Server tickt **20 Hz** → ein `game_state` alle ~50 ms.
 - **Client darf NICHT predicten.** Server ist autoritativ.
 - **Render-Strategie:** Position-Lerp jedes Frame zum letzten
-  `push_target`. Die Demo lerpt mit `POSITION_LERP_SPEED=14` und kommt
-  damit auf flüssige Bewegung. Eine gefederte Variante (tatsächliche
-  Snapshot-Interpolation mit Prev/Curr-Buffer) ist möglich; die Demo
-  hat das nicht ausgeschöpft.
+  `push_target`. Aktuell `POSITION_LERP_SPEED=35` (Stand 2026-04-28,
+  cfef514 — Spike-Wert war 14, Tier-4.3.1-Tuning hat hochgezogen) plus
+  Snap-on-Pushback bei Wall-Clamp/Idle-Stuck. Eine gefederte Variante
+  (tatsächliche Snapshot-Interpolation mit Prev/Curr-Buffer) ist möglich;
+  bisher nicht implementiert.
 - **`player_input` Throttle:** Bei Input-Change ODER alle 50 ms — was
   zuerst kommt. `input_sender.gd` benutzt einen `_accum`-Akkumulator
   (`SEND_INTERVAL = 0.05`). `_dirty` wird auf Hash-Vergleich des
   Bool-Quadrupels gesetzt.
 
-### 5.3 Reconnect-Verhalten (Tier 4.12 TODO)
+### 5.3 Reconnect-Verhalten (Tier 4.12 — done seit 71ab9c4)
 
 - **Server hält Session 30 s nach Disconnect.** Innerhalb dieser Zeit
   reconnecten → `rejoin` (nicht `join_room`) mit gleicher `playerId`.
@@ -647,9 +647,11 @@ nur die Demo-Felder konsumierst.
 - **`playerId` persistieren:** Empfohlen `user://player.json`. Nach jedem
   `room_joined` speichern; beim Boot lesen, falls present `rejoin`
   versuchen.
-- **Demo-Stand:** `world.gd:_on_disconnected` ruft direkt `_return_to_main`,
-  ohne Reconnect-Versuch. `main.gd` zeigt nur "Verbindung verloren". Das
-  ist Tier-4.12-Followup.
+- **Demo-Stand (historisch):** `world.gd:_on_disconnected` rief direkt
+  `_return_to_main`, ohne Reconnect-Versuch. **Update 2026-04-28
+  (71ab9c4):** Auto-Reconnect implementiert — `playerId` wird in
+  `user://player.json` persistiert, beim Boot wird `rejoin` versucht,
+  Fallback auf `join_room` bei `REJOIN_NOT_AVAILABLE`.
 
 ---
 
@@ -1079,12 +1081,12 @@ bevor es auf IPv4 fällt → fühlt sich wie "Connect hängt" an.
   `main.gd:_url_field`).
 - Oder: `uv run uvicorn app.main:app --host :: --reload` (bindet beides).
 
-### 9.5 Reconnect-Window (TODO in Demo)
+### 9.5 Reconnect-Window (done seit 71ab9c4)
 
 Server hält Session 30 s nach Disconnect. Innerhalb der Zeit:
 
 ```gdscript
-# Pseudocode — noch nicht in der Demo implementiert.
+# Live in main.gd / ws_client.gd seit Tier 4.12 (71ab9c4).
 if FileAccess.file_exists("user://player.json"):
     var saved = JSON.parse_string(FileAccess.open("user://player.json", FileAccess.READ).get_as_text())
     _ws.send(Protocol.TYPE_REJOIN, {"roomCode": saved.roomCode, "playerId": saved.playerId})
@@ -1095,13 +1097,14 @@ Bei `REJOIN_NOT_AVAILABLE` → fallback auf `join_room`.
 
 ### 9.6 Snapshot-Position-Lerp vs. echte Interpolation
 
-Die Demo lerpt jedes Frame gegen das letzte `push_target` mit
-`POSITION_LERP_SPEED=14`. Das ist visuell smooth genug für den Spike,
-ist aber **kein** Snapshot-Interpolation im strengen Sinne — eine
-gespeicherte Prev/Curr-Kette mit Timestamps + alpha-basiertem `lerp`
-würde gegen Server-Hiccups deterministischer sein. Für Tier 4.4-Polish
-ist das ein Refactor-Kandidat. Validierte Formel aus dem 2D-Spike
-(damals fluid):
+Aktuell lerpt der Client jedes Frame gegen das letzte `push_target` mit
+`POSITION_LERP_SPEED=35` (Spike-Wert war 14; Tier-4.3.1-Tuning hat
+hochgezogen, dazu Snap-on-Pushback bei Wall-Clamp/Idle-Stuck). Das ist
+visuell smooth, ist aber **kein** Snapshot-Interpolation im strengen
+Sinne — eine gespeicherte Prev/Curr-Kette mit Timestamps + alpha-basiertem
+`lerp` würde gegen Server-Hiccups deterministischer sein. Bleibt als
+optionaler Refactor-Kandidat. Validierte Formel aus dem 2D-Spike (damals
+fluid):
 
 ```
 alpha = clamp((now - curr_snapshot_time) / 50ms + 1.0, 0, 1)
