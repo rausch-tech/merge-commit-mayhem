@@ -270,7 +270,6 @@
       "width": 110,
       "height": 60,
       "kind": "desk",
-      "blocksMovement": false,
       "taskId": "fix_unit_tests",
       "objectType": "qa_terminal"
     },
@@ -299,7 +298,6 @@
       "width": 110,
       "height": 60,
       "kind": "desk",
-      "blocksMovement": false,
       "taskId": "review_pr",
       "objectType": "git_terminal"
     },
@@ -443,7 +441,6 @@
       "width": 110,
       "height": 60,
       "kind": "desk",
-      "blocksMovement": false,
       "taskId": "write_release_notes",
       "objectType": "release_console"
     },
@@ -548,7 +545,6 @@
       "width": 110,
       "height": 60,
       "kind": "desk",
-      "blocksMovement": false,
       "taskId": "repair_deployment",
       "objectType": "ci_console",
       "sabotageRepairId": "lights_out"
@@ -623,7 +619,6 @@
       "width": 110,
       "height": 60,
       "kind": "old_workstation",
-      "blocksMovement": false,
       "taskId": "calm_legacy_service",
       "objectType": "legacy_terminal",
       "sabotageRepairId": "comms_outage"

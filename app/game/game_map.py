@@ -23,10 +23,10 @@ import re
 from pathlib import Path
 from typing import Any, Final, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 
-from app.game.kinds_registry import is_known_kind, known_kinds
+from app.game.kinds_registry import get_kinds_registry, is_known_kind, known_kinds
 from app.game.walls import DOOR_WIDTH_DEFAULT, WALL_THICKNESS
 
 
@@ -170,6 +170,27 @@ class MapObject(BaseModel):
     task_id: str | None = None
     sabotage_repair_id: str | None = None
     object_type: str | None = None  # Tier 2.7 sabotage trigger binding
+
+    @model_validator(mode="before")
+    @classmethod
+    def _default_blocks_movement_from_registry(cls, data: Any) -> Any:
+        """Wenn weder ``blocks_movement`` noch ``blocksMovement`` im Map-JSON
+        gesetzt sind, fuelle den Wert aus ``maps/kinds.json``. Damit wird die
+        Registry zur Default-Source: einzelne Map-JSONs muessen das Feld nur
+        explizit setzen, wenn sie das Kind-Default ueberschreiben wollen.
+        Verhindert die Drift-Klasse, in der ein Map-JSON-Eintrag fuer einen
+        Tisch ``blocksMovement: false`` haelt obwohl die Registry True sagt.
+        Pydantic-Default ``True`` bleibt als Last-Resort-Fallback fuer Kinds
+        ohne Registry-Eintrag (was der ``kind``-Validator separat ablehnt).
+        """
+        if isinstance(data, dict):
+            if "blocks_movement" not in data and "blocksMovement" not in data:
+                kind = data.get("kind")
+                if kind:
+                    kdef = get_kinds_registry().get(kind)
+                    if isinstance(kdef, dict) and "blocks_movement" in kdef:
+                        data["blocks_movement"] = kdef["blocks_movement"]
+        return data
 
     @field_validator("kind")
     @classmethod
