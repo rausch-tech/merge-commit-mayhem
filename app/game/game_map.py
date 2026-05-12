@@ -183,13 +183,16 @@ class MapObject(BaseModel):
         Pydantic-Default ``True`` bleibt als Last-Resort-Fallback fuer Kinds
         ohne Registry-Eintrag (was der ``kind``-Validator separat ablehnt).
         """
-        if isinstance(data, dict):
-            if "blocks_movement" not in data and "blocksMovement" not in data:
-                kind = data.get("kind")
-                if kind:
-                    kdef = get_kinds_registry().get(kind)
-                    if isinstance(kdef, dict) and "blocks_movement" in kdef:
-                        data["blocks_movement"] = kdef["blocks_movement"]
+        if (
+            isinstance(data, dict)
+            and "blocks_movement" not in data
+            and "blocksMovement" not in data
+        ):
+            kind = data.get("kind")
+            if kind:
+                kdef = get_kinds_registry().get(kind)
+                if isinstance(kdef, dict) and "blocks_movement" in kdef:
+                    data["blocks_movement"] = kdef["blocks_movement"]
         return data
 
     @field_validator("kind")
