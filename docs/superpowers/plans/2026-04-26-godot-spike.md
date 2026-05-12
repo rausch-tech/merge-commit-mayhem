@@ -1,5 +1,12 @@
 # Godot-Client Bootstrapping-Spike — Implementation Plan
 
+> **Status (2026-05-12):** ARCHIVED. Der Spike wurde durchgeführt — das
+> Resultat liegt unter `godot-3d/` und der vollständige Tier-4-Sprint
+> (siehe `docs/ROADMAP.md` Tier 4.0–4.13) ist abgeschlossen. Die
+> ungehakten Checkboxes und `[TODO: ...]`-Marker unten reflektieren den
+> _Plan-Zustand vor Ausführung_, sie sind keine offenen Action-Items.
+> Behalten als historisches Artefakt + Beispiel für das Plan-Format.
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Schmaler Godot-4.3-Client gegen den existierenden FastAPI-Backend, der das WS-Protokoll real validiert, `docs/CLIENT.md` mit gemessenen Werten füllt und ein Skelett für Tier 3 hinterlässt.
@@ -1271,7 +1278,7 @@ Pre-Spike sind die im initialen Plan identifizierten Lücken bereits in `docs/PR
 
 **Vom Spike NEU entdeckte Lücken** (während Tasks 7-12 + Reconnect-Test):
 
-[TODO: Task 14 füllt nach Spike-Ende. Beispielsweise: Wall-Computation-Algorithmus an Map-Rändern, `compute_walls()`-Verhalten, Edge-Cases bei Reconnect mid-Meeting, ...]
+[ARCHIVED — Plan archiviert vor Task 14. Real entdeckte Lücken sind in `docs/GODOT_HANDOFF.md` §3.6 (Schema-Drift) + §9 (Stolperfallen) dokumentiert.]
 ```
 
 - [ ] **Step 4: Commit**
@@ -1393,7 +1400,7 @@ In `docs/ROADMAP.md` direkt **vor** "### Tier 3 — Godot-Migration" eine neue S
 
 **Ziel:** Protokoll-Annahmen vor dem Tier-3-Sprint real validieren, Doku-Lücken aufdecken, Skelett-Repo-Struktur etablieren.
 
-**Aufwand (real):** [TODO: nach Spike-Ende eintragen]
+**Aufwand (real):** [ARCHIVED — die Pre-Tier-3-Sektion in ROADMAP wurde nicht eingefügt, weil die Roadmap-Nummerierung nach dem Spike neu strukturiert wurde (Godot wurde von Tier 3 zu Tier 4). Die Spike-Erkenntnisse sind in `docs/GODOT_HANDOFF.md` aufgegangen.]
 
 | #    | Was                                                                                                        | Status       |
 | ---- | ---------------------------------------------------------------------------------------------------------- | ------------ |
