@@ -391,10 +391,10 @@ requires-dist = [
 dev = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "hypothesis", specifier = ">=6.115.0" },
-    { name = "mypy", specifier = ">=1.13.0" },
+    { name = "mypy", specifier = ">=1.20.2" },
     { name = "pre-commit", specifier = ">=4.6.0" },
     { name = "pytest", specifier = ">=9.0.3" },
-    { name = "pytest-cov", specifier = ">=6.0.0" },
+    { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "ruff", specifier = ">=0.15.12" },
 ]
 
