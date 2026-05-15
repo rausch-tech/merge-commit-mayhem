@@ -1,23 +1,23 @@
-# Asset-Spec — MCM Tier 4 (Godot 3D Client)
+# Asset-Spec — Godot 3D Client
 
-> **Zweck:** Konventions-Dokument zwischen dem Godot-Asset-Team und der
-> Backend-/Editor-Seite. Definiert verbindlich, in welchem Format neue
-> 3D-Meshes ins Repo landen, damit Editor-3D-Vorschau und Godot-Client
-> beide automatisch upgepicken — ohne pro Asset einen Code-Patch.
+> **Zweck:** Konventions-Dokument für die Asset-Pipeline. Definiert
+> verbindlich, in welchem Format neue 3D-Meshes ins Repo landen, damit
+> Editor-3D-Vorschau und Godot-Client beide automatisch upgepicken —
+> ohne pro Asset einen Code-Patch.
 >
-> **Status:** Tier 4.0.2 (Pipeline-Aufbau) wird gerade vom Godot-Team
-> umgesetzt. Dieses Doc ist die Vorab-Vereinbarung; Updates per PR
-> wenn Konventionen sich in der Praxis ändern müssen.
+> **Status:** Pipeline ist live (25/25 Kinds gestaged via KayKit-Default-
+> Sweep). Dieses Doc dokumentiert die etablierten Konventionen; Updates
+> per PR wenn sie sich in der Praxis ändern müssen.
 
 ---
 
 ## 1. Übersicht
 
-Die `MapObject`-Pipeline hat seit Tier 3.8.7 eine einzige Quelle der
-Wahrheit: [`maps/kinds.json`](../maps/kinds.json). Pro Kind steht dort
-ein Block mit `category`, `label`, `default_size`, `blocks_movement`,
-`browser_2d` (2D-Renderer-Hint), `godot_asset` (Pfad zum 3D-Mesh) und
-`kaykit_source` (Asset-Pack-Provenance).
+Die `MapObject`-Pipeline hat eine einzige Quelle der Wahrheit:
+[`maps/kinds.json`](../maps/kinds.json). Pro Kind steht dort ein Block
+mit `category`, `label`, `default_size`, `blocks_movement`, `browser_2d`
+(2D-Renderer-Hint), `godot_asset` (Pfad zum 3D-Mesh) und `kaykit_source`
+(Asset-Pack-Provenance).
 
 Vier Konsumenten lesen die Datei live:
 

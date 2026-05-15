@@ -1,6 +1,6 @@
 # HOWTO: Eine neue Sabotage hinzufügen
 
-Step-by-step für den Fall, dass du eine 9. Sabotage ergänzen willst (nach den 8 aus Tier 2.5/2.7). Der Server-Code, der Map-Editor und der Browser-Client müssen alle mitziehen.
+Step-by-step für den Fall, dass du eine 9. Sabotage ergänzen willst (nach den 8 existierenden). Der Server-Code, der Map-Editor und der Browser-Client müssen alle mitziehen.
 
 > **Architektur-Erinnerung:** Backend ist autoritativ. Wenn du eine neue Sabotage baust, schreibt sich der Effekt in `SabotagesController.trigger`, nicht im Frontend. Das Frontend zeigt nur den Button + Cooldown.
 
@@ -16,14 +16,14 @@ SabotageDefinition(
     title="Rubber-Duck-Panic",      # Anzeigename im HUD
     cooldown_seconds=80.0,
     incidents_increase=15,           # optional, +n Incidents on trigger
-    trigger_object_types=("dev_chair",),  # Tier 2.7 object-binding
+    trigger_object_types=("dev_chair",),  # object-binding: an welchen MapObject-Typen triggerbar
     object_hint="Schreibtisch im Open Space",
 )
 ```
 
 Pflichtfelder: `id`, `title`, `cooldown_seconds`. Alles andere hat Defaults.
 
-**Convention:** Tier 2.7 verlangt `trigger_object_types`, sonst ist die Sabotage nur auf Maps ohne typed-anchors (legacy-Pfad) triggerbar. Heißt praktisch: **immer setzen**, sonst kommt sie auf der `default.json` nicht zur Geltung.
+**Convention:** `trigger_object_types` ist Pflicht in der Praxis — ohne wird die Sabotage nur auf Maps ohne typed-anchors (legacy-Pfad) triggerbar. Heißt: **immer setzen**, sonst kommt sie auf der `default.json` nicht zur Geltung.
 
 ## 2. Effekt in `app/game/controllers/sabotages.py`
 
@@ -40,9 +40,9 @@ Wenn die Sabotage einen **Repair-Pfad** braucht (wie `lights_out` und `comms_out
 
 Wenn die Sabotage nur einmalig wirkt (wie `merge_conflict_storm`), ist nichts davon nötig.
 
-## 3. Map-Anchor (Tier 4: MapObject mit `objectType`)
+## 3. Map-Anchor (MapObject mit `objectType`)
 
-Tier-4-Pfad (empfohlen): in `maps/default.json` einen `MapObject` mit `objectType: "<dein_neuer_type>"` ergänzen — z.B. ein `desk` mit `objectType: "dev_chair"`. Der Server iteriert sowohl `taskAnchors` als auch `mapObjects` für die Tier-2.7-Object-Binding, beides funktioniert.
+Empfohlen: in `maps/default.json` einen `MapObject` mit `objectType: "<dein_neuer_type>"` ergänzen — z.B. ein `desk` mit `objectType: "dev_chair"`. Der Server iteriert sowohl `taskAnchors` als auch `mapObjects` für das Object-Binding, beides funktioniert.
 
 Legacy-Pfad: `taskAnchor`-Eintrag mit `objectType` setzen (für Maps ohne MapObjects).
 
@@ -60,7 +60,7 @@ Pflicht: Ein neuer Test in `tests/test_sabotages.py`, der:
 2. `room.apply_sabotage(chaos_id, "rubber_duck_panic")` aufruft.
 3. Den erwarteten Effekt prüft (z.B. `room.incidents == 15`).
 
-**Common gotcha:** Ohne `snap_to_object_for_sabotage` kommt `NOT_NEAR_OBJECT` — Tier 2.7 Object-Binding gilt für alle typed-anchor-Maps.
+**Common gotcha:** Ohne `snap_to_object_for_sabotage` kommt `NOT_NEAR_OBJECT` — Object-Binding gilt für alle typed-anchor-Maps.
 
 ## 6. CI-Gate-Run
 

@@ -1,6 +1,6 @@
 # HOWTO: Eine neue Rolle hinzufügen
 
-Step-by-step für eine 9. Rolle (5 Release + 3 Chaos sind aktuell drin). Tier 6.7 in der Roadmap nennt mehrere Kandidaten: Data Wizard, Incident Commander, Bug Squasher, Legacy Oracle.
+Step-by-step für eine 9. Rolle (5 Release + 3 Chaos sind aktuell drin). Die [Roadmap](ROADMAP.md) nennt mehrere Kandidaten: Data Wizard, Incident Commander, Bug Squasher, Legacy Oracle.
 
 > **Architektur-Erinnerung:** Rollen-Daten sind statisch (im Code), Rollen-Zuweisung ist server-authoritativ (`assign()` in `roles.py`), Rollen werden im `private_role`-Frame an genau einen Spieler gesendet. Ein Public-Broadcast einer Rolle ist ein Bug.
 
@@ -61,7 +61,7 @@ In `app/game/game_room.py:apply_use_ability` einen neuen `elif`-Zweig:
 
 ```python
 elif ability == "trace_query":
-    # Tier 3.5 ability: Data Wizard markiert die letzten 5 Sabotage-Events
+    # ability: Data Wizard markiert die letzten 5 Sabotage-Events
     # sichtbar im Eventfeed.
     self._emit_event(
         "info",

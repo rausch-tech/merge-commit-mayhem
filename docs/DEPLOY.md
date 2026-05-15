@@ -103,7 +103,7 @@ cd /opt/mcm
 sudo systemctl restart mcm-server.service
 ```
 
-## LLM-Secrets (Tier 3.9)
+## LLM-Secrets
 
 Die Bot-Manager und der `ai_flavor`-Layer können einen LLM-Provider nutzen
 (`AnthropicClient` oder lokales OpenAI-kompatibel). Die API-Keys liegen NICHT
@@ -135,8 +135,8 @@ beiden Fällen.
 
 **Recovery-Tip:** Wenn der LLM-Provider Probleme hat (Timeout-Storm, Rate-
 Limit), API-Key in `/etc/mcm-server.env` auskommentieren + Service-Restart.
-Bots sind sofort wieder responsive (heuristic-only mode). Siehe Tier 3.9.2.1
-in der Roadmap für den Live-Incident vom 2026-04-28.
+Bots sind sofort wieder responsive (heuristic-only mode) — der `ai_flavor`-
+Layer fällt automatisch auf Templates zurück, kein Code-Change nötig.
 
 ## Caddyfile
 
@@ -163,7 +163,7 @@ git checkout <vorheriger-tag-oder-sha>
 git checkout main
 ```
 
-Für die Zukunft: Deploy-Script könnte den vorherigen Tarball auf der Instanz aufbewahren, sodass `--rollback` möglich wäre. (Tier 0 Polish, nicht jetzt.)
+Für die Zukunft: Deploy-Script könnte den vorherigen Tarball auf der Instanz aufbewahren, sodass `--rollback` möglich wäre. Polish-Item ohne Priorität.
 
 ## Initial-Setup (Historisch — nicht mehr nötig)
 

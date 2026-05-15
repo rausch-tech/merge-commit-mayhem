@@ -55,7 +55,7 @@ Begründung: wir wollen langfristig einen Godot-Client, ohne den Browser-Client 
        ▲                                  ▲
        │ wss://...                        │ https://.../static/...
        │                                  │
-   Browser-Client                    Godot-Client (Tier 4)
+   Browser-Client                    Godot-Client
    (Vanilla JS + Canvas)             (3D + GDScript)
 ```
 
@@ -105,7 +105,7 @@ for room in registry.active_rooms():
 
 Das Tick-Loop läuft serverweit als ein einziger asyncio-Task (in `app.main:_tick_loop`). Es iteriert über alle Räume — auch wenn ein Raum mal hängt (Exception), kommt der nächste dran.
 
-**Tick darf nicht blocken.** Der LLM-Call der Bots läuft in einem `ThreadPoolExecutor` (Tier 3.9.2.1, PR #38) — der Tick prüft pro Bot nur `Future.done()` (μs) und reapt das Result wenn da, sonst fällt er auf die Heuristik zurück. Vorher-Bug: 3 s `urllib.urlopen`-Timeout fror den Tick und damit ALLE Räume gleichzeitig ein.
+**Tick darf nicht blocken.** Der LLM-Call der Bots läuft in einem `ThreadPoolExecutor` (eingeführt mit PR #38 nach einem Live-Incident) — der Tick prüft pro Bot nur `Future.done()` (μs) und reapt das Result wenn da, sonst fällt er auf die Heuristik zurück. Vorher-Bug: 3 s `urllib.urlopen`-Timeout fror den Tick und damit ALLE Räume gleichzeitig ein.
 
 ---
 
@@ -115,8 +115,8 @@ Die Spielkarte ist **kein Code, sondern Daten** in `maps/default.json`. Das ist 
 
 - **Single Source of Truth.** Server lädt + validiert mit Pydantic beim Start.
 - **An den Client gespiegelt.** Server sendet die Map als Teil von `room_joined`. Client rendert daraus, hardcoded keine Räume oder Wände.
-- **Editor-fähig.** Phase-1-Editor (Tier 1.7) wird einfach JSON-Files erzeugen — das Game-Engine-Setup ändert sich nicht.
-- **Mod-fähig.** Später (Tier 5) sollen auch Tasks/Sabotagen/Rollen aus JSON kommen, sodass nicht-Devs Inhalte beitragen können.
+- **Editor-fähig.** Der Browser-Editor unter `/editor` erzeugt JSON-Files direkt im Map-Schema — das Game-Engine-Setup ändert sich nicht.
+- **Mod-fähig.** Roadmap-Plan: Tasks/Sabotagen/Rollen analog zu `maps/kinds.json` aus JSON laden, sodass Nicht-Devs Inhalte beitragen können.
 
 Aus den `wallLines` (axis-parallele Linien mit Tür-Cutouts) berechnet der Server zur Lade-Zeit konkrete Wand-Rechtecke für Kollisions-Checks. Der Client mirrored den gleichen Algorithmus für Rendering.
 
@@ -142,14 +142,14 @@ app/
     │   ├── tasks.py        TasksController — hold-E flow, per-tick progress,
     │   │                   rewards, personal-task allocation, coffee splash
     │   ├── sabotages.py    SabotagesController — trigger / repair / tick,
-    │   │                   Tier 2.7 object-binding
+    │   │                   object-binding (typed anchors)
     │   ├── meeting.py      MeetingController — emergency meetings, voting,
     │   │                   take-downs, body reports, context snapshot
     │   ├── mini_game.py    MiniGameController — start / input / complete /
     │   │                   cancel + pending-events queue
     │   └── movement.py     MovementController — per-tick step + collision,
     │                       coffee decay, current-speed-for, vent teleport
-    ├── bots/                AI-NPCs (Tier 3.9.2)
+    ├── bots/                AI-NPCs (heuristik + optional LLM)
     │   ├── manager.py      BotManager — lifecycle, tick, stuck-detection,
     │   │                   ThreadPoolExecutor for non-blocking LLM calls
     │   ├── pathfinding.py  Room-graph BFS via doors (no MapObject-awareness)
@@ -202,7 +202,7 @@ static/
 ├── sabotages.js            Bottom-right chaos buttons (color-coded, with cooldown)
 ├── meetings.js             Emergency-meeting button + voting overlay + result toast (lastWords)
 ├── endscreen.js            End-of-round overlay with role reveal + stats + AI postmortem
-├── role_intro.js           Role-Intro modal (Tier 3.5)
+├── role_intro.js           Role-Intro modal
 ├── kinds.js                Holt /api/kinds, Browser-Render-Metadaten pro Kind
 ├── takedown.js / report.js Force-Reboot + Body-Report buttons + interactions
 ├── menu.js                 Pause + role recap
@@ -226,7 +226,7 @@ static/
 
 Alle reagieren auf `game_state`-Updates, keine hat eigenen State außer dem letzten Snapshot.
 
-Daneben existiert der **Godot-3D-Client** unter `godot-3d/` (Tier 4) — gleiches WebSocket-Protokoll, GDScript statt JS, KayKit-3D-Assets statt Canvas-Rectangles. Beide Clients sind interchangeable; der Server kennt den Unterschied nicht.
+Daneben existiert der **Godot-3D-Client** unter `godot-3d/` — gleiches WebSocket-Protokoll, GDScript statt JS, KayKit-3D-Assets statt Canvas-Rectangles. Beide Clients sind interchangeable; der Server kennt den Unterschied nicht.
 
 ---
 
@@ -270,8 +270,8 @@ Siehe [`DEPLOY.md`](DEPLOY.md). Kurz: GitHub Actions baut Tarball, scp + ssh-res
 
 1. **MapObject-aware Pathfinder für Bots.** Aktueller Pathfinder kennt nur Räume + Türen. Bots können hinter blockierende Möbel laufen und stuck-detektion fängt das ab. Folge-Slice: A\* über ein Grid mit `compute_walls`-Output als Hindernissen.
 2. **Async LLM-Provider mit Prompt-Cache.** PR #38 bringt non-blocking via ThreadPool, aber jeder Call schickt den vollen System-Prompt unverwendet. Anthropic-Prompt-Caching wäre 1-Zeilen-Header.
-3. **JSON-Config für Tasks/Sabotagen/Rollen.** `kinds.json` ist erstes Beispiel. Tier 6: Tasks + Sabotagen + Rollen analog auslagern, macht Mod-Beiträge code-frei möglich.
-4. **Reconnect-Mechanismus** ist da (Tier 0.10): 30 s grace per Player nach Disconnect.
+3. **JSON-Config für Tasks/Sabotagen/Rollen.** `kinds.json` ist erstes Beispiel. Plan auf der Roadmap: Tasks + Sabotagen + Rollen analog auslagern, macht Mod-Beiträge code-frei möglich.
+4. **Reconnect-Mechanismus** ist live: 30 s grace per Player nach Disconnect.
 
 Detail siehe `docs/ROADMAP.md`.
 

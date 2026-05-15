@@ -22,15 +22,15 @@ laden.
   "taskAnchors":    [ ... ],
   "sabotagePanels": [ ... ],
   "vents":          [ ... ],
-  "mapObjects":     [ ... ],   // Tier 4 props (optional, defaults to [])
+  "mapObjects":     [ ... ],   // props with collision (optional, defaults to [])
   "warRoomId":      "war_room"
 }
 ```
 
 ## Rooms
 
-Each room is an axis-aligned rectangle. Optional Tier-4 / Godot fields
-let the 3D client pick floor materials, ceiling height, ambient lighting,
+Each room is an axis-aligned rectangle. Optional Godot/3D fields let
+the 3D client pick floor materials, ceiling height, ambient lighting,
 and per-room sound zones — the browser ignores them.
 
 ```jsonc
@@ -43,7 +43,7 @@ and per-room sound zones — the browser ignores them.
   "height": 800,
   "color": "#3a4560",
 
-  // Tier-4 / Godot extras (all optional, sensible defaults):
+  // Godot/3D extras (all optional, sensible defaults):
   "floorMaterial": "office", // office | kitchen | server | legacy
   "wallHeightM": 2.6,
   "lightingProfile": "neutral", // neutral | warm | cold | dim
@@ -121,7 +121,7 @@ via the `game_state` message.
 `warRoomId` references the room id where Emergency Meetings can be called from.
 The server derives the war-room AABB from the referenced room rectangle.
 
-## Map objects (Tier 4 — props with collision)
+## Map objects (props with collision)
 
 `mapObjects` is an optional list of axis-aligned props on the map: desks,
 server racks, kitchen counters, fridges, plants, decorative crates. Each
@@ -139,7 +139,7 @@ object has a center position, a bounding box (width × height), a logical
   "rotation": 0, // axis-aligned: 0 / 90 / 180 / 270 only
   "blocksMovement": true, // true (default) = added to wall collision
   "taskId": "fix_unit_tests", // optional — replaces standalone TaskAnchor
-  "objectType": "qa_terminal", // optional — Tier 2.7 sabotage trigger binding
+  "objectType": "qa_terminal", // optional — sabotage trigger binding
   "sabotageRepairId": "lights_out", // optional — replaces standalone SabotagePanel
 }
 ```
