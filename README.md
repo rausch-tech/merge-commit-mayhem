@@ -1,12 +1,24 @@
 # Merge Conflict Mayhem
 
-[![CI](https://github.com/rausch-tech/merge-commit-mayhem/actions/workflows/ci.yml/badge.svg)](https://github.com/rausch-tech/merge-commit-mayhem/actions/workflows/ci.yml)
+<p align="center">
+  <img src="images/cover.png" alt="Merge Conflict Mayhem — Lunch Break Edition" width="420">
+</p>
+
+<p align="center">
+  <a href="https://github.com/rausch-tech/merge-commit-mayhem/actions/workflows/ci.yml"><img src="https://github.com/rausch-tech/merge-commit-mayhem/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/rausch-tech/merge-commit-mayhem?color=blue" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/python-3.12-blue?logo=python&logoColor=white" alt="Python 3.12">
+  <img src="https://img.shields.io/badge/godot-4.6-478CBF?logo=godotengine&logoColor=white" alt="Godot 4.6">
+  <a href="https://prod-is-lava.dev"><img src="https://img.shields.io/badge/live-prod--is--lava.dev-success" alt="Live demo"></a>
+</p>
 
 Ein Among-Us-artiges Social-Deduction-Game für Tech-Teams. Statt Raumstation: ein Software-Büro mitten im Release. Statt Crewmates und Imposter: Release-Team und Chaos-Agenten. Mit der Mechanik-Klarheit von Among Us und der Insider-Komik eines Engineering-Teams in der Krise.
 
-**Status:** Spielbar als Browser-Client (live, auto-deployed) und als Godot-3D-Client (parallel in Tier 4). Beide gegen denselben FastAPI-Server. Siehe [`docs/ROADMAP.md`](docs/ROADMAP.md) für Stand und nächste Schritte.
+## Jetzt spielen
 
-**Live (Test-Server):** https://prod-is-lava.dev
+**Live (Test-Server):** **https://prod-is-lava.dev** — Browser-Client direkt unter `/`, Godot-3D-Web-Client unter `/godot/`. Beide gegen denselben FastAPI-Backend.
+
+Beide Clients sind feature-vollständig (8 Mini-Games, Sabotagen, Meeting+Voting, Among-Us-Mechaniken, AI-NPC-Bots). Live-Test-Sweep mit echten Spielern steht noch aus — siehe [`docs/ROADMAP.md`](docs/ROADMAP.md) für den aktuellen Stand.
 
 ## Schnellstart
 
@@ -32,13 +44,25 @@ Drei Browser-Tabs (oder echte Geräte im selben Netz) öffnen, je einen Namen + 
 ## Tests
 
 ```bash
-uv run pytest          # ~714 Backend-Tests
-npx vitest run         # ~109 Frontend-Tests
+uv run pytest          # 717 Backend-Tests, 92% coverage auf app/game/
+npx vitest run         # 109 Frontend-Tests
+scripts/godot-check.sh # 22 GDScript-Parse-Checks
 ```
+
+## Stack
+
+| Layer          | Tech                                                        |
+| -------------- | ----------------------------------------------------------- |
+| Backend        | Python 3.12, FastAPI, Pydantic v2, asyncio, WebSockets      |
+| Browser-Client | Vanilla JS + Canvas                                         |
+| 3D-Client      | Godot 4.6, GDScript, KayKit-Assets (CC0)                    |
+| Maps + Assets  | JSON + GLTF, alle als Daten im Repo                         |
+| AI-NPC-Bots    | Optional via Anthropic Claude API (heuristic-only fallback) |
+| Deploy         | EC2 (t4g.nano), Caddy, GitHub Actions                       |
 
 ## Architektur (kurz)
 
-- **Backend autoritativ:** Python + FastAPI + WebSockets. Server hält allen Spielzustand, rechnet Positionen, verteilt Rollen, prüft Win-Conditions.
+- **Backend autoritativ:** FastAPI + WebSockets. Server hält allen Spielzustand, rechnet Positionen, verteilt Rollen, prüft Win-Conditions.
 - **Browser-Client:** Vanilla JS + Canvas. Sendet Input-State, rendert empfangene Snapshots. Keine Spiellogik im Browser.
 - **Godot-3D-Client (`godot-3d/`):** Godot 4.6, gleicher WebSocket-Vertrag wie der Browser-Client. 3D-Render mit echten KayKit-Assets, holt Map + Kinds-Registry zur Laufzeit vom Backend.
 - **Map als Daten:** `maps/*.json` ist Single Source of Truth für Räume, Türen, Spawns, Task-Anker, Möbel. Vom Server validiert + an Client geschickt. `maps/kinds.json` ist die zentrale Registry für MapObject-Typen (Desk, Server-Rack, …) inklusive Asset-Pfade pro Client.
