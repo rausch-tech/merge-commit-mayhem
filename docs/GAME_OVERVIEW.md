@@ -1,8 +1,8 @@
 # Merge Conflict Mayhem — Game Overview
 
 Eine kompakte, vollständige Beschreibung des Spiels — gedacht zum Teilen mit
-Leuten, die noch keine Runde gespielt haben. Stand: **2026-04-28**, Tier 0–3.9.2
-auf Live deployt, parallel Godot-3D-Client (Tier 4) in aktiver Entwicklung.
+Leuten, die noch keine Runde gespielt haben. Stand: **2026-05-15**, beide
+Clients (Browser-2D + Godot-3D) sind feature-vollständig und auf Live deployt.
 
 **Live-Server:** https://prod-is-lava.dev
 **Repo:** https://github.com/rausch-tech/merge-commit-mayhem
@@ -347,7 +347,7 @@ Undo/Redo, Validation-Strip.
   WebSocket-Endpoint `/ws`. Authoritativ für **allen** State.
 - **Browser-Client:** Vanilla HTML/CSS/JS + `<canvas>`-Renderer. Keine
   Build-Pipeline, keine Frameworks. Spielbar auf Phone, Tablet, Desktop.
-- **Godot-3D-Client (Tier 4):** Godot 4.6 mit echten KayKit-Assets. Gleiches
+- **Godot-3D-Client:** Godot 4.6 mit echten KayKit-Assets. Gleiches
   WebSocket-Protokoll, fetcht Map + Kinds-Registry zur Laufzeit vom Backend
   (keine Drift). Web-Export läuft als CI-Gate.
 - **AI-Layer:** `LLMClient` Protocol + Anthropic Haiku oder lokales
@@ -365,7 +365,7 @@ geht sie zurück.
 
 ---
 
-## Aktueller Stand (2026-04-28)
+## Aktueller Stand (2026-05-15)
 
 **Was funktioniert auf Live:**
 
@@ -393,17 +393,18 @@ geht sie zurück.
 - **Vier Maps** wählbar (default, office_complex mit 390 Möbeln, datacenter,
   small-arena), kinds.json als Single Source of Truth
 - Metrik-Export (JSONL pro Tag) für Balancing, lesbar via `GET /api/metrics`
-- **Godot-3D-Client** parallel auf gleichem WS-Protokoll (Tier 4 in Arbeit)
+- **Godot-3D-Client** mit voller Feature-Parität (Lobby, Map-Render,
+  Char-Movement, Mini-Games, Sabotagen, Meeting/Voting, Endscreen,
+  Among-Us-Mechaniken, Auto-Reconnect, Polish) auf gleichem WS-Protokoll
 
-**Was offen ist:**
+**Was offen ist** (siehe [`ROADMAP.md`](ROADMAP.md) für Details):
 
-- **Tier 3.9.3** AI-Postmortem mit echtem LLM (statt Templates)
-- **Tier 3.9.4** AI-Game-Master / Live-Commentary
-- **Tier 3.9.5** AI-Meeting-Summary
-- **Tier 3.9.6** Chaos-Bots (Phase 2 — schwierig wegen Game-Sense)
-- **Tier 4.x** Godot-Client Feature-Parität (Persona-Layer, einzelne
-  Polish-Slices)
-- **Pathfinder MapObject-aware** für Bots (heute room+door-only)
+- AI-Erweiterungen: Live-Commentary, Meeting-Summary, smartere
+  Chaos-Bots, AI-Postmortem mit echtem LLM statt Templates
+- Pathfinder MapObject-aware für Bots (heute room+door-only)
+- Touch-Controls + BGM-Layer im Godot-Client
+- Tier 5: Skins, Awards, Account-System; Tier 6: Mod-Support;
+  Tier 7: Live-Service
 
 ---
 

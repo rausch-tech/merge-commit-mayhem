@@ -1,6 +1,6 @@
 # HOWTO: Ein neues Mini-Game hinzufügen
 
-Step-by-step für ein 6. Mini-Game (Tier 3 hat 5 Mechanik-Patterns: Sequencing, Pairing, Timing, Filter, Subset). Tier 3.7 hat noch drei offene Tasks (`review_pr`, `calm_legacy_service`, `write_release_notes`) ohne Mini-Game.
+Step-by-step für ein neues Mini-Game. Das Spiel hat aktuell 8 Mechanik-Patterns (Sequencing, Pairing, Timing, Filter, Subset, Stop-Timing, Rotating-Correction, Click-to-Cycle-Sort), jede der 8 Standard-Tasks ist mit einem Mini-Game verknüpft. Eine neue Task-Kategorie oder ein zusätzliches Pattern braucht das gleiche Six-Step-Setup unten.
 
 > **Architektur-Erinnerung:** Server hält den State, Plugin definiert die Regeln. Client zeigt nur was `public_view(state)` zurückgibt. Cheat-Resistance kommt daher, dass der Client den `state` nicht sieht.
 

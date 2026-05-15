@@ -111,7 +111,7 @@ Pre-commit-Hook (siehe Erst-Setup) macht das automatisch bei jedem `git commit`.
 | Prefix              | Wofür                                                                           |
 | ------------------- | ------------------------------------------------------------------------------- |
 | `slice/<kurztitel>` | Sprint-Schnitte aus der Roadmap (z.B. `slice/voting`, `slice/scrolling-camera`) |
-| `feat/<kurz>`       | Einzelnes Feature, kleiner als ein Tier-Item                                    |
+| `feat/<kurz>`       | Einzelnes Feature, kleiner als ein Roadmap-Slice                                |
 | `fix/<kurz>`        | Bugfix                                                                          |
 | `docs/<kurz>`       | Reine Doku-Änderung                                                             |
 | `chore/<kurz>`      | Tooling, CI, deps                                                               |
@@ -206,7 +206,7 @@ Common types: `feat`, `fix`, `docs`, `chore`, `test`, `refactor`, `style`, `perf
 
 1. `maps/<name>.json` nach Schema in `docs/maps.md`
 2. Validieren: `uv run python -c "from app.game.game_map import load_map; print(load_map('maps/<name>.json').name)"`
-3. (Aktuell wird nur `maps/default.json` geladen — Multi-Map kommt mit Tier 1.8)
+3. Map taucht automatisch im Lobby-Map-Dropdown auf (Editor unter `/editor` bietet auch eine GUI-basierte Variante)
 
 ### Neuen Test schreiben
 
